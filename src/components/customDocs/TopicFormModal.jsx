@@ -1,5 +1,7 @@
+// TẠO TOPIC CUSTOM
+
 import CustomModal from './CustomModal';
-import { languageFlags, languageLabels } from '../utils/language';
+import { languageFlags, languageLabels } from '../../utils/language';
 
 const supportedLanguages = ['en', 'ko', 'ja', 'zh', 'fr'];
 

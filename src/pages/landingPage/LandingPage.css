@@ -52,8 +52,10 @@
 }
 
 .lp-eyebrow-blue {
-    background: rgba(28, 176, 246, .12);
+    /* background: rgba(28, 176, 246, .12); */
+    background: rgba(255, 255, 255, 0.12);
     color: var(--blue);
+    border: 1px solid var(--border-color);
 }
 
 .lp-eyebrow-green {
@@ -73,6 +75,19 @@
     line-height: 1.15;
     margin-bottom: 14px;
     font-size: 54px;
+}
+
+.name-logo {
+    display: inline-block;
+    font-weight: 900;
+    background-image: radial-gradient(at 0% 0%, #7dd3fc 0%, transparent 50%),
+        radial-gradient(at 100% 0%, #1cb0f6 0%, transparent 50%),
+        radial-gradient(at 50% 100%, #b3e5fc 0%, transparent 50%),
+        linear-gradient(#1cb0f6, #1cb0f6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
 }
 
 .lp-subheading {

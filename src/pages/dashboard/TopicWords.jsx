@@ -3,10 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import { coursesData } from '../../data/coursesData';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
-import WordModal from '../../components/WordModal';
-import AIGenModal from '../../components/AIGenModal';
-import WordDetailOverlay from '../../components/WordDetailOverlay';
-import TopicPickerModal from '../../components/TopicPickerModal';
+import WordModal from '../../components/detailTopic/WordModal';
+import AIGenModal from '../../components/detailTopic/AIGenModal';
+import WordDetailOverlay from '../../components/detailTopic/WordDetailOverlay';
+import TopicPickerModal from '../../components/detailTopic/TopicPickerModal';
 import Flashcard from '../../components/Flashcard';
 import { recordFlashcardSessionProgress } from '../../utils/dashboardProgress';
 

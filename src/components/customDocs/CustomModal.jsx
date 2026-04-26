@@ -1,4 +1,4 @@
-import { useOverlayBehavior } from '../hooks/useOverlayBehavior';
+import { useOverlayBehavior } from '../../hooks/useOverlayBehavior';
 
 export default function CustomModal({ isOpen, onClose, title, children }) {
     useOverlayBehavior(isOpen, onClose);

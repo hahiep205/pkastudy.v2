@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import logo2 from '../assets/images/logo2.png';
-import aiImg from '../assets/images/ai.png';
-import { useAuth } from '../contexts/useAuth';
+import logo2 from '../../assets/images/logo2.png';
+import aiImg from '../../assets/images/ai.png';
+import { useAuth } from '../../contexts/useAuth';
 import {
     getDashboardUserKey,
     readDashboardProgress,
     subscribeDashboardProgress,
-} from '../utils/dashboardProgress';
+} from '../../utils/dashboardProgress';
 
 export default function Topbar({ onMenuClick }) {
     const { user } = useAuth();

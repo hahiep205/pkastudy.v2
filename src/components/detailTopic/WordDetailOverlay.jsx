@@ -1,5 +1,7 @@
-import { useOverlayBehavior } from '../hooks/useOverlayBehavior';
-import { languageFlags, languageLabels, languageVoiceMap } from '../utils/language';
+// CHI TIẾT VỀ WORD (KHI ẤN VÀO 1 WORD NÀO ĐẤY TRONG CÁI LIST WORD Ở TRONG MỘT TOPIC BẤT KỲ)
+
+import { useOverlayBehavior } from '../../hooks/useOverlayBehavior';
+import { languageFlags, languageLabels, languageVoiceMap } from '../../utils/language';
 
 export default function WordDetailOverlay({
     isOpen,

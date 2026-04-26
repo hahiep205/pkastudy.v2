@@ -10,7 +10,7 @@ import Overview from './pages/dashboard/Overview';
 import Settings from './pages/dashboard/Settings';
 import Stats from './pages/dashboard/Stats';
 import TopicWords from './pages/dashboard/TopicWords';
-import LandingPage from './pages/LandingPage';
+import LandingPage from './pages/landingPage/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { initializeTheme } from './utils/theme';

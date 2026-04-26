@@ -1,5 +1,7 @@
+// TẠO LIST TỪ VỰNG HÀNG LOẠI VỚI AI
+
 import { useState } from 'react';
-import CustomModal from './CustomModal';
+import CustomModal from '../customDocs/CustomModal';
 
 const AI_API_URL = 'https://platform.beeknoee.com/api/v1/chat/completions';
 const AI_BEARER = 'sk-bee-c3b440a14f7a434283c95709c96c5879';
@@ -598,8 +600,6 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                                     <option value="5">5 từ</option>
                                     <option value="10">10 từ</option>
                                     <option value="15">15 từ</option>
-                                    <option value="20">20 từ</option>
-                                    <option value="30">30 từ</option>
                                 </select>
                             </div>
                         </div>

@@ -232,9 +232,6 @@ export default function FloatChat() {
                 </div>
             </div>
 
-            {/* <button className="float-chat-btn" onClick={() => setIsOpen(!isOpen)}>
-                <img src={aiImg} alt="Chatbot Icon" className="float-chat-icon" />
-            </button> */}
         </div>
     );
 }

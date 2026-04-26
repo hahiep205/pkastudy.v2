@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import MobileNav from '../components/MobileNav';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import MobileNav from '../components/landingPage/MobileNav';
+import Sidebar from '../components/landingPage/Sidebar';
+import Topbar from '../components/landingPage/Topbar';
 import '../assets/css/dashboard.css';
 import '../assets/css/custom-courses.css';
 import '../assets/css/custom-pages.css';

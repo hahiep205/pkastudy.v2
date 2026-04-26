@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import logo2 from '../assets/images/logo2.png';
-import { useAuth } from '../contexts/useAuth';
+import logo2 from '../../assets/images/logo2.png';
+import { useAuth } from '../../contexts/useAuth';
 
 const getSidebarLinkClass = ({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`;
 

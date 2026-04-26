@@ -1,5 +1,7 @@
+// THÊM TỪ VỰNG THỦ CÔNG
+
 import { useState } from 'react';
-import CustomModal from './CustomModal';
+import CustomModal from '../customDocs/CustomModal';
 
 const WORD_TYPES = ['danh từ', 'động từ', 'tính từ', 'trạng từ', 'cụm từ', 'thành ngữ', 'khác'];
 

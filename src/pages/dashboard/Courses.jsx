@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import TopicFormModal from '../../components/TopicFormModal';
+import TopicFormModal from '../../components/customDocs/TopicFormModal';
 import { coursesData } from '../../data/coursesData';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
