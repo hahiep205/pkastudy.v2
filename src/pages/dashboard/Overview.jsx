@@ -302,8 +302,8 @@ export default function Overview() {
                     </div>
 
                     <div className="chart-legend">
-                        <span className="legend-dot" style={{ background: 'var(--blue)' }}></span> EXP thực nhận
-                        <span className="legend-dot" style={{ background: 'var(--green)', marginLeft: '16px' }}></span> Từ mới đã học
+                        <span className="legend-dot" style={{ background: 'var(--blue)' }}></span> Từ mới đã học
+                        <span className="legend-dot" style={{ background: 'var(--green)', marginLeft: '16px' }}></span> EXP thực nhận
                     </div>
                 </div>
 

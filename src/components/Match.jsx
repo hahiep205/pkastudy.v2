@@ -293,7 +293,7 @@ export default function Match({
                         { label: 'Số cặp đúng', value: `${matchedCount}/${totalPairs}` },
                         { label: 'Tỉ lệ', value: `${Math.round((matchedCount / totalPairs) * 100)}%` },
                     ]}
-                    title="Xác nhận lại danh sách từ đã thuộc sau Match"
+                    title="Xác nhận lại danh sách từ đã thuộc sau khi học Match"
                     words={board.pairs.map((pair) => pair.word)}
                     selectedWordIds={selectedWordIds}
                     onToggleWord={toggleSelectedWord}

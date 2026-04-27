@@ -262,7 +262,7 @@ export default function Typing({
                             <div className="typing-card-main">
                                 <div className="typing-topline-row">
                                     <span className="typing-topline">Typing</span>
-                                    <span className="typing-substat">Đã check {answeredCount}/{totalQuestions}</span>
+                                    <span className="typing-substat">Tiến độ: {answeredCount}/{totalQuestions}</span>
                                 </div>
 
                                 <div className="typing-prompt-card">
@@ -381,7 +381,7 @@ export default function Typing({
                         { label: 'Số câu đúng', value: `${correctCount}/${totalQuestions}` },
                         { label: 'Tỉ lệ', value: `${Math.round((correctCount / totalQuestions) * 100)}%` },
                     ]}
-                    title="Xác nhận lại danh sách từ đã thuộc sau Typing"
+                    title="Xác nhận lại danh sách từ đã thuộc sau khi học Typing"
                     words={words}
                     selectedWordIds={selectedWordIds}
                     onToggleWord={toggleSelectedWord}

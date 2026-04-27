@@ -26,6 +26,10 @@ export function shuffleArray(items = []) {
     return cloned;
 }
 
+export function buildFlashcardDeck(words = []) {
+    return shuffleArray(words);
+}
+
 function getChoiceText(word) {
     return word.mean?.trim() || word.word?.trim() || 'Chua co nghia';
 }
@@ -48,7 +52,7 @@ function getUniqueDistractors(currentWord, words, count = 3) {
 }
 
 export function buildQuizQuestions(words = []) {
-    return words.map((word) => {
+    return shuffleArray(words).map((word) => {
         const distractors = getUniqueDistractors(word, words, 3);
         const choices = shuffleArray([
             {
@@ -73,7 +77,7 @@ export function buildQuizQuestions(words = []) {
 }
 
 export function buildTypingQuestions(words = []) {
-    return words.map((word) => ({
+    return shuffleArray(words).map((word) => ({
         wordId: word.id,
         word,
     }));
@@ -159,8 +163,9 @@ export function getNextHintState(answer = '', revealedIndices = [], hintLevel = 
 }
 
 export function buildMatchBoard(words = [], limit = 20) {
-    const validPairs = words
-        .filter((word) => word?.id && word?.word && word?.mean)
+    const validPairs = shuffleArray(
+        words.filter((word) => word?.id && word?.word && word?.mean),
+    )
         .slice(0, limit)
         .map((word) => ({
             wordId: word.id,
@@ -181,3 +186,6 @@ export function buildMatchBoard(words = [], limit = 20) {
         }))),
     };
 }
+
+
+

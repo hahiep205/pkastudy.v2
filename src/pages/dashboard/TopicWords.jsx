@@ -70,6 +70,7 @@ export default function TopicWords() {
     const [selectedWord, setSelectedWord] = useState(null);
     const [pickerWord, setPickerWord] = useState(null);
     const [activeMode, setActiveMode] = useState(null);
+    const [learnUntilMastered, setLearnUntilMastered] = useState(false);
 
     const courseId = rawCourseId || 'custom';
     const isCustom = courseId === 'custom';
@@ -199,7 +200,19 @@ export default function TopicWords() {
             ) : (
                 <>
                     <section className="cv-modes-section">
-                        <h3 className="cv-section-title">Chọn cách học</h3>
+                        <div className="cv-modes-header">
+                            <h3 className="cv-section-title">Chọn cách học</h3>
+                            <label className="flashcard-action-switch cv-modes-learn-toggle" title={learnUntilMastered ? 'Đang bật học tới khi thuộc hết' : 'Đang tắt học tới khi thuộc hết'}>
+                                <span className="flashcard-action-switch-label">Học tới khi thuộc hết</span>
+                                <input
+                                    className="cv-switch-chk"
+                                    type="checkbox"
+                                    checked={learnUntilMastered}
+                                    onChange={() => setLearnUntilMastered((prev) => !prev)}
+                                />
+                                <span className="cv-switch-track"><span className="cv-switch-thumb"></span></span>
+                            </label>
+                        </div>
                         <div className="cv-modes-grid" id="cv-modes-grid">
                             {MODES.map(({ mode, icon, name, desc }) => (
                                 <button
@@ -396,3 +409,5 @@ export default function TopicWords() {
         </main>
     );
 }
+
+

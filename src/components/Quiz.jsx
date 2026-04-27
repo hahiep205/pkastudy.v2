@@ -236,7 +236,7 @@ export default function Quiz({
                                                 disabled={!!currentAnswer}
                                             >
                                                 <span className="quiz-choice-key">{index + 1}</span>
-                                                <span className="quiz-choice-copy">{choice.text}</span>
+                                                <span className="quiz-choice-copy" style={{ fontSize: '16px' }}>{choice.text}</span>
                                             </button>
                                         );
                                     })}
@@ -292,7 +292,7 @@ export default function Quiz({
                         { label: 'Số câu đúng', value: `${correctCount}/${totalQuestions}` },
                         { label: 'Tỉ lệ', value: `${Math.round((correctCount / totalQuestions) * 100)}%` },
                     ]}
-                    title="Xác nhận lại danh sách từ đã thuộc sau Quiz"
+                    title="Xác nhận lại danh sách từ đã thuộc sau khi học Quiz"
                     words={words}
                     selectedWordIds={selectedWordIds}
                     onToggleWord={toggleSelectedWord}

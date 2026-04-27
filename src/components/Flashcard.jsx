@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import StudyCompletionPanel from './studyModes/StudyCompletionPanel';
-import { getInitialRememberedSelection, getSpeechLang } from '../utils/studyModes';
+import { buildFlashcardDeck, getInitialRememberedSelection, getSpeechLang } from '../utils/studyModes';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
 
@@ -61,6 +61,7 @@ export default function Flashcard({
     onExit,
     onBackToTopic,
 }) {
+    const [sessionWords, setSessionWords] = useState(() => buildFlashcardDeck(words));
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [selectedWordIds, setSelectedWordIds] = useState(() => getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -69,6 +70,7 @@ export default function Flashcard({
     const sessionLockedRef = useRef(false);
 
     useEffect(() => {
+        setSessionWords(buildFlashcardDeck(words));
         setCurrentIndex(0);
         setIsFlipped(false);
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -94,8 +96,8 @@ export default function Flashcard({
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
-    const totalCards = words.length;
-    const currentWord = words[currentIndex];
+    const totalCards = sessionWords.length;
+    const currentWord = sessionWords[currentIndex];
     const isLastCard = currentIndex === totalCards - 1;
     const progressLabel = totalCards ? `${currentIndex + 1}/${totalCards}` : '0/0';
     const currentWordRemembered = currentWord ? selectedWordIds.includes(currentWord.id) : false;
@@ -136,6 +138,7 @@ export default function Flashcard({
     };
 
     const handlePlayAgain = () => {
+        setSessionWords(buildFlashcardDeck(words));
         setCurrentIndex(0);
         setIsFlipped(false);
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -164,7 +167,7 @@ export default function Flashcard({
         toggleFlip();
     };
 
-    if (!words.length) {
+    if (!sessionWords.length) {
         return (
             <section className="flashcard-shell">
                 <div className="flashcard-empty">
@@ -296,7 +299,7 @@ export default function Flashcard({
                 </>
             ) : (
                 <StudyCompletionPanel
-                    summary={<><strong>Tong ket:</strong> Bạn đã đánh dấu {selectedWordIds.length}/{totalCards} từ.</>}
+                    summary={<><strong>Tổng kết:</strong> Bạn đã đánh dấu {selectedWordIds.length}/{totalCards} từ.</>}
                     title="Chọn lại danh sách từ đã thuộc"
                     words={words}
                     selectedWordIds={selectedWordIds}
@@ -309,3 +312,7 @@ export default function Flashcard({
         </section>
     );
 }
+
+
+
+

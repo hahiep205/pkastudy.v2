@@ -281,7 +281,7 @@ export default function Listening({
                             <div className="listening-card-main">
                                 <div className="listening-topline-row">
                                     <span className="listening-topline">Listening</span>
-                                    <span className="listening-substat">Đã check {answeredCount}/{totalQuestions}</span>
+                                    <span className="listening-substat">Tiến độ: {answeredCount}/{totalQuestions}</span>
                                 </div>
 
                                 <div className="listening-prompt-card">
@@ -299,22 +299,24 @@ export default function Listening({
                                     >
                                         {SPEAKER_ICON} Nghe
                                     </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary listening-helper-btn"
-                                        onClick={handleHint}
-                                        disabled={currentAttempt.isChecked || remainingHints === 0}
-                                    >
-                                        Gợi ý ({remainingHints})
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary listening-helper-btn"
-                                        onClick={handleToggleExample}
-                                        disabled={currentAttempt.isChecked || currentAttempt.exampleViewCount >= MAX_EXAMPLE_VIEWS}
-                                    >
-                                        Xem ví dụ
-                                    </button>
+                                    <div class="helper-group">
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary listening-helper-btn"
+                                            onClick={handleHint}
+                                            disabled={currentAttempt.isChecked || remainingHints === 0}
+                                        >
+                                            Gợi ý ({remainingHints})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary listening-helper-btn"
+                                            onClick={handleToggleExample}
+                                            disabled={currentAttempt.isChecked || currentAttempt.exampleViewCount >= MAX_EXAMPLE_VIEWS}
+                                        >
+                                            Xem ví dụ
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="listening-answer-box">
@@ -347,7 +349,7 @@ export default function Listening({
                                 <div className="listening-support-grid">
                                     <div className="listening-support-card">
                                         <span className="listening-support-label">Gợi ý</span>
-                                        <div className="listening-hint-mask">{currentHintMask || 'Chưa dùng gợi ý'}</div>
+                                        <div className="listening-hint-mask">{currentHintMask || 'Nhấn "Gợi ý"'}</div>
                                     </div>
 
                                     <div className="listening-support-card">
