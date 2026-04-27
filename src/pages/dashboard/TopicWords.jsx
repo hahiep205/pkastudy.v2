@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { coursesData } from '../../data/coursesData';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
@@ -8,7 +8,12 @@ import AIGenModal from '../../components/detailTopic/AIGenModal';
 import WordDetailOverlay from '../../components/detailTopic/WordDetailOverlay';
 import TopicPickerModal from '../../components/detailTopic/TopicPickerModal';
 import Flashcard from '../../components/Flashcard';
+import Quiz from '../../components/Quiz';
+import Listening from '../../components/Listening';
+import Typing from '../../components/Typing';
+import Match from '../../components/Match';
 import { recordFlashcardSessionProgress } from '../../utils/dashboardProgress';
+import { getSpeechLang } from '../../utils/studyModes';
 
 const SVG_ICONS = {
     VOICE_SM: (
@@ -43,21 +48,15 @@ const SVG_ICONS = {
     ),
 };
 
-const LANG_VOICE_MAP = {
-    en: 'en-US',
-    ko: 'ko-KR',
-    ja: 'ja-JP',
-    zh: 'zh-CN',
-    fr: 'fr-FR',
-};
-
 const MODES = [
     { mode: 'flashcard', name: 'Flashcard', desc: 'Lật thẻ, nhớ từ nhanh' },
     { mode: 'quiz', name: 'Quiz', desc: '4 đáp án, chọn đúng' },
-    { mode: 'typing', name: 'Typing', desc: 'Gõ từ vựng chính xác' },
-    { mode: 'listen', name: 'Listening', desc: 'Luyện kỹ năng nghe' },
+    { mode: 'listen', name: 'Listening', desc: 'Nghe và điền lại từ' },
+    { mode: 'typing', name: 'Typing', desc: 'Nhìn nghĩa và gõ lại từ' },
     { mode: 'match', name: 'Match', desc: 'Nối từ với nghĩa đúng' },
 ];
+
+const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match']);
 
 export default function TopicWords() {
     const { courseId: rawCourseId, topicId } = useParams();
@@ -89,7 +88,7 @@ export default function TopicWords() {
         words = topic.words;
     } else {
         const course = coursesData[courseId];
-        if (!course) return <div>Khoa học không tồn tại</div>;
+        if (!course) return <div>Khóa học không tồn tại</div>;
         courseTitle = course.title;
         const topic = course.topics.find((item) => item.id === topicId);
         if (!topic) return <div>Chủ đề không tồn tại</div>;
@@ -120,16 +119,15 @@ export default function TopicWords() {
     const speakWord = (text, langStr) => {
         if (!window.speechSynthesis) return;
         window.speechSynthesis.cancel();
-        const langCode = LANG_VOICE_MAP[langStr] || 'en-US';
         const ut = new SpeechSynthesisUtterance(text);
-        ut.lang = langCode;
+        ut.lang = getSpeechLang(langStr, topicLang);
         ut.rate = 0.85;
         window.speechSynthesis.speak(ut);
     };
 
     const handleModeClick = (modeName) => {
-        if (modeName === 'flashcard') {
-            setActiveMode('flashcard');
+        if (IMMERSIVE_MODES.has(modeName)) {
+            setActiveMode(modeName);
             window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
@@ -144,12 +142,39 @@ export default function TopicWords() {
         }
     };
 
-    const handleSaveFlashcard = (selectedWordIds) => {
+    const saveRememberedWords = (selectedWordIds) => {
         replaceRememberedInTopic(words.map((word) => word.id), selectedWordIds);
+    };
+
+    const handleSaveFlashcard = (selectedWordIds) => {
+        saveRememberedWords(selectedWordIds);
         recordFlashcardSessionProgress();
     };
 
     const doneCount = words.filter((word) => remembered[word.id]).length;
+    const initialLearnedWordIds = words.filter((word) => remembered[word.id]).map((word) => word.id);
+
+    const studyModeProps = {
+        topicLang,
+        words,
+        initialLearnedWordIds,
+        onExit: () => setActiveMode(null),
+        onBackToTopic: () => setActiveMode(null),
+    };
+
+    let modeView = null;
+
+    if (activeMode === 'flashcard') {
+        modeView = <Flashcard {...studyModeProps} onSaveLearnedWords={handleSaveFlashcard} />;
+    } else if (activeMode === 'quiz') {
+        modeView = <Quiz {...studyModeProps} onSaveLearnedWords={saveRememberedWords} />;
+    } else if (activeMode === 'listen') {
+        modeView = <Listening {...studyModeProps} onSaveLearnedWords={saveRememberedWords} />;
+    } else if (activeMode === 'typing') {
+        modeView = <Typing {...studyModeProps} onSaveLearnedWords={saveRememberedWords} />;
+    } else if (activeMode === 'match') {
+        modeView = <Match {...studyModeProps} onSaveLearnedWords={saveRememberedWords} />;
+    }
 
     return (
         <main className={`dash-main cv-subview${isCustom ? ' cv-custom-mode' : ''}`} id="cv-words-view">
@@ -162,23 +187,15 @@ export default function TopicWords() {
                 <span className="cv-breadcrumb-current" id="cv-topic-title">{topicTitle}</span>
             </div>
 
-            {isCustom && activeMode !== 'flashcard' && (
+            {isCustom && !IMMERSIVE_MODES.has(activeMode) && (
                 <div id="cv-custom-toolbar" className="cv-custom-toolbar">
                     <button className="btn btn-primary btn-small" id="cv-add-word-btn" onClick={() => openWordModal(null)}>+ Thêm từ vựng</button>
-                    <button className="cv-btn-ai" id="cv-ai-gen-btn" onClick={() => setAIModalOpen(true)}>AI tạo từ hàng loạt</button>
+                    <button className="cv-btn-ai" id="cv-ai-gen-btn" onClick={() => setAIModalOpen(true)}>✨ AI tạo từ hàng loạt</button>
                 </div>
             )}
 
-            {activeMode === 'flashcard' ? (
-                <Flashcard
-                    topicName={topicTitle}
-                    topicLang={topicLang}
-                    words={words}
-                    initialLearnedWordIds={words.filter((word) => remembered[word.id]).map((word) => word.id)}
-                    onSaveLearnedWords={handleSaveFlashcard}
-                    onExit={() => setActiveMode(null)}
-                    onBackToTopic={() => setActiveMode(null)}
-                />
+            {modeView ? (
+                modeView
             ) : (
                 <>
                     <section className="cv-modes-section">
@@ -194,7 +211,7 @@ export default function TopicWords() {
                                     <div className="cv-mode-card-icon">{icon}</div>
                                     <div className="cv-mode-card-name">{name}</div>
                                     <div className="cv-mode-card-desc">{desc}</div>
-                                    {mode !== 'flashcard' ? <span className="cv-soon-badge">Sắp có</span> : null}
+                                    {!IMMERSIVE_MODES.has(mode) ? <span className="cv-soon-badge">Sắp có</span> : null}
                                 </button>
                             ))}
                         </div>
@@ -203,9 +220,9 @@ export default function TopicWords() {
                     <div id="cv-mode-area" className={activeMode ? '' : 'cv-hidden'}>
                         {activeMode && (
                             <div className="cv-coming-soon">
-                                <div className="cv-cs-icon">SOON</div>
+                                <div className="cv-cs-icon">Coming soon..</div>
                                 <h3>Đang phát triển</h3>
-                                <p>Chế độ <strong>{MODES.find((item) => item.mode === activeMode)?.name}</strong> sẽ sớm ra mắt.<br />Theo dõi các cập nhật của PKA Study nhé.</p>
+                                <p>Chế độ <strong>{MODES.find((item) => item.mode === activeMode)?.name}</strong> sẽ sớm ra mắt.<br />Theo dõi các cập nhật của pkastudy nhé.</p>
                             </div>
                         )}
                     </div>
@@ -249,7 +266,7 @@ export default function TopicWords() {
                                                     <span className="cv-row-chevron" aria-hidden="true">{SVG_ICONS.CHEVRON}</span>
                                                 </div>
                                                 <div className="cv-mobile-sub">
-                                                    <button className="cv-voice-btn" title="Nghe phát âm" onClick={(event) => { event.stopPropagation(); speakWord(w.word, w.language || topicLang); }}>
+                                                    <button className="cv-voice-btn" title="Nghe phat am" onClick={(event) => { event.stopPropagation(); speakWord(w.word, w.language || topicLang); }}>
                                                         {SVG_ICONS.VOICE_SM}
                                                     </button>
                                                     <span className="cv-trans">{w.transcription || ''}</span>
@@ -299,10 +316,10 @@ export default function TopicWords() {
                                                             />
                                                             <span className="cv-switch-track"><span className="cv-switch-thumb"></span></span>
                                                         </label>
-                                                        <button className="cv-action-btn cv-action-edit" title="Sua tu" onClick={(event) => { event.stopPropagation(); openWordModal(w); }}>
+                                                        <button className="cv-action-btn cv-action-edit" title="Sửa từ" onClick={(event) => { event.stopPropagation(); openWordModal(w); }}>
                                                             {SVG_ICONS.EDIT}
                                                         </button>
-                                                        <button className="cv-action-btn cv-action-delete" title="Xoa tu" onClick={(event) => {
+                                                        <button className="cv-action-btn cv-action-delete" title="Xóa từ" onClick={(event) => {
                                                             event.stopPropagation();
                                                             if (window.confirm(`Xóa từ \"${w.word}\"?`)) deleteWordFromTopic(topicId, w.id);
                                                         }}>
@@ -318,7 +335,7 @@ export default function TopicWords() {
 
                             <div id="cv-empty-words" className={`cv-words-empty${words.length > 0 ? ' cv-hidden' : ''}`}>
                                 <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>EMPTY</div>
-                                <p>Chưa có từ vựng nào.<br />Hãy thêm từ thủ công hoặc dùng AI tạo từ hàng loạt.</p>
+                                <p>Chưa có từ vựng nào.<br />Hãy thêm từ thủ công hoặc dùng AI tạo từ hàng lọat.</p>
                             </div>
                         </div>
                     </section>
@@ -356,7 +373,7 @@ export default function TopicWords() {
                     if (word.mean) parts.push(`- nghĩa: \"${word.mean}\"`);
                     if (word.wordtype) parts.push(`- loại từ: ${word.wordtype}`);
                     if (word.example) parts.push(`- ví dụ: \"${word.example}\"`);
-                    parts.push('. Bao gồm: cách dùng chi tiết, các nghĩa khác (nếu có), thêm ví dụ thực tế, từ đồng nghĩa/trái nghĩa, và mẹo ghi nhớ.');
+                    parts.push('. Bao gồm: cách dùng chi tiết, các nghĩa khác (nếu có), thêm ví dụ thực tế, tự đồng nghĩa/trái nghĩa, và mẹo ghi nhớ.');
                     window.dispatchEvent(new CustomEvent('pkaAskAI', { detail: { message: parts.join(' ') } }));
                 }}
             />

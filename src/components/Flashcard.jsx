@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
+import StudyCompletionPanel from './studyModes/StudyCompletionPanel';
+import { getInitialRememberedSelection, getSpeechLang } from '../utils/studyModes';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
 
-const SPEECH_LANG_MAP = {
-    en: 'en-US',
-    ko: 'ko-KR',
-    ja: 'ja-JP',
-    zh: 'zh-CN',
-    fr: 'fr-FR',
+const LANGUAGE_LABELS = {
+    en: 'Tiếng Anh',
+    ko: 'Tiếng Hàn',
+    ja: 'Tiếng Nhật',
+    zh: 'Tiếng Trung',
+    fr: 'Tiếng Nhấp',
 };
 
 const ARROW_LEFT_ICON = (
@@ -30,7 +32,6 @@ const SPEAKER_ICON = (
     </svg>
 );
 
-
 const FLASHCARD_GRADIENTS = [
     { front: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', back: 'linear-gradient(135deg, #2dd4bf 0%, #3b82f6 100%)' },
     { front: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)', back: 'linear-gradient(135deg, #3b82f6 0%, #34d399 100%)' },
@@ -52,10 +53,6 @@ function getCardTheme(word, index) {
     return FLASHCARD_GRADIENTS[hash % FLASHCARD_GRADIENTS.length];
 }
 
-function getInitialSelection() {
-    return [];
-}
-
 export default function Flashcard({
     topicLang = 'en',
     words,
@@ -66,7 +63,7 @@ export default function Flashcard({
 }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
-    const [selectedWordIds, setSelectedWordIds] = useState(() => getInitialSelection(words, initialLearnedWordIds));
+    const [selectedWordIds, setSelectedWordIds] = useState(() => getInitialRememberedSelection(words, initialLearnedWordIds));
     const [isCompleted, setIsCompleted] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const sessionLockedRef = useRef(false);
@@ -74,7 +71,7 @@ export default function Flashcard({
     useEffect(() => {
         setCurrentIndex(0);
         setIsFlipped(false);
-        setSelectedWordIds(getInitialSelection(words, initialLearnedWordIds));
+        setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
         setIsCompleted(false);
         setIsSaved(false);
         sessionLockedRef.current = false;
@@ -103,6 +100,7 @@ export default function Flashcard({
     const progressLabel = totalCards ? `${currentIndex + 1}/${totalCards}` : '0/0';
     const currentWordRemembered = currentWord ? selectedWordIds.includes(currentWord.id) : false;
     const currentTheme = getCardTheme(currentWord, currentIndex);
+    const languageLabel = LANGUAGE_LABELS[currentWord?.language || topicLang] || 'Từ vựng';
 
     const toggleSelectedWord = (wordId) => {
         setSelectedWordIds((prev) => (
@@ -140,7 +138,7 @@ export default function Flashcard({
     const handlePlayAgain = () => {
         setCurrentIndex(0);
         setIsFlipped(false);
-        setSelectedWordIds(getInitialSelection(words, selectedWordIds));
+        setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
         setIsCompleted(false);
         setIsSaved(false);
         sessionLockedRef.current = false;
@@ -151,7 +149,7 @@ export default function Flashcard({
         if (!currentWord || !window.speechSynthesis) return;
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(currentWord.word);
-        utterance.lang = SPEECH_LANG_MAP[currentWord.language || topicLang] || 'en-US';
+        utterance.lang = getSpeechLang(currentWord.language, topicLang);
         utterance.rate = 0.9;
         window.speechSynthesis.speak(utterance);
     };
@@ -166,13 +164,12 @@ export default function Flashcard({
         toggleFlip();
     };
 
-
     if (!words.length) {
         return (
             <section className="flashcard-shell">
                 <div className="flashcard-empty">
                     <h3>Topic này chưa có từ vựng</h3>
-                    <p>Hay thêm từ vựng trước khi bắt đầu flashcard.</p>
+                    <p>Hãy thêm từ vựng trước khi bắt đầu flashcard.</p>
                     <button type="button" className="btn btn-secondary" onClick={onBackToTopic}>
                         Quay lại
                     </button>
@@ -181,25 +178,11 @@ export default function Flashcard({
         );
     }
 
-    let tuTieng = '';
-
-    if (currentWord.language === 'en') {
-        tuTieng = 'Tiếng Anh';
-    } else if (currentWord.language === 'ko') {
-        tuTieng = 'Tiếng Hàn';
-    } else if (currentWord.language === 'ja') {
-        tuTieng = 'Tiếng Nhật';
-    } else if (currentWord.language === 'zh') {
-        tuTieng = 'Tiếng Trung';
-    } else if (currentWord.language === 'fr') {
-        tuTieng = 'Tiếng Pháp';
-    }
-
     return (
         <section className="flashcard-shell">
             <div className="flashcard-header-meta">
                 <div className="flashcard-progress">
-                    <span>Tiến độ: </span>
+                    <span>Tiến độ:</span>
                     <strong>{isCompleted ? `${totalCards}/${totalCards}` : progressLabel}</strong>
                 </div>
                 <div className="flashcard-header-actions">
@@ -225,20 +208,20 @@ export default function Flashcard({
                                 onKeyDown={handleCardKeyDown}
                             >
                                 <div className="flashcard-face flashcard-face-front" style={{ background: currentTheme.front }}>
-                                    <div className="flashcard-face-topline">Từ {tuTieng}</div>
+                                    <div className="flashcard-face-topline">Từ {languageLabel}</div>
                                     <div className="flashcard-face-center">
                                         <strong className="flashcard-word">{currentWord.word}</strong>
                                         <span className="flashcard-wordtype flashcard-wordtype-front">{currentWord.wordtype || 'VOCABULARY'}</span>
                                         <span className="flashcard-transcription">{currentWord.transcription || '/dang-cap-nhat/'}</span>
                                     </div>
-                                    <div className="flashcard-face-hint" style={{ margin: '10px 0 0' }}>Nhấn Space hoặc click để lật lại</div>
+                                    <div className="flashcard-face-hint" style={{ margin: '10px 0 0' }}>Nhấn space hoặc click để lật lại</div>
                                 </div>
 
                                 <div className="flashcard-face flashcard-face-back" style={{ background: currentTheme.back }}>
                                     <div className="flashcard-back-layout">
-                                        <div className="flashcard-face-topline">Nghĩa tiếng việt</div>
+                                        <div className="flashcard-face-topline">Nghĩa tiếng Việt</div>
                                         <div className="flashcard-back-center">
-                                            <strong className="flashcard-meaning flashcard-meaning-hero">{currentWord.mean || 'Chua co nghia'}</strong>
+                                            <strong className="flashcard-meaning flashcard-meaning-hero">{currentWord.mean || 'Chưa có nghĩa'}</strong>
                                             <div className="flashcard-detail-row flashcard-audio-row">
                                                 <div className="flashcard-example-pill-copy">
                                                     <span className="flashcard-field-label">Phiên âm</span>
@@ -259,13 +242,13 @@ export default function Flashcard({
                                             <div className="flashcard-example-pill">
                                                 <div className="flashcard-example-pill-copy">
                                                     <span className="flashcard-field-label">Ví dụ</span>
-                                                    <span className="flashcard-example flashcard-example-main">{currentWord.example || 'Chua co vi du tieng Anh'}</span>
-                                                    <span className="flashcard-example flashcard-example-vi">{currentWord.example_vi || 'Chua co vi du tieng Viet'}</span>
+                                                    <span className="flashcard-example flashcard-example-main">{currentWord.example || 'Chưa có ví dụ tiếng Anh'}</span>
+                                                    <span className="flashcard-example flashcard-example-vi">{currentWord.example_vi || 'Chưa có ví dụ tiếng Việt'}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flashcard-face-hint flashcard-face-hint-back">
-                                            Nhấn Space hoặc click để lật lại
+                                            Nhấn space hoặc click để lật lại
                                         </div>
                                     </div>
                                 </div>
@@ -312,60 +295,17 @@ export default function Flashcard({
                     </div>
                 </>
             ) : (
-                <div className="flashcard-completion">
-                    <div className="flashcard-completion-head">
-                        <div className="flashcard-completion-head-main">
-                            <div className="flashcard-completion-head-topline">
-                                <div className="flashcard-summary-pill flashcard-summary-pill-merged">
-                                    <span><strong>Tổng kết:</strong> Bạn đã đánh dấu {selectedWordIds.length}/{totalCards} từ.</span>
-                                </div>
-                            </div>
-                            <h3>Chọn lại danh sách từ đã thuộc</h3>
-                        </div>
-                    </div>
-
-                    <div className="flashcard-checklist">
-                        {words.map((word) => {
-                            const checked = selectedWordIds.includes(word.id);
-                            return (
-                                <label key={word.id} className={`flashcard-check-row${checked ? ' is-checked' : ''}`}>
-                                    <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={() => toggleSelectedWord(word.id)}
-                                    />
-                                    <span className="flashcard-check-main">
-                                        <strong>{word.word}</strong>
-                                        <span>{word.mean || 'Chua co nghia'}</span>
-                                    </span>
-                                </label>
-                            );
-                        })}
-                    </div>
-
-                    <div className="flashcard-completion-actions">
-                        {!isSaved ? (
-                            <>
-                                <button type="button" className="btn btn-secondary" onClick={handlePlayAgain}>
-                                    Học lại
-                                </button>
-                                <button type="button" className="btn btn-primary" onClick={handleSave}>
-                                    Hoàn thành
-                                </button>
-                            </>
-                        ) : null}
-                    </div>
-                </div>
+                <StudyCompletionPanel
+                    summary={<><strong>Tong ket:</strong> Bạn đã đánh dấu {selectedWordIds.length}/{totalCards} từ.</>}
+                    title="Chọn lại danh sách từ đã thuộc"
+                    words={words}
+                    selectedWordIds={selectedWordIds}
+                    onToggleWord={toggleSelectedWord}
+                    onPlayAgain={handlePlayAgain}
+                    onSave={handleSave}
+                    isSaved={isSaved}
+                />
             )}
         </section>
     );
 }
-
-
-
-
-
-
-
-
-
