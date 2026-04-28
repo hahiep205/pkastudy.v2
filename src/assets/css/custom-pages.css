@@ -3909,6 +3909,10 @@ body.app-dark-mode .flappy-resume-overlay span {
 }
 
 @media (max-width: 640px) {
+    .flappy-setup-shell {
+        padding-bottom: 70px;
+    }
+
     .flappy-heart {
         width: 17px;
         height: 17px;

@@ -479,7 +479,7 @@ function GameOverModal({ isOpen, score, hearts, answered, correct, wrong, reason
 function SetupPanel({ langOptions, selectedLang, onPickLang, selectedBird, onPickBird, onStart, onBackGallery }) {
     return (
         <section className="flappy-setup-shell">
-            <div className="flappy-setup-panel" style={{ marginBottom: "75px" }}>
+            <div className="flappy-setup-panel">
                 <div className="flappy-setup-header">
                     <div>
                         <div className="flappy-setup-eyebrow">Bắt đầu luyện tập</div>

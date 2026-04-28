@@ -952,6 +952,22 @@ body.app-dark-mode .cv-modal-box {
     color: var(--dark-blue);
 }
 
+.cv-modal-title-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cv-modal-title-with-icon svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: var(--blue);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+}
+
 body.app-dark-mode .cv-topic-picker-box .cv-modal-header,
 body.app-dark-mode .cv-topic-picker-box .cv-modal-footer,
 body.app-dark-mode .cv-modal-box .cv-modal-header,

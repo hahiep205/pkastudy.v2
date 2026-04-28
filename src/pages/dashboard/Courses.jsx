@@ -111,17 +111,14 @@ export default function Courses() {
                 <div className="lang-tabs">
                     <button className={`lang-tab-btn ${activeLang === 'english' ? 'active' : ''}`} onClick={() => setActiveLang('english')}>
                         <span className="lang-tab-name">Tiếng Anh</span>
-                        <span className="lang-tab-count">1 bộ tài liệu</span>
                     </button>
 
                     <button className={`lang-tab-btn ${activeLang === 'korean' ? 'active' : ''}`} onClick={() => setActiveLang('korean')}>
                         <span className="lang-tab-name">Tiếng Hàn</span>
-                        <span className="lang-tab-count">1 bộ tài liệu</span>
                     </button>
 
                     <button className={`lang-tab-btn ${activeLang === 'custom' ? 'active' : ''}`} onClick={() => setActiveLang('custom')}>
                         <span className="lang-tab-name">Cá nhân</span>
-                        <span className="lang-tab-count">{customCourses.length} chủ đề</span>
                     </button>
                 </div>
             </div>
@@ -133,7 +130,6 @@ export default function Courses() {
                             <div className="card-eyebrow">Tiếng Anh</div>
                             <h2 className="card-title-text">Tài liệu học tập</h2>
                         </div>
-                        <span className="badge badge-progress">1 bộ tài liệu</span>
                     </div>
 
                     <div className="doc-list">
@@ -177,7 +173,6 @@ export default function Courses() {
                             <div className="card-eyebrow">Tiếng Hàn</div>
                             <h2 className="card-title-text">Tài liệu học tập</h2>
                         </div>
-                        <span className="badge badge-review">1 bộ tài liệu</span>
                     </div>
 
                     <div className="doc-list">
