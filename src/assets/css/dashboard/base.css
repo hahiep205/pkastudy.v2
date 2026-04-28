@@ -273,6 +273,9 @@ button {
 }
 
 .btn-secondary.btn-small {
+    min-width: 0;
+    width: auto;
+    padding: 0 12px;
     box-shadow: 0 3px 0 var(--border-color);
 }
 

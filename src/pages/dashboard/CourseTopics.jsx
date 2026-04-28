@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import TopicFormModal from '../../components/customDocs/TopicFormModal';
 import { coursesData } from '../../data/coursesData';
@@ -13,6 +14,8 @@ export default function CourseTopics() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingTopic, setEditingTopic] = useState(null);
     const [topicForm, setTopicForm] = useState({ title: '', description: '', lang: 'en' });
+    const [toastMessage, setToastMessage] = useState('');
+    const [pendingDeleteTopic, setPendingDeleteTopic] = useState(null);
 
     const openTopicModal = (topicId = null) => {
         if (topicId) {
@@ -33,7 +36,7 @@ export default function CourseTopics() {
 
     const handleSaveTopic = () => {
         if (!topicForm.title.trim()) {
-            alert('Vui lòng nhập tên chủ đề');
+            setToastMessage('Vui lòng nhập tên chủ đề');
             return;
         }
 
@@ -44,14 +47,13 @@ export default function CourseTopics() {
         }
 
         setModalOpen(false);
+        setToastMessage('');
     };
 
-    const handleDeleteTopic = (event, topicId) => {
-        event.stopPropagation();
-
-        if (window.confirm('Hành động này sẽ xóa toàn bộ từ vựng trong chủ đề và không thể hoàn tác. Tiếp tục?')) {
-            deleteTopic(topicId);
-        }
+    const handleDeleteTopic = (topicId) => {
+        deleteTopic(topicId);
+        setPendingDeleteTopic(null);
+        setToastMessage('Đã xóa chủ đề');
     };
 
     let title = '';
@@ -154,7 +156,10 @@ export default function CourseTopics() {
                                             className="cv-icon-btn cv-cc-delete"
                                             title="Xóa chủ đề"
                                             style={{ '--icon-color': 'var(--red)' }}
-                                            onClick={(event) => handleDeleteTopic(event, topic.id)}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setPendingDeleteTopic(topic);
+                                            }}
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                                                 <path d="M17 6H22V8H20V21C20 21.5523 19.5523 22 19 22H5C4.44772 22 4 21.5523 4 21V8H2V6H7V3C7 2.44772 7.44772 2 8 2H16C16.5523 2 17 2.44772 17 3V6ZM18 8H6V20H18V8ZM9 11H11V17H9V11ZM13 11H15V17H13V11ZM9 4V6H15V4H9Z" />
@@ -182,11 +187,24 @@ export default function CourseTopics() {
 
             <TopicFormModal
                 isOpen={modalOpen}
-                onClose={() => setModalOpen(false)}
+                onClose={() => {
+                    setModalOpen(false);
+                    setToastMessage('');
+                }}
                 onSave={handleSaveTopic}
                 topicForm={topicForm}
                 setTopicForm={setTopicForm}
                 editingTopic={editingTopic}
+                toastMessage={toastMessage}
+                onToastHide={() => setToastMessage('')}
+            />
+            <ConfirmActionModal
+                isOpen={Boolean(pendingDeleteTopic)}
+                onClose={() => setPendingDeleteTopic(null)}
+                onConfirm={() => handleDeleteTopic(pendingDeleteTopic.id)}
+                title="Xác nhận xóa chủ đề"
+                message={pendingDeleteTopic ? `Bạn có chắc muốn xóa chủ đề "${pendingDeleteTopic.title}" không?` : ''}
+                confirmLabel="Xóa chủ đề"
             />
         </main>
     );

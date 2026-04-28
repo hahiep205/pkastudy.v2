@@ -2562,3 +2562,1655 @@ body.app-dark-mode .settings2-role-card small {
         padding: 20px 16px 24px;
     }
 }
+
+/* ══════════════════════════════════════════════
+   PAGE GAMES
+══════════════════════════════════════════════ */
+
+.games-page {
+    padding: 28px 30px 56px;
+    height: calc(100dvh - var(--games-dashboard-topbar-h, 0px) - var(--games-mobile-nav-h, 0px));
+    min-height: calc(100dvh - var(--games-dashboard-topbar-h, 0px) - var(--games-mobile-nav-h, 0px));
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    box-sizing: border-box;
+}
+
+.games-hub,
+.flappy-setup-shell,
+.flappy-play-shell {
+    animation: fadeInUp .35s ease both;
+    flex: 1;
+    min-height: 0;
+}
+
+/* .games-hub,
+.flappy-setup-shell {
+    overflow: auto;
+} */
+
+.games-page.is-game-active {
+    overflow: hidden;
+}
+
+.games-page.is-game-active .flappy-play-shell {
+    height: 100%;
+    /* overflow: hidden; */
+}
+
+.games-page.is-game-active .flappy-game-topbar {
+    flex: 0 0 auto;
+}
+
+.games-page.is-game-active .flappy-game-shell,
+.games-page.is-game-active .flappy-board {
+    flex: 1;
+    min-height: 0;
+}
+
+.games-page.is-game-active .flappy-game-shell {
+    width: 76%;
+    margin: 0 auto;
+}
+
+.games-page.is-game-active .flappy-scene {
+    height: 100%;
+    min-height: 0;
+    aspect-ratio: auto;
+}
+
+.games-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+    padding: 28px 30px;
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top right, rgba(28, 176, 246, .18), transparent 28%),
+        linear-gradient(135deg, #ffffff 0%, #eef8ff 100%);
+    border: 2px solid rgba(28, 176, 246, .16);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, .08);
+}
+
+.games-eyebrow {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--blue);
+    margin-bottom: 8px;
+}
+
+.games-hero h1 {
+    margin: 0;
+    font-size: 34px;
+    line-height: 1.1;
+    color: var(--dark-blue);
+}
+
+.games-hero p {
+    margin: 14px 0 0;
+    max-width: 680px;
+    color: var(--gray-text);
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 340px));
+    gap: 18px;
+}
+
+.game-card-image-button {
+    display: block;
+    width: min(100%, 520px);
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, .14);
+    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+.game-card-image-button:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 32px 60px rgba(15, 23, 42, .18);
+    filter: saturate(1.02);
+}
+
+.game-card-image-button:active {
+    transform: translateY(-1px) scale(.992);
+}
+
+.game-card-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 28px;
+}
+
+.game-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 22px;
+    border-radius: 28px;
+    border: 2px solid rgba(28, 176, 246, .14);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(243, 249, 255, .98));
+    box-shadow: 0 20px 40px rgba(15, 23, 42, .08);
+    cursor: pointer;
+    text-align: left;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.game-card-flappy {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at top right, rgba(255, 196, 77, .24), transparent 30%),
+        linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(234, 247, 255, .98));
+}
+
+.game-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 28px 54px rgba(15, 23, 42, .12);
+    border-color: rgba(28, 176, 246, .28);
+}
+
+.game-card-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1cb0f6 0%, #0f83c4 100%);
+    color: #fff;
+    box-shadow: 0 12px 24px rgba(28, 176, 246, .25);
+}
+
+.game-card-icon svg {
+    width: 34px;
+    height: 34px;
+}
+
+.game-card-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.game-card-eyebrow {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--blue);
+}
+
+.game-card-copy strong {
+    font-size: 24px;
+    color: var(--dark-blue);
+    line-height: 1.1;
+}
+
+.game-card-copy p {
+    margin: 0;
+    color: var(--gray-text);
+    line-height: 1.7;
+    font-size: 14px;
+}
+
+.game-card-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 999px;
+    background: rgba(28, 176, 246, .1);
+    color: var(--blue);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.flappy-setup-panel,
+.flappy-empty-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-height: 0;
+    padding: 28px;
+    border-radius: 30px;
+    background:
+        radial-gradient(circle at top right, rgba(255, 196, 77, .18), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(247, 251, 255, .98));
+    border: 2px solid rgba(28, 176, 246, .14);
+    box-shadow: 0 26px 52px rgba(15, 23, 42, .08);
+}
+
+.flappy-empty-panel {
+    align-items: flex-start;
+}
+
+.flappy-empty-panel h2,
+.flappy-setup-header h2 {
+    margin: 0;
+    color: var(--dark-blue);
+}
+
+.flappy-empty-panel p,
+.flappy-setup-header p {
+    margin: 10px 0 0;
+    color: var(--gray-text);
+    line-height: 1.7;
+}
+
+.flappy-setup-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+}
+
+.flappy-setup-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.flappy-setup-eyebrow {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--orange);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 8px;
+}
+
+.flappy-lang-grid,
+.flappy-topic-grid,
+.flappy-choice-grid,
+.flappy-result-grid {
+    display: grid;
+    gap: 14px;
+}
+
+.flappy-lang-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.flappy-topic-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.flappy-topic-grid-modal {
+    max-height: min(52dvh, 520px);
+    padding-right: 6px;
+}
+
+.flappy-lang-card,
+.flappy-topic-card {
+    text-align: left;
+    cursor: pointer;
+    border: 2px solid var(--border-color);
+    background: #fff;
+    transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.flappy-lang-card {
+    padding: 18px 16px;
+    border-radius: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.flappy-lang-card span:first-child {
+    font-size: 26px;
+}
+
+.flappy-lang-card strong,
+.flappy-topic-card strong {
+    color: var(--dark-blue);
+}
+
+.flappy-lang-card small,
+.flappy-topic-meta {
+    color: var(--gray-light);
+}
+
+.flappy-topic-card {
+    padding: 18px;
+    border-radius: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.flappy-lang-card:hover,
+.flappy-topic-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(28, 176, 246, .28);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, .08);
+}
+
+.flappy-lang-card.is-active,
+.flappy-topic-card.is-active {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 4px rgba(28, 176, 246, .12);
+}
+
+.flappy-topic-head,
+.flappy-topic-meta,
+.flappy-setup-footer,
+.flappy-game-topbar,
+.flappy-game-shell,
+.flappy-hud {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.flappy-topic-card p {
+    margin: 0;
+    color: var(--gray-text);
+    line-height: 1.65;
+    font-size: 14px;
+}
+
+.flappy-topic-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.flappy-topic-badge.is-custom {
+    color: var(--green);
+    background: rgba(88, 204, 2, .12);
+}
+
+.flappy-topic-badge.is-built-in {
+    color: var(--blue);
+    background: rgba(28, 176, 246, .12);
+}
+
+.flappy-setup-footer {
+    padding-top: 6px;
+}
+
+.flappy-selected-topic-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, .82);
+    border: 1px solid rgba(28, 176, 246, .14);
+}
+
+.flappy-selected-topic-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.flappy-selected-topic-label {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--orange);
+}
+
+.flappy-selected-topic-copy strong {
+    color: var(--dark-blue);
+    font-size: 18px;
+}
+
+.flappy-selected-topic-copy p {
+    margin: 0;
+    color: var(--gray-text);
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.flappy-bird-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    width: min(100%, 320px);
+}
+
+.flappy-bird-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 10px;
+    border-radius: 18px;
+    border: 1px solid rgba(28, 176, 246, .14);
+    background: rgba(240, 249, 255, .85);
+    cursor: pointer;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.flappy-bird-option:hover {
+    transform: translateY(-1px);
+    border-color: rgba(28, 176, 246, .28);
+    box-shadow: 0 14px 24px rgba(28, 176, 246, .12);
+}
+
+.flappy-bird-option.is-active {
+    border-color: rgba(245, 158, 11, .45);
+    background: rgba(255, 247, 237, .95);
+    box-shadow: 0 16px 30px rgba(245, 158, 11, .18);
+}
+
+.flappy-bird-option span {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--dark-blue);
+}
+
+.flappy-bird-option-image {
+    width: 52px;
+    height: 52px;
+    display: block;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.flappy-play-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 0;
+}
+
+.flappy-game-topbar {
+    padding: 18px 20px;
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at right top, rgba(255, 196, 77, .18), transparent 28%),
+        rgba(255, 255, 255, .94);
+    border: 2px solid rgba(28, 176, 246, .12);
+    box-shadow: var(--shadow-card);
+}
+
+.flappy-game-context {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.flappy-game-context-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.flappy-game-kicker {
+    color: var(--orange);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.flappy-game-context strong {
+    color: var(--dark-blue);
+    font-size: 22px;
+}
+
+.flappy-game-context-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.flappy-game-context-meta span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(28, 176, 246, .08);
+    font-size: 13px;
+    color: var(--gray-light);
+}
+
+.flappy-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.flappy-game-shell {
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+}
+
+.flappy-board {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 18px;
+    border-radius: 32px;
+    border: 2px solid rgba(28, 176, 246, .12);
+    background:
+        radial-gradient(circle at top right, rgba(28, 176, 246, .12), transparent 24%),
+        rgba(255, 255, 255, .74);
+    box-shadow: 0 24px 48px rgba(15, 23, 42, .08);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+}
+
+.flappy-scene {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 32px;
+    border: 2px solid rgba(28, 176, 246, .12);
+    background: linear-gradient(180deg, #bce8ff 0%, #d9f7ff 48%, #fef7d7 100%);
+    box-shadow: 0 28px 50px rgba(15, 23, 42, .10);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.flappy-sky-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 21%;
+    background:
+        radial-gradient(circle at 20% 18%, rgba(255, 255, 255, .9), transparent 13%),
+        radial-gradient(circle at 78% 16%, rgba(255, 255, 255, .7), transparent 12%);
+}
+
+.flappy-cloud {
+    position: absolute;
+    height: 28px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .75);
+}
+
+.flappy-cloud::before,
+.flappy-cloud::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    background: inherit;
+}
+
+.flappy-cloud::before {
+    width: 30px;
+    height: 30px;
+    top: -10px;
+    left: 10px;
+}
+
+.flappy-cloud::after {
+    width: 38px;
+    height: 38px;
+    top: -18px;
+    right: 18px;
+}
+
+.flappy-cloud.cloud-a {
+    top: 74px;
+    left: 14%;
+    width: 110px;
+}
+
+.flappy-cloud.cloud-b {
+    top: 132px;
+    right: 12%;
+    width: 132px;
+}
+
+.flappy-cloud.cloud-c {
+    top: 42px;
+    right: 34%;
+    width: 86px;
+    height: 22px;
+    opacity: .82;
+}
+
+.flappy-pipe {
+    position: absolute;
+    background: linear-gradient(180deg, #5bcf31 0%, #3ea91f 100%);
+    border: 3px solid #2d8819;
+    box-shadow: inset -8px 0 0 rgba(255, 255, 255, .18);
+}
+
+.flappy-pipe::before {
+    content: '';
+    position: absolute;
+    left: -8%;
+    width: 116%;
+    height: 18px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #7ce449 0%, #43b122 100%);
+    border: 3px solid #2d8819;
+}
+
+.flappy-pipe.top {
+    top: 0;
+    border-radius: 0 0 18px 18px;
+}
+
+.flappy-pipe.top::before {
+    bottom: -10px;
+}
+
+.flappy-pipe.bottom {
+    border-radius: 18px 18px 0 0;
+}
+
+.flappy-pipe.bottom::before {
+    top: -10px;
+}
+
+.flappy-pipe.is-safe {
+    opacity: .55;
+    filter: saturate(.8);
+}
+
+.flappy-challenge-marker {
+    position: absolute;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    border: 2px solid #d97706;
+    background:
+        radial-gradient(circle at 30% 28%, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 34%),
+        linear-gradient(180deg, #ffd54f 0%, #f59e0b 100%);
+    box-shadow: 0 14px 24px rgba(15, 23, 42, .18);
+    transform: translate(-50%, -50%);
+    z-index: 4;
+}
+
+.flappy-challenge-marker span {
+    font-size: 22px;
+    line-height: 1;
+    font-weight: 900;
+    color: #7c2d12;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+.flappy-bird {
+    position: absolute;
+    width: 38px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: center;
+    z-index: 3;
+    filter: drop-shadow(0 9px 14px rgba(15, 23, 42, .18));
+}
+
+.flappy-bird.is-pipe-shielded {
+    animation: flappyBirdShieldBlink .24s ease-in-out infinite alternate;
+}
+
+.flappy-bird-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+@keyframes flappyBirdShieldBlink {
+    from {
+        opacity: 1;
+        filter: brightness(1);
+    }
+
+    to {
+        opacity: .3;
+        filter: brightness(1.18);
+    }
+}
+
+.flappy-ground {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 58px;
+    background: linear-gradient(180deg, #f3cf67 0%, #d19b34 100%);
+    border-top: 4px solid rgba(104, 76, 12, .18);
+}
+
+.flappy-hud {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 4;
+    gap: 10px;
+    flex-wrap: nowrap;
+}
+
+.flappy-score-pill,
+.flappy-side-card {
+    background: #fff;
+    border: 2px solid rgba(28, 176, 246, .12);
+    box-shadow: var(--shadow-card);
+}
+
+.flappy-score-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+    color: var(--dark-blue);
+}
+
+.flappy-score-pill strong {
+    font-size: 18px;
+}
+
+.flappy-hearts {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.flappy-hearts-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+    background: #fff;
+    border: 2px solid rgba(28, 176, 246, .12);
+    box-shadow: var(--shadow-card);
+}
+
+.flappy-hud-label {
+    color: var(--gray-light);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.flappy-heart {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.flappy-heart svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.flappy-heart.is-alive {
+    color: #d0021b;
+}
+
+.flappy-heart.is-empty {
+    color: rgba(208, 2, 27, .24);
+}
+
+.flappy-tap-hint {
+    position: absolute;
+    left: 18px;
+    bottom: 74px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, .2);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    backdrop-filter: blur(4px);
+}
+
+.flappy-resume-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(15, 23, 42, .16);
+    backdrop-filter: blur(3px);
+    pointer-events: none;
+}
+
+.flappy-resume-overlay span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .9);
+    color: var(--dark-blue);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.flappy-resume-overlay strong {
+    font-size: 72px;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 10px 28px rgba(15, 23, 42, .28);
+}
+
+.flappy-challenge-overlay {
+    backdrop-filter: blur(4px);
+}
+
+.flappy-challenge-box,
+.flappy-result-box,
+.flappy-requirement-box,
+.flappy-topic-modal {
+    max-width: 560px;
+}
+
+.flappy-requirement-box {
+    width: min(420px, calc(100vw - 28px));
+}
+
+.flappy-result-box {
+    width: min(456px, calc(100vw - 28px));
+    border-radius: 26px;
+    overflow: hidden;
+    box-shadow: 0 28px 54px rgba(15, 23, 42, .18);
+    max-height: min(82dvh, 620px);
+    display: flex;
+    flex-direction: column;
+}
+
+.flappy-result-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.flappy-result-head h3 {
+    margin: 0;
+}
+
+.flappy-result-kicker {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--orange);
+}
+
+.flappy-result-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.flappy-result-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px 16px;
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at top center, rgba(255, 196, 77, .28), transparent 65%),
+        linear-gradient(180deg, rgba(28, 176, 246, .1), rgba(28, 176, 246, .04));
+    border: 1px solid rgba(28, 176, 246, .12);
+}
+
+.flappy-result-hero span {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--gray-light);
+}
+
+.flappy-result-hero strong {
+    font-size: 44px;
+    line-height: 1;
+    color: var(--dark-blue);
+}
+
+.flappy-topic-modal {
+    width: min(760px, calc(100vw - 28px));
+}
+
+.flappy-topic-modal-copy {
+    margin: 6px 0 0;
+    color: var(--gray-light);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.flappy-topic-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.flappy-challenge-type {
+    margin: 6px 0 0;
+    color: var(--gray-light);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.flappy-timer {
+    min-width: 72px;
+    min-height: 40px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(28, 176, 246, .12);
+    color: var(--blue);
+    font-weight: 900;
+}
+
+.flappy-timer.is-danger {
+    color: #b91c1c;
+    background: rgba(239, 68, 68, .12);
+}
+
+.flappy-challenge-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+}
+
+.flappy-challenge-arm-lock {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: rgba(255, 196, 77, .18);
+    border: 1px solid rgba(255, 196, 77, .45);
+    color: var(--dark-blue);
+}
+
+.flappy-challenge-arm-lock strong {
+    font-size: 15px;
+}
+
+.flappy-challenge-arm-lock span {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--gray-text);
+}
+
+.flappy-challenge-prompt,
+.flappy-result-copy {
+    margin: 0;
+    color: var(--gray-text);
+    line-height: 1.7;
+}
+
+.flappy-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.flappy-choice-card,
+.flappy-typing-helper,
+.flappy-result-card {
+    border-radius: 18px;
+}
+
+.flappy-choice-card {
+    border: 2px solid var(--border-color);
+    background: #fff;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.flappy-choice-grid.is-locked,
+.flappy-typing-wrap.is-locked {
+    opacity: .56;
+}
+
+.flappy-choice-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--blue);
+    box-shadow: 0 18px 30px rgba(15, 23, 42, .08);
+}
+
+.flappy-choice-card strong {
+    color: var(--dark-blue);
+    line-height: 1.35;
+}
+
+.flappy-choice-card span {
+    color: var(--gray-light);
+    font-size: 13px;
+}
+
+.flappy-listen-btn {
+    align-self: flex-start;
+}
+
+.flappy-typing-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.flappy-typing-helper {
+    padding: 12px 14px;
+    background: rgba(28, 176, 246, .08);
+    color: var(--dark-blue);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.flappy-result-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.flappy-result-card {
+    padding: 12px 14px;
+    background: linear-gradient(180deg, rgba(28, 176, 246, .08), rgba(28, 176, 246, .04));
+    border: 1px solid rgba(28, 176, 246, .12);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.flappy-result-card span {
+    font-size: 12px;
+    color: var(--gray-light);
+    line-height: 1.45;
+}
+
+.flappy-result-card strong {
+    font-size: 22px;
+    color: var(--dark-blue);
+    line-height: 1.1;
+}
+
+.flappy-result-actions {
+    padding-top: 4px;
+    flex-shrink: 0;
+}
+
+.flappy-result-actions .btn {
+    min-height: 42px;
+}
+
+.flappy-result-footer {
+    padding-top: 6px;
+    flex-shrink: 0;
+}
+
+.flappy-result-footer .btn {
+    min-width: 100%;
+}
+
+body.app-dark-mode .games-hero,
+body.app-dark-mode .game-card,
+body.app-dark-mode .flappy-setup-panel,
+body.app-dark-mode .flappy-empty-panel,
+body.app-dark-mode .flappy-game-topbar,
+body.app-dark-mode .flappy-board,
+body.app-dark-mode .flappy-score-pill,
+body.app-dark-mode .flappy-hearts-wrap,
+body.app-dark-mode .flappy-choice-card,
+body.app-dark-mode .flappy-typing-helper,
+body.app-dark-mode .flappy-result-card,
+body.app-dark-mode .flappy-bird-option,
+body.app-dark-mode .flappy-selected-topic-panel {
+    background: #243047;
+    border-color: rgba(148, 163, 184, .18);
+    box-shadow: 0 18px 36px rgba(2, 6, 23, .28);
+}
+
+body.app-dark-mode .games-hero h1,
+body.app-dark-mode .game-card-copy strong,
+body.app-dark-mode .flappy-empty-panel h2,
+body.app-dark-mode .flappy-setup-header h2,
+body.app-dark-mode .flappy-lang-card strong,
+body.app-dark-mode .flappy-topic-card strong,
+body.app-dark-mode .flappy-bird-option span,
+body.app-dark-mode .flappy-selected-topic-copy strong,
+body.app-dark-mode .flappy-game-context strong,
+body.app-dark-mode .flappy-score-pill,
+body.app-dark-mode .flappy-choice-card strong,
+body.app-dark-mode .flappy-typing-helper,
+body.app-dark-mode .flappy-result-card strong,
+body.app-dark-mode .flappy-result-hero strong {
+    color: #f8fafc;
+}
+
+body.app-dark-mode .games-hero p,
+body.app-dark-mode .game-card-copy p,
+body.app-dark-mode .flappy-empty-panel p,
+body.app-dark-mode .flappy-setup-header p,
+body.app-dark-mode .flappy-topic-card p,
+body.app-dark-mode .flappy-selected-topic-copy p,
+body.app-dark-mode .flappy-game-context-meta span,
+body.app-dark-mode .flappy-choice-card span,
+body.app-dark-mode .flappy-challenge-prompt,
+body.app-dark-mode .flappy-result-copy {
+    color: #cbd5e1;
+}
+
+body.app-dark-mode .flappy-bird-option.is-active {
+    background: rgba(51, 65, 85, .92);
+    border-color: rgba(251, 191, 36, .45);
+    box-shadow: 0 16px 30px rgba(15, 23, 42, .34);
+}
+
+body.app-dark-mode .flappy-challenge-marker {
+    border-color: rgba(251, 191, 36, .45);
+    box-shadow: 0 16px 30px rgba(2, 6, 23, .34);
+}
+
+body.app-dark-mode .flappy-result-hero {
+    background:
+        radial-gradient(circle at top center, rgba(255, 196, 77, .2), transparent 65%),
+        linear-gradient(180deg, rgba(148, 163, 184, .12), rgba(148, 163, 184, .04));
+    border-color: rgba(148, 163, 184, .18);
+}
+
+body.app-dark-mode .flappy-result-hero span {
+    color: #cbd5e1;
+}
+
+body.app-dark-mode .flappy-challenge-arm-lock {
+    background: rgba(255, 196, 77, .14);
+    border-color: rgba(255, 196, 77, .28);
+    color: #f8fafc;
+}
+
+body.app-dark-mode .flappy-challenge-arm-lock span {
+    color: #cbd5e1;
+}
+
+body.app-dark-mode .flappy-game-context-meta span {
+    background: rgba(148, 163, 184, .12);
+}
+
+body.app-dark-mode .flappy-tap-hint {
+    background: rgba(15, 23, 42, .52);
+}
+
+body.app-dark-mode .flappy-resume-overlay span {
+    background: rgba(36, 48, 71, .92);
+    color: #f8fafc;
+}
+
+@media (max-width: 1180px) {
+    .flappy-game-shell {
+        flex-direction: column;
+    }
+
+    .flappy-board {
+        order: 1;
+    }
+
+}
+
+@media (max-width: 840px) {
+    .games-page.is-game-active .flappy-game-shell {
+        width: 100%;
+    }
+
+    .games-page {
+        padding: 16px 14px 24px;
+    }
+
+    .games-hero,
+    .flappy-setup-panel,
+    .flappy-game-topbar {
+        padding: 18px 16px;
+    }
+
+    .flappy-board {
+        padding: 10px;
+        border-radius: 26px;
+    }
+
+    .games-hero h1 {
+        font-size: 28px;
+    }
+
+    .flappy-selected-topic-panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .flappy-bird-picker-grid {
+        width: 100%;
+    }
+
+    .flappy-challenge-marker {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+    }
+
+    .flappy-challenge-marker span {
+        font-size: 20px;
+    }
+
+    .flappy-setup-header,
+    .flappy-hud {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .flappy-game-topbar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .flappy-topbar-actions {
+        width: auto;
+    }
+
+    .flappy-topbar-actions .btn {
+        flex: 0 0 auto;
+    }
+
+    .flappy-hud {
+        margin-bottom: 8px;
+    }
+
+    .flappy-hearts-wrap,
+    .flappy-score-pill {
+        justify-content: center;
+        min-height: 38px;
+        padding: 0 12px;
+    }
+
+    .flappy-choice-grid,
+    .flappy-result-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .flappy-result-box {
+        width: min(400px, calc(100vw - 24px));
+        max-height: min(80dvh, 560px);
+    }
+}
+
+@media (max-width: 640px) {
+    .flappy-heart {
+        width: 17px;
+        height: 17px;
+    }
+
+    .flappy-challenge-box {
+        width: min(100vw - 20px, 372px);
+        max-height: min(72dvh, 500px);
+        border-radius: 22px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .flappy-challenge-box .cv-modal-header {
+        padding: 14px 14px 10px;
+        gap: 10px;
+    }
+
+    .flappy-challenge-box .cv-modal-header h3 {
+        font-size: 18px;
+        line-height: 1.2;
+    }
+
+    .flappy-challenge-box .cv-modal-body {
+        padding: 10px 14px 14px;
+    }
+
+    .flappy-challenge-box .cv-modal-footer {
+        padding: 10px 14px 14px;
+    }
+
+    .flappy-challenge-body {
+        gap: 12px;
+    }
+
+    .flappy-challenge-type {
+        margin-top: 4px;
+        font-size: 12px;
+    }
+
+    .flappy-timer {
+        min-width: 62px;
+        min-height: 34px;
+        font-size: 14px;
+    }
+
+    .flappy-challenge-arm-lock {
+        gap: 4px;
+        padding: 10px 12px;
+        border-radius: 16px;
+    }
+
+    .flappy-challenge-arm-lock strong {
+        font-size: 14px;
+    }
+
+    .flappy-challenge-arm-lock span,
+    .flappy-challenge-prompt {
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .flappy-listen-btn {
+        min-height: 38px;
+    }
+
+    .flappy-choice-card {
+        padding: 12px 13px;
+        gap: 6px;
+        border-radius: 16px;
+    }
+
+    .flappy-choice-card strong {
+        font-size: 14px;
+    }
+
+    .flappy-choice-card span {
+        font-size: 12px;
+    }
+
+    .flappy-typing-helper {
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .flappy-challenge-box .cv-form-input {
+        min-height: 42px;
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+
+    .flappy-challenge-box .cv-modal-footer .btn {
+        min-height: 40px;
+    }
+
+    .flappy-setup-title-row {
+        align-items: flex-start;
+    }
+
+    .flappy-setup-title-row .btn {
+        flex: 0 0 auto;
+        width: fit-content;
+        min-width: 0;
+        max-height: 36px;
+        padding: 0 8px;
+        font-size: 11px;
+        border-radius: 12px;
+    }
+
+    .flappy-setup-footer {
+        justify-content: center;
+    }
+
+    .flappy-setup-footer .btn {
+        margin-inline: auto;
+    }
+
+    .flappy-sky-layer {
+        height: 17%;
+    }
+
+    .games-page {
+        padding: 12px 12px 12px;
+    }
+
+    .flappy-result-box {
+        width: min(100vw - 20px, 372px);
+        border-radius: 22px;
+        max-height: min(78dvh, 520px);
+    }
+
+    .flappy-result-body {
+        gap: 10px;
+    }
+
+    .flappy-result-grid {
+        display: none;
+    }
+
+    .flappy-result-hero {
+        padding: 16px 14px;
+        border-radius: 18px;
+    }
+
+    .flappy-result-hero strong {
+        font-size: 38px;
+    }
+
+    .flappy-result-card {
+        padding: 11px 12px;
+        border-radius: 16px;
+    }
+
+    .flappy-result-card strong {
+        font-size: 20px;
+    }
+
+    .flappy-result-actions .btn,
+    .flappy-result-footer .btn {
+        min-height: 40px;
+    }
+
+    .flappy-resume-overlay strong {
+        font-size: 56px;
+    }
+
+    .flappy-hud {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+    }
+
+    .games-grid {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+
+    .flappy-play-shell {
+        gap: 12px;
+    }
+
+    .flappy-topic-grid-modal {
+        max-height: min(58dvh, 460px);
+    }
+
+    .flappy-game-topbar {
+        position: relative;
+        padding: 14px;
+        border-radius: 22px;
+        gap: 10px;
+        flex-wrap: nowrap;
+        align-items: flex-start;
+    }
+
+    .flappy-game-topbar::after {
+        content: '';
+        position: absolute;
+        inset: auto 14px 0;
+        height: 1px;
+        background: rgba(28, 176, 246, .1);
+    }
+
+    .flappy-game-context {
+        flex: 1;
+        min-width: 0;
+        gap: 6px;
+    }
+
+    .flappy-game-context-copy,
+    .flappy-game-context-meta {
+        min-width: 0;
+    }
+
+    .flappy-game-context-copy strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .flappy-board {
+        padding: 8px;
+        border-radius: 22px;
+    }
+
+    .game-card-image-button {
+        width: 100%;
+        max-width: 420px;
+        border-radius: 22px;
+    }
+
+    .game-card-image {
+        border-radius: 22px;
+    }
+
+    .flappy-score-pill,
+    .flappy-hearts-wrap {
+        min-width: 0;
+    }
+
+    .flappy-score-pill {
+        flex: 0 0 34%;
+    }
+
+    .flappy-hearts-wrap {
+        flex: 1 1 66%;
+    }
+
+    .flappy-scene {
+        min-height: min(58dvh, 420px);
+        aspect-ratio: auto;
+        border-radius: 22px;
+    }
+
+    .flappy-game-context strong {
+        font-size: 16px;
+        line-height: 1.2;
+    }
+
+    .flappy-game-context-meta {
+        gap: 6px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .flappy-game-context-meta::-webkit-scrollbar {
+        display: none;
+    }
+
+    .flappy-game-context-meta span {
+        min-height: 24px;
+        padding: 0 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        flex: 0 0 auto;
+    }
+
+    .flappy-game-context-copy {
+        gap: 2px;
+    }
+
+    .flappy-game-kicker {
+        font-size: 10px;
+    }
+
+    .flappy-topbar-actions {
+        gap: 8px;
+        flex: 0 0 auto;
+        align-items: stretch;
+    }
+
+    .flappy-topbar-actions .btn {
+        min-width: 42px;
+        min-height: 36px;
+        padding: 0 12px;
+        font-size: 11px;
+        border-radius: 14px;
+    }
+
+    .flappy-tap-hint {
+        left: 12px;
+        right: 12px;
+        bottom: 68px;
+        justify-content: center;
+    }
+}

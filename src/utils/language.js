@@ -1,11 +1,4 @@
-export const languageFlags = {
-    en: '🇺🇸',
-    ko: '🇰🇷',
-    vi: '🇻🇳',
-    ja: '🇯🇵',
-    zh: '🇨🇳',
-    fr: '🇫🇷',
-};
+export const languageFlags = {};
 
 export const languageLabels = {
     en: 'Tiếng Anh',

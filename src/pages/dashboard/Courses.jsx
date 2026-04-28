@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
+import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import { Link, useLocation } from 'react-router-dom';
 import TopicFormModal from '../../components/customDocs/TopicFormModal';
 import { coursesData } from '../../data/coursesData';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
-import { languageFlags, languageLabels } from '../../utils/language';
+import { languageLabels } from '../../utils/language';
 
 export default function Courses() {
     const location = useLocation();
@@ -17,6 +18,8 @@ export default function Courses() {
     const [modalType, setModalType] = useState(null);
     const [editingTopic, setEditingTopic] = useState(null);
     const [topicForm, setTopicForm] = useState({ title: '', description: '', lang: 'en' });
+    const [toastMessage, setToastMessage] = useState('');
+    const [pendingDeleteTopic, setPendingDeleteTopic] = useState(null);
     const { customCourses, createTopic, updateTopic, deleteTopic } = useCustomCourses();
     const { remembered } = useCourseProgress();
 
@@ -62,7 +65,7 @@ export default function Courses() {
 
     const handleSaveTopic = () => {
         if (!topicForm.title.trim()) {
-            alert('Vui lòng nhập tên chủ đề');
+            setToastMessage('Vui lòng nhập tên chủ đề');
             return;
         }
 
@@ -73,6 +76,13 @@ export default function Courses() {
         }
 
         setModalType(null);
+        setToastMessage('');
+    };
+
+    const handleDeleteTopic = (topicId) => {
+        deleteTopic(topicId);
+        setPendingDeleteTopic(null);
+        setToastMessage('Đã xóa chủ đề');
     };
 
     return (
@@ -245,7 +255,7 @@ export default function Courses() {
                                             <div className="doc-meta-row">
                                                 <span className="doc-type-badge cv-custom-badge">CÁ NHÂN</span>
                                                 <span className="doc-level">
-                                                    {languageFlags[topic.lang] || '🌐'} {languageLabels[topic.lang] || 'Ngôn ngữ'} · {progress.total} từ
+                                                    {languageLabels[topic.lang] || 'Ngôn ngữ'} · {progress.total} từ
                                                 </span>
                                             </div>
                                             <h3 className="doc-name">{topic.title}</h3>
@@ -277,11 +287,8 @@ export default function Courses() {
                                                 <button
                                                     className="cv-icon-btn cv-cc-delete"
                                                     title="Xóa chủ đề"
-                                                    onClick={() => {
-                                                        if (window.confirm('Bạn có chắc chắn muốn xóa chủ đề này?')) {
-                                                            deleteTopic(topic.id);
-                                                        }
-                                                    }}
+                                                    style={{ '--icon-color': 'var(--red)' }}
+                                                    onClick={() => setPendingDeleteTopic(topic)}
                                                 >
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <polyline points="3 6 5 6 21 6"></polyline>
@@ -302,11 +309,24 @@ export default function Courses() {
 
             <TopicFormModal
                 isOpen={modalType === 'topic-form'}
-                onClose={() => setModalType(null)}
+                onClose={() => {
+                    setModalType(null);
+                    setToastMessage('');
+                }}
                 onSave={handleSaveTopic}
                 topicForm={topicForm}
                 setTopicForm={setTopicForm}
                 editingTopic={editingTopic}
+                toastMessage={toastMessage}
+                onToastHide={() => setToastMessage('')}
+            />
+            <ConfirmActionModal
+                isOpen={Boolean(pendingDeleteTopic)}
+                onClose={() => setPendingDeleteTopic(null)}
+                onConfirm={() => handleDeleteTopic(pendingDeleteTopic.id)}
+                title="Xác nhận xóa chủ đề"
+                message={pendingDeleteTopic ? `Bạn có chắc muốn xóa chủ đề "${pendingDeleteTopic.title}" không?` : ''}
+                confirmLabel="Xóa chủ đề"
             />
         </main>
     );

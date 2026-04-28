@@ -1,6 +1,7 @@
 // THÊM TỪ VỰNG THỦ CÔNG
 
 import { useState } from 'react';
+import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
 
 const WORD_TYPES = ['danh từ', 'động từ', 'tính từ', 'trạng từ', 'cụm từ', 'thành ngữ', 'khác'];
@@ -11,15 +12,16 @@ export default function WordModal({ isOpen, onClose, onSave, existingWord }) {
     const [meaning, setMeaning] = useState(existingWord?.mean || '');
     const [wordType, setWordType] = useState(existingWord?.wordtype || 'danh từ');
     const [example, setExample] = useState(existingWord?.example || '');
+    const [toastMessage, setToastMessage] = useState('');
 
     const handleSave = () => {
         if (!word.trim()) {
-            alert('Vui lòng nhập từ vựng!');
+            setToastMessage('Vui lòng nhập từ vựng!');
             return;
         }
 
         if (!meaning.trim()) {
-            alert('Vui lòng nhập nghĩa!');
+            setToastMessage('Vui lòng nhập nghĩa!');
             return;
         }
 
@@ -30,18 +32,28 @@ export default function WordModal({ isOpen, onClose, onSave, existingWord }) {
             wordtype: wordType,
             example: example.trim(),
         });
+        setToastMessage('');
         onClose();
     };
 
     return (
         <CustomModal isOpen={isOpen} onClose={onClose} title={existingWord ? '✏️ Sửa từ vựng' : '➕ Thêm từ vựng mới'}>
+            <ToastNotice message={toastMessage} onHide={() => setToastMessage('')} />
             <div className="cv-modal-body">
                 <div className="cv-form-row">
                     <div className="cv-form-group">
                         <label className="cv-form-label">
                             Từ vựng <span style={{ color: 'var(--red)' }}>*</span>
                         </label>
-                        <input className="cv-form-input" placeholder="schedule" value={word} onChange={(event) => setWord(event.target.value)} />
+                        <input
+                            className="cv-form-input"
+                            placeholder="schedule"
+                            value={word}
+                            onChange={(event) => {
+                                setWord(event.target.value);
+                                if (toastMessage) setToastMessage('');
+                            }}
+                        />
                     </div>
                     <div className="cv-form-group">
                         <label className="cv-form-label">Phiên âm</label>
@@ -62,7 +74,10 @@ export default function WordModal({ isOpen, onClose, onSave, existingWord }) {
                             className="cv-form-input"
                             placeholder="lịch trình, thời gian biểu"
                             value={meaning}
-                            onChange={(event) => setMeaning(event.target.value)}
+                            onChange={(event) => {
+                                setMeaning(event.target.value);
+                                if (toastMessage) setToastMessage('');
+                            }}
                         />
                     </div>
                     <div className="cv-form-group">

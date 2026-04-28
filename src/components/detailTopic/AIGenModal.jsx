@@ -1,6 +1,7 @@
 // TẠO LIST TỪ VỰNG HÀNG LOẠI VỚI AI
 
 import { useState } from 'react';
+import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
 
 const AI_API_URL = 'https://platform.beeknoee.com/api/v1/chat/completions';
@@ -9,7 +10,6 @@ const AI_BEARER = 'sk-bee-c3b440a14f7a434283c95709c96c5879';
 const LANG_CONFIG = {
     en: {
         label: 'Anh',
-        flag: '\uD83C\uDDFA\uD83C\uDDF8',
         systemPrompt: `You generate high-quality English vocabulary for Vietnamese learners.
 
 STRICT OUTPUT RULES:
@@ -41,7 +41,6 @@ PREFERENCE:
     },
     ko: {
         label: 'Hàn',
-        flag: '\uD83C\uDDF0\uD83C\uDDF7',
         systemPrompt: `You generate high-quality Korean vocabulary for Vietnamese learners.
 
 STRICT OUTPUT RULES:
@@ -68,7 +67,6 @@ QUALITY RULES:
     },
     ja: {
         label: 'Nhật',
-        flag: '\uD83C\uDDEF\uD83C\uDDF5',
         systemPrompt: `You generate high-quality Japanese vocabulary for Vietnamese learners.
 
 STRICT OUTPUT RULES:
@@ -94,7 +92,6 @@ QUALITY RULES:
     },
     zh: {
         label: 'Trung',
-        flag: '\uD83C\uDDE8\uD83C\uDDF3',
         systemPrompt: `You generate high-quality Mandarin Chinese vocabulary for Vietnamese learners.
 
 =====================
@@ -265,7 +262,6 @@ OUTPUT ONLY JSON.`
     },
     fr: {
         label: 'Pháp',
-        flag: '\uD83C\uDDEB\uD83C\uDDF7',
         systemPrompt: `You generate high-quality French vocabulary for Vietnamese learners.
 
 STRICT OUTPUT RULES:
@@ -461,14 +457,14 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
     const [errorMsg, setErrorMsg] = useState('');
     const [previewWords, setPreviewWords] = useState([]);
     const [selectedIndexes, setSelectedIndexes] = useState(new Set());
+    const [toastMessage, setToastMessage] = useState('');
 
     const currentLang = LANG_CONFIG[topicLang] || DEFAULT_LANG;
     const langLabel = currentLang.label;
-    const flag = currentLang.flag;
 
     const handleGenerate = async () => {
         if (!theme.trim()) {
-            alert('Vui lòng nhập chủ đề');
+            setToastMessage('Vui lòng nhập chủ đề');
             return;
         }
 
@@ -528,7 +524,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
     const handleSaveWords = () => {
         const selected = Array.from(selectedIndexes).map((idx) => previewWords[idx]);
         if (selected.length === 0) {
-            alert('Vui lòng chọn ít nhất 1 từ');
+            setToastMessage('Vui lòng chọn ít nhất 1 từ');
             return;
         }
 
@@ -543,6 +539,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
         setErrorMsg('');
         setPreviewWords([]);
         setSelectedIndexes(new Set());
+        setToastMessage('');
     };
 
     return (
@@ -554,6 +551,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
             }}
             title="AI tạo từ vựng hàng loạt"
         >
+            <ToastNotice message={toastMessage} onHide={() => setToastMessage('')} />
             {status === 'input' && (
                 <>
                     <div className="cv-modal-body" id="cv-ai-modal-body">
@@ -586,7 +584,6 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                                         color: 'var(--gray-text)'
                                     }}
                                 >
-                                    <span>{flag}</span>
                                     <span>Tiếng {langLabel}</span>
                                 </div>
                             </div>

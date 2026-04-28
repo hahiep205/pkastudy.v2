@@ -1,7 +1,8 @@
 // TẠO TOPIC CUSTOM
 
 import CustomModal from './CustomModal';
-import { languageFlags, languageLabels } from '../../utils/language';
+import ToastNotice from '../common/ToastNotice';
+import { languageLabels } from '../../utils/language';
 
 const supportedLanguages = ['en', 'ko', 'ja', 'zh', 'fr'];
 
@@ -12,6 +13,8 @@ export default function TopicFormModal({
     topicForm,
     setTopicForm,
     editingTopic,
+    toastMessage,
+    onToastHide,
 }) {
     return (
         <CustomModal
@@ -19,6 +22,7 @@ export default function TopicFormModal({
             onClose={onClose}
             title={editingTopic ? '✏️ Sửa chủ đề' : '📁 Tạo chủ đề mới'}
         >
+            <ToastNotice message={toastMessage} onHide={onToastHide} />
             <div className="cv-modal-body">
                 <div className="cv-form-group">
                     <label className="cv-form-label">
@@ -29,9 +33,10 @@ export default function TopicFormModal({
                         maxLength="60"
                         placeholder="Ví dụ: 🏢 Từ vựng văn phòng"
                         value={topicForm.title}
-                        onChange={(event) =>
-                            setTopicForm({ ...topicForm, title: event.target.value })
-                        }
+                        onChange={(event) => {
+                            setTopicForm({ ...topicForm, title: event.target.value });
+                            onToastHide?.();
+                        }}
                     />
                 </div>
                 <div className="cv-form-row">
@@ -42,9 +47,10 @@ export default function TopicFormModal({
                             placeholder="Mô tả ngắn..."
                             rows="2"
                             value={topicForm.description}
-                            onChange={(event) =>
-                                setTopicForm({ ...topicForm, description: event.target.value })
-                            }
+                            onChange={(event) => {
+                                setTopicForm({ ...topicForm, description: event.target.value });
+                                onToastHide?.();
+                            }}
                         />
                     </div>
                     <div className="cv-form-group" style={{ flex: 1 }}>
@@ -52,13 +58,14 @@ export default function TopicFormModal({
                         <select
                             className="cv-form-input cv-form-select"
                             value={topicForm.lang}
-                            onChange={(event) =>
-                                setTopicForm({ ...topicForm, lang: event.target.value })
-                            }
+                            onChange={(event) => {
+                                setTopicForm({ ...topicForm, lang: event.target.value });
+                                onToastHide?.();
+                            }}
                         >
                             {supportedLanguages.map((languageCode) => (
                                 <option key={languageCode} value={languageCode}>
-                                    {languageFlags[languageCode]} {languageLabels[languageCode]}
+                                    {languageLabels[languageCode]}
                                 </option>
                             ))}
                         </select>

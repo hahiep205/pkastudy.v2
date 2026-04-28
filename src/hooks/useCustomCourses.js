@@ -12,6 +12,14 @@ const getInitialCourses = () => {
     }
 };
 
+const getLatestCourses = () => {
+    try {
+        return JSON.parse(localStorage.getItem(CUSTOM_KEY)) || [];
+    } catch {
+        return [];
+    }
+};
+
 export function useCustomCourses() {
     const [customCourses, setCustomCourses] = useState(getInitialCourses);
 
@@ -33,7 +41,7 @@ export function useCustomCourses() {
 
     // --- TOPIC CRUD --- //
     const createTopic = ({ title, description, lang }) => {
-        const courses = [...customCourses];
+        const courses = [...getLatestCourses()];
         const newTopic = {
             id: createId('custop'),
             title,
@@ -47,7 +55,7 @@ export function useCustomCourses() {
     };
 
     const updateTopic = (topicId, updates) => {
-        const coursesCopy = cloneCourses(customCourses);
+        const coursesCopy = cloneCourses(getLatestCourses());
         const topic = coursesCopy.find(t => t.id === topicId);
         if (topic) {
             Object.assign(topic, updates);
@@ -56,13 +64,13 @@ export function useCustomCourses() {
     };
 
     const deleteTopic = (topicId) => {
-        const filtered = customCourses.filter(t => t.id !== topicId);
+        const filtered = getLatestCourses().filter(t => t.id !== topicId);
         saveCourses(filtered);
     };
 
     // --- WORD CRUD --- //
     const addWordToTopic = (topicId, wordData) => {
-        const coursesCopy = cloneCourses(customCourses);
+        const coursesCopy = cloneCourses(getLatestCourses());
         const topic = coursesCopy.find(t => t.id === topicId);
         if (topic) {
             topic.words.push({
@@ -75,7 +83,7 @@ export function useCustomCourses() {
     };
 
     const updateWordInTopic = (topicId, wordId, updates) => {
-        const coursesCopy = cloneCourses(customCourses);
+        const coursesCopy = cloneCourses(getLatestCourses());
         const topic = coursesCopy.find(t => t.id === topicId);
         if (topic) {
             const w = topic.words.find(x => x.id === wordId);
@@ -87,7 +95,7 @@ export function useCustomCourses() {
     };
 
     const deleteWordFromTopic = (topicId, wordId) => {
-        const coursesCopy = cloneCourses(customCourses);
+        const coursesCopy = cloneCourses(getLatestCourses());
         const topic = coursesCopy.find(t => t.id === topicId);
         if (topic) {
             topic.words = topic.words.filter(w => w.id !== wordId);
@@ -96,7 +104,7 @@ export function useCustomCourses() {
     };
 
     const addManyWordsToTopic = (topicId, wordArray) => {
-        const coursesCopy = cloneCourses(customCourses);
+        const coursesCopy = cloneCourses(getLatestCourses());
         const topic = coursesCopy.find(t => t.id === topicId);
         if (topic) {
             wordArray.forEach(wd => {

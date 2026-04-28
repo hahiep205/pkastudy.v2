@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import { coursesData } from '../../data/coursesData';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
@@ -76,6 +77,7 @@ export default function TopicWords() {
     const [isDetailOpen, setDetailOpen] = useState(false);
     const [selectedWord, setSelectedWord] = useState(null);
     const [pickerWord, setPickerWord] = useState(null);
+    const [pendingDeleteWord, setPendingDeleteWord] = useState(null);
     const [activeMode, setActiveMode] = useState(null);
     const [learnUntilMastered, setLearnUntilMastered] = useState(false);
     const [isLearnInfoOpen, setLearnInfoOpen] = useState(false);
@@ -118,6 +120,11 @@ export default function TopicWords() {
 
     const handleSaveAIWords = (selectedWords) => {
         addManyWordsToTopic(topicId, selectedWords);
+    };
+
+    const handleDeleteWord = (wordId) => {
+        deleteWordFromTopic(topicId, wordId);
+        setPendingDeleteWord(null);
     };
 
     const openWordModal = (wordObj = null) => {
@@ -358,10 +365,14 @@ export default function TopicWords() {
                                                         <button className="cv-action-btn cv-action-edit" title="Sửa từ" onClick={(event) => { event.stopPropagation(); openWordModal(w); }}>
                                                             {SVG_ICONS.EDIT}
                                                         </button>
-                                                        <button className="cv-action-btn cv-action-delete" title="Xóa từ" onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            if (window.confirm(`Xóa từ \"${w.word}\"?`)) deleteWordFromTopic(topicId, w.id);
-                                                        }}>
+                                                        <button
+                                                            className="cv-action-btn cv-action-delete"
+                                                            title="Xóa từ"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                setPendingDeleteWord(w);
+                                                            }}
+                                                        >
                                                             {SVG_ICONS.DELETE}
                                                         </button>
                                                     </>
@@ -424,24 +435,21 @@ export default function TopicWords() {
                     customCourses={customCourses}
                     onAdd={(targetTopicId, newWordObj) => {
                         addWordToTopic(targetTopicId, newWordObj);
-                        alert(`Đã thêm \"${newWordObj.word}\" vào danh sách!`);
                         setPickerWord(null);
                     }}
                     onCreateTopic={(topicData) => {
-                        createTopic(topicData);
+                        return createTopic(topicData);
                     }}
                 />
             )}
+            <ConfirmActionModal
+                isOpen={Boolean(pendingDeleteWord)}
+                onClose={() => setPendingDeleteWord(null)}
+                onConfirm={() => handleDeleteWord(pendingDeleteWord.id)}
+                title="Xác nhận xóa từ"
+                message={pendingDeleteWord ? `Bạn có chắc muốn xóa từ "${pendingDeleteWord.word}" không?` : ''}
+                confirmLabel="Xóa từ"
+            />
         </main>
     );
 }
-
-
-
-
-
-
-
-
-
-

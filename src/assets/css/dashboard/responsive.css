@@ -135,6 +135,10 @@
         width: calc(50% - 6px);
     }
 
+    .welcome-actions>a>.btn {
+        min-width: 0;
+    }
+
     .stats-row {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
@@ -217,11 +221,15 @@
     }
 
     .welcome-actions {
-        gap: 8px;
+        gap: 12px;
     }
 
     .welcome-actions>a {
-        width: calc(50% - 4px);
+        width: calc(50% - 6px);
+    }
+
+    .welcome-actions>a>.btn {
+        min-width: 0;
     }
 
     .btn-large {
