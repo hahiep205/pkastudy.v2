@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import birdBlueImage from '../../assets/images/bird-blue.svg';
+import birdBrownImage from '../../assets/images/bird-brown.svg';
 import birdPinkImage from '../../assets/images/bird-pink.svg';
 import birdYellowImage from '../../assets/images/bird-yellow.svg';
 import { coursesData } from '../../data/coursesData';
@@ -33,9 +33,9 @@ const RESUME_PIPE_SHIELD_MS = 3000;
 const FLAPPY_SETUP_LANGS = ['en', 'ko'];
 const GAME_ID = 'flappy-bird';
 const BIRD_OPTIONS = [
-    { id: 'yellow', label: 'Vàng', image: birdYellowImage },
-    { id: 'blue', label: 'Xanh', image: birdBlueImage },
-    { id: 'pink', label: 'Hồng', image: birdPinkImage },
+    { id: 'yellow', label: 'Vàng', image: birdYellowImage, gameImage: birdYellowImage },
+    { id: 'pink', label: 'Hồng', image: birdPinkImage, gameImage: birdPinkImage },
+    { id: 'brown', label: 'Nâu', image: birdBrownImage, gameImage: birdBrownImage },
 ];
 
 const GAME_CARD = {
@@ -511,7 +511,7 @@ function SetupPanel({ langOptions, selectedLang, onPickLang, selectedBird, onPic
                     <div className="flappy-selected-topic-copy">
                         <span className="flappy-selected-topic-label">Chọn Bird</span>
                         <strong>Chọn nhân vật bạn muốn dùng cho lượt chơi này.</strong>
-                        <p>Mặc định là bird vàng. Bạn có thể đổi sang xanh hoặc hồng trước khi bấm Play.</p>
+                        <p>Bạn có thể chọn một trong 3 con rồi bấm Play để bắt đầu chơi.</p>
                     </div>
                     <div className="flappy-bird-picker-grid">
                         {BIRD_OPTIONS.map((bird) => (
@@ -595,7 +595,9 @@ export default function FlappyBirdExperience({ onBackGallery }) {
         sourceLabel: '',
         words: selectedWords,
     } : null;
-    const selectedBirdImage = BIRD_OPTIONS.find((bird) => bird.id === selectedBird)?.image || birdYellowImage;
+    const selectedBirdOption = BIRD_OPTIONS.find((bird) => bird.id === selectedBird) || BIRD_OPTIONS[0];
+    const selectedBirdImage = selectedBirdOption.gameImage || selectedBirdOption.image || birdYellowImage;
+    const selectedBirdImageClassName = selectedBirdOption.gameClassName || '';
 
     const resetRun = () => {
         const nextWorld = buildInitialWorld();
@@ -1076,7 +1078,11 @@ export default function FlappyBirdExperience({ onBackGallery }) {
                                 transform: `rotate(${birdRotation}deg)`,
                             }}
                         >
-                            <img className="flappy-bird-image" src={selectedBirdImage} alt="Bird" />
+                            <img
+                                className={`flappy-bird-image${selectedBirdImageClassName ? ` ${selectedBirdImageClassName}` : ''}`}
+                                src={selectedBirdImage}
+                                alt="Bird"
+                            />
                         </div>
 
                         <div className="flappy-tap-hint">

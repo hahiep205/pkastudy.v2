@@ -2,16 +2,12 @@ const streakLeaders = [
     { rank: 1, name: 'Linh Tran', score: 42, accent: 'orange' },
     { rank: 2, name: 'Minh Khoa', score: 37, accent: 'blue' },
     { rank: 3, name: 'Thu An', score: 33, accent: 'green' },
-    { rank: 4, name: 'Gia Huy', score: 29, accent: 'slate' },
-    { rank: 5, name: 'Bao Ngoc', score: 24, accent: 'slate' },
 ];
 
 const expLeaders = [
     { rank: 1, name: 'Ngoc Mai', score: 12840, accent: 'blue' },
     { rank: 2, name: 'Quang Huy', score: 11920, accent: 'orange' },
     { rank: 3, name: 'Hoai Thu', score: 11310, accent: 'green' },
-    { rank: 4, name: 'Tuan Anh', score: 10540, accent: 'slate' },
-    { rank: 5, name: 'Diep Chi', score: 9840, accent: 'slate' },
 ];
 
 function getInitial(name) {
@@ -42,7 +38,7 @@ function LeaderboardCard({ title, subtitle, unit, leaders, tone }) {
                             </div>
                             <div className="stats2-leader-copy">
                                 <strong>{entry.name}</strong>
-                                <small>{getHandle(entry.name)} · {unit === 'ngày' ? 'Học đều mỗi ngày' : 'Tổng điểm tích lũy'}</small>
+                                <small>{getHandle(entry.name)}</small>
                             </div>
                         </div>
                         <div className="stats2-history-values">
