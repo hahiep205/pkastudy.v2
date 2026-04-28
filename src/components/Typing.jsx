@@ -1,16 +1,22 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import StudyCompletionPanel from './studyModes/StudyCompletionPanel';
 import {
-    buildTypingQuestions,
     buildHintMask,
+    buildSessionQueue,
+    buildTypingQuestions,
+    createSessionStats,
+    getSpeechLang,
     getInitialRememberedSelection,
     getNextHintState,
     maskWordInExample,
     normalizeTypingAnswer,
+    resolveSessionQueueResult,
 } from '../utils/studyModes';
+import { playCorrectSound, playIncorrectSound } from '../utils/feedbackAudio';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
-const MAX_HINT_LEVEL = 4;
+const MAX_HINT_LEVEL = 6;
+const TRANSCRIPTION_HINT_LEVEL = 5;
 const MAX_EXAMPLE_VIEWS = 1;
 
 const ARROW_LEFT_ICON = (
@@ -22,6 +28,14 @@ const ARROW_LEFT_ICON = (
 const ARROW_RIGHT_ICON = (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 6l6 6-6 6" />
+    </svg>
+);
+
+const SPEAKER_ICON = (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+        <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+        <path d="M18 6a8.5 8.5 0 0 1 0 12" />
     </svg>
 );
 
@@ -50,13 +64,18 @@ function createDraftRememberedSelection(questions, attemptsByWordId, initialLear
 }
 
 export default function Typing({
+    topicLang = 'en',
     words,
     initialLearnedWordIds = [],
     onSaveLearnedWords,
     onExit,
     onBackToTopic,
+    learnUntilMastered = false,
 }) {
+    const isQueueMode = learnUntilMastered;
     const [questions, setQuestions] = useState(() => buildTypingQuestions(words));
+    const [activeQueue, setActiveQueue] = useState(() => buildSessionQueue(buildTypingQuestions(words), 'wordId'));
+    const [sessionStatsByWordId, setSessionStatsByWordId] = useState(() => createSessionStats(words, initialLearnedWordIds));
     const [currentIndex, setCurrentIndex] = useState(0);
     const [attemptsByWordId, setAttemptsByWordId] = useState({});
     const [selectedWordIds, setSelectedWordIds] = useState(() => getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -66,7 +85,10 @@ export default function Typing({
     const sessionLockedRef = useRef(false);
 
     useEffect(() => {
-        setQuestions(buildTypingQuestions(words));
+        const nextQuestions = buildTypingQuestions(words);
+        setQuestions(nextQuestions);
+        setActiveQueue(buildSessionQueue(nextQuestions, 'wordId'));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setAttemptsByWordId({});
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -81,11 +103,13 @@ export default function Typing({
         const handleExitClick = (event) => {
             if (sessionLockedRef.current) return;
             if (!event.target.closest(EXIT_CLICK_SELECTOR)) return;
+            event.preventDefault();
+            event.stopPropagation();
             onExit?.();
         };
 
-        document.addEventListener('pointerdown', handleExitClick, true);
-        return () => document.removeEventListener('pointerdown', handleExitClick, true);
+        document.addEventListener('click', handleExitClick, true);
+        return () => document.removeEventListener('click', handleExitClick, true);
     }, [onExit, words.length]);
 
     useEffect(() => {
@@ -96,14 +120,28 @@ export default function Typing({
         if (!isCompleted) {
             inputRef.current?.focus();
         }
-    }, [currentIndex, isCompleted]);
+    }, [currentIndex, isCompleted, activeQueue]);
+
+    const questionsByWordId = useMemo(
+        () => questions.reduce((map, question) => {
+            map[question.wordId] = question;
+            return map;
+        }, {}),
+        [questions],
+    );
 
     const totalQuestions = questions.length;
-    const currentQuestion = questions[currentIndex];
+    const currentQuestion = isQueueMode ? questionsByWordId[activeQueue[0]] : questions[currentIndex];
     const currentAttempt = currentQuestion ? (attemptsByWordId[currentQuestion.wordId] || getEmptyAttempt()) : getEmptyAttempt();
     const answeredCount = Object.values(attemptsByWordId).filter((attempt) => attempt.isChecked).length;
-    const correctCount = Object.values(attemptsByWordId).filter((attempt) => attempt.isCorrect).length;
-    const progressLabel = totalQuestions ? `${currentIndex + 1}/${totalQuestions}` : '0/0';
+    const reviewedCount = Object.values(sessionStatsByWordId).reduce((sum, stats) => sum + stats.seenCount, 0);
+    const correctCount = isQueueMode
+        ? totalQuestions - activeQueue.length
+        : Object.values(attemptsByWordId).filter((attempt) => attempt.isCorrect).length;
+    const remainingCount = isQueueMode ? activeQueue.length : Math.max(totalQuestions - currentIndex - 1, 0);
+    const progressLabel = totalQuestions
+        ? (isQueueMode ? `${correctCount}/${totalQuestions}` : `${currentIndex + 1}/${totalQuestions}`)
+        : '0/0';
     const remainingHints = Math.max(0, MAX_HINT_LEVEL - currentAttempt.hintLevel);
 
     const maskedExample = useMemo(() => {
@@ -134,6 +172,15 @@ export default function Typing({
         });
     };
 
+    const speakCurrentWord = () => {
+        if (!currentQuestion?.word || !window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(currentQuestion.word.word);
+        utterance.lang = getSpeechLang(currentQuestion.word.language, topicLang);
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    };
+
     const handleInputChange = (event) => {
         if (!currentQuestion || currentAttempt.isChecked) return;
         const nextValue = event.target.value;
@@ -151,6 +198,12 @@ export default function Typing({
         const normalizedAnswer = normalizeTypingAnswer(currentQuestion.word.word);
         const isCorrect = normalizedInput === normalizedAnswer;
 
+        if (isCorrect) {
+            playCorrectSound();
+        } else {
+            playIncorrectSound();
+        }
+
         updateAttempt(currentQuestion.wordId, (attempt) => ({
             ...attempt,
             isChecked: true,
@@ -161,11 +214,31 @@ export default function Typing({
     const handleHint = () => {
         if (!currentQuestion || currentAttempt.isChecked || currentAttempt.hintLevel >= MAX_HINT_LEVEL) return;
 
+        if (
+            currentAttempt.hintLevel === TRANSCRIPTION_HINT_LEVEL - 1
+            || currentAttempt.hintLevel === MAX_HINT_LEVEL - 1
+        ) {
+            updateAttempt(currentQuestion.wordId, (attempt) => ({
+                ...attempt,
+                hintLevel: attempt.hintLevel + 1,
+            }));
+            return;
+        }
+
         const nextHint = getNextHintState(
             currentQuestion.word.word || '',
             currentAttempt.revealedIndices || [],
             currentAttempt.hintLevel || 0,
+            MAX_HINT_LEVEL,
         );
+
+        if (!nextHint.canAdvance) {
+            updateAttempt(currentQuestion.wordId, (attempt) => ({
+                ...attempt,
+                hintLevel: attempt.hintLevel + 1,
+            }));
+            return;
+        }
 
         updateAttempt(currentQuestion.wordId, (attempt) => ({
             ...attempt,
@@ -185,10 +258,40 @@ export default function Typing({
     };
 
     const handlePrevious = () => {
+        if (isQueueMode) return;
         setCurrentIndex((prev) => Math.max(prev - 1, 0));
     };
 
+    const resolveQueueAdvance = () => {
+        if (!currentQuestion || !currentAttempt.isChecked) return;
+
+        const result = resolveSessionQueueResult(activeQueue, currentQuestion.wordId, currentAttempt.isCorrect, sessionStatsByWordId);
+        setActiveQueue(result.queue);
+        setSessionStatsByWordId(result.statsByWordId);
+        setAttemptsByWordId((prev) => {
+            const nextAttempts = { ...prev };
+            if (!currentAttempt.isCorrect) {
+                delete nextAttempts[currentQuestion.wordId];
+            }
+            return nextAttempts;
+        });
+
+        if (currentAttempt.isCorrect) {
+            setSelectedWordIds((prev) => (prev.includes(currentQuestion.wordId) ? prev : [...prev, currentQuestion.wordId]));
+        }
+
+        if (result.isCompleted) {
+            setIsCompleted(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     const handleNext = () => {
+        if (isQueueMode) {
+            resolveQueueAdvance();
+            return;
+        }
+
         setCurrentIndex((prev) => Math.min(prev + 1, totalQuestions - 1));
     };
 
@@ -200,7 +303,10 @@ export default function Typing({
     };
 
     const handlePlayAgain = () => {
-        setQuestions(buildTypingQuestions(words));
+        const nextQuestions = buildTypingQuestions(words);
+        setQuestions(nextQuestions);
+        setActiveQueue(buildSessionQueue(nextQuestions, 'wordId'));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setAttemptsByWordId({});
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -242,7 +348,7 @@ export default function Typing({
         <section className="flashcard-shell typing-shell">
             <div className="flashcard-header-meta">
                 <div className="flashcard-progress">
-                    <span>Tiến độ:</span>
+                    <span>{isQueueMode ? 'Đã thuộc trong phiên:' : 'Tiến độ:'}</span>
                     <strong>{isCompleted ? `${totalQuestions}/${totalQuestions}` : progressLabel}</strong>
                 </div>
                 <div className="flashcard-header-actions">
@@ -261,18 +367,57 @@ export default function Typing({
                         <div className="typing-card">
                             <div className="typing-card-main">
                                 <div className="typing-topline-row">
-                                    <span className="typing-topline">Typing</span>
-                                    <span className="typing-substat">Tiến độ: {answeredCount}/{totalQuestions}</span>
+                                    <span className="typing-topline">Typing: Nhìn nghĩa và gõ lại từ</span>
+                                    <span className="typing-substat">
+                                        {isQueueMode ? `Còn lại ${remainingCount}/${totalQuestions}` : `Tiến độ: ${answeredCount}/${totalQuestions}`}
+                                    </span>
                                 </div>
 
                                 <div className="typing-prompt-card">
-                                    <span className="typing-prompt-label">Nhìn nghĩa và gõ lại từ</span>
                                     <h3>{currentQuestion.word.mean || 'Chưa có nghĩa'}</h3>
                                     <div className="typing-meta-row">
                                         <span className="typing-meta-pill">{currentQuestion.word.wordtype || 'Vocabulary'}</span>
-                                        {currentQuestion.word.transcription ? <span className="typing-meta-pill">{currentQuestion.word.transcription}</span> : null}
                                     </div>
                                 </div>
+
+                                {currentAttempt.hintLevel > 0 || currentAttempt.isExampleVisible ? (
+                                    <div className="typing-support-grid">
+                                        {currentAttempt.hintLevel > 0 ? (
+                                            <div className="typing-support-card">
+                                                <span className="typing-support-label">Gợi ý</span>
+                                                <div className="typing-hint-row">
+                                                    <div className="typing-hint-mask">{currentHintMask}</div>
+                                                    {currentAttempt.hintLevel >= MAX_HINT_LEVEL ? (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-primary typing-hint-audio-btn"
+                                                            onClick={speakCurrentWord}
+                                                        >
+                                                            {SPEAKER_ICON} Nghe
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                                <div className="typing-hint-meta">
+                                                    <span>
+                                                        Từ này có {(currentQuestion.word.word || '').replace(/\s+/g, '').length} chữ cái
+                                                    </span>
+                                                    {currentAttempt.hintLevel >= TRANSCRIPTION_HINT_LEVEL && currentQuestion.word.transcription ? (
+                                                        <span>Phiên âm: {currentQuestion.word.transcription}</span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {currentAttempt.isExampleVisible ? (
+                                            <div className="typing-support-card">
+                                                <span className="typing-support-label">Ví dụ</span>
+                                                <div className="typing-example-copy">
+                                                    {maskedExample || 'Chưa có ví dụ phù hợp để hiển thị.'}
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
 
                                 <div className="typing-tool-row">
                                     <button
@@ -294,7 +439,7 @@ export default function Typing({
                                 </div>
 
                                 <div className="typing-answer-box">
-                                    <label className="typing-input-label" htmlFor="typing-answer-input">Nhập word</label>
+                                    <label className="typing-input-label" htmlFor="typing-answer-input">Nhập từ vựng</label>
                                     <div className="typing-input-row">
                                         <input
                                             id="typing-answer-input"
@@ -320,21 +465,6 @@ export default function Typing({
                                     </div>
                                 </div>
 
-                                <div className="typing-support-grid">
-                                    <div className="typing-support-card">
-                                        <span className="typing-support-label">Gợi ý</span>
-                                        <div className="typing-hint-mask">{currentHintMask || 'Nhấn "Gợi ý" để mở gợi ý.'}</div>
-                                    </div>
-
-                                    <div className="typing-support-card">
-                                        <span className="typing-support-label">Ví dụ</span>
-                                        <div className={`typing-example-copy${currentAttempt.isExampleVisible ? '' : ' is-muted'}`}>
-                                            {currentAttempt.isExampleVisible
-                                                ? (maskedExample || 'Chưa có ví dụ phù hợp để hiển thị.')
-                                                : 'Nhấn "Xem ví dụ" để mở ví dụ có ẩn từ khóa.'}
-                                        </div>
-                                    </div>
-                                </div>
 
                                 {currentAttempt.isChecked ? (
                                     <div className={`typing-feedback${currentAttempt.isCorrect ? ' is-correct' : ' is-wrong'}`}>
@@ -342,27 +472,25 @@ export default function Typing({
                                         <span>
                                             {currentAttempt.isCorrect
                                                 ? `Bạn đã nhập đúng: ${currentQuestion.word.word}`
-                                                : `Đáp án đúng là ${currentQuestion.word.word}`}
+                                                : `Đáp án đúng là: ${currentQuestion.word.word}`}
                                         </span>
-                                        {currentQuestion.word.mean ? <span>Nghĩa: {currentQuestion.word.mean}</span> : null}
-                                        {currentQuestion.word.example ? <span>Ví dụ: {currentQuestion.word.example}</span> : null}
                                     </div>
-                                ) : (
-                                    <div className="typing-feedback typing-feedback-pending">
-                                        <strong>Mời nhập đáp án</strong>
-                                        <span>Sau khi bấm Check, câu trả lời sẽ được khóa.</span>
-                                    </div>
-                                )}
+                                ) : null}
                             </div>
                         </div>
                     </div>
 
-                    <div className="typing-actions">
-                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0}>
+                    <div className="typing-actions" style={{ marginBottom: '24px' }}>
+                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0 || isQueueMode}>
                             <span className="flashcard-nav-icon">{ARROW_LEFT_ICON}</span>
                             <span>TRƯỚC</span>
                         </button>
-                        {currentIndex === totalQuestions - 1 ? (
+                        {isQueueMode ? (
+                            <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleNext} disabled={!currentAttempt.isChecked}>
+                                <span>Tiếp</span>
+                                <span className="flashcard-nav-icon">{ARROW_RIGHT_ICON}</span>
+                            </button>
+                        ) : currentIndex === totalQuestions - 1 ? (
                             <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleComplete} disabled={!currentAttempt.isChecked}>
                                 <span>Xem kết quả</span>
                             </button>

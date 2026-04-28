@@ -1,6 +1,14 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import StudyCompletionPanel from './studyModes/StudyCompletionPanel';
-import { buildFlashcardDeck, getInitialRememberedSelection, getSpeechLang } from '../utils/studyModes';
+import {
+    buildFlashcardDeck,
+    buildSessionQueue,
+    buildWordsMap,
+    createSessionStats,
+    getInitialRememberedSelection,
+    getSpeechLang,
+    resolveSessionQueueResult,
+} from '../utils/studyModes';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
 
@@ -60,8 +68,12 @@ export default function Flashcard({
     onSaveLearnedWords,
     onExit,
     onBackToTopic,
+    learnUntilMastered = false,
 }) {
+    const isQueueMode = learnUntilMastered;
     const [sessionWords, setSessionWords] = useState(() => buildFlashcardDeck(words));
+    const [activeQueue, setActiveQueue] = useState(() => buildSessionQueue(buildFlashcardDeck(words)));
+    const [sessionStatsByWordId, setSessionStatsByWordId] = useState(() => createSessionStats(words, initialLearnedWordIds));
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [selectedWordIds, setSelectedWordIds] = useState(() => getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -69,8 +81,13 @@ export default function Flashcard({
     const [isSaved, setIsSaved] = useState(false);
     const sessionLockedRef = useRef(false);
 
+    const wordsById = useMemo(() => buildWordsMap(words), [words]);
+
     useEffect(() => {
-        setSessionWords(buildFlashcardDeck(words));
+        const nextSessionWords = buildFlashcardDeck(words);
+        setSessionWords(nextSessionWords);
+        setActiveQueue(buildSessionQueue(nextSessionWords));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setIsFlipped(false);
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -85,11 +102,13 @@ export default function Flashcard({
         const handleExitClick = (event) => {
             if (sessionLockedRef.current) return;
             if (!event.target.closest(EXIT_CLICK_SELECTOR)) return;
+            event.preventDefault();
+            event.stopPropagation();
             onExit?.();
         };
 
-        document.addEventListener('pointerdown', handleExitClick, true);
-        return () => document.removeEventListener('pointerdown', handleExitClick, true);
+        document.addEventListener('click', handleExitClick, true);
+        return () => document.removeEventListener('click', handleExitClick, true);
     }, [onExit, words.length]);
 
     useEffect(() => {
@@ -97,9 +116,13 @@ export default function Flashcard({
     }, []);
 
     const totalCards = sessionWords.length;
-    const currentWord = sessionWords[currentIndex];
-    const isLastCard = currentIndex === totalCards - 1;
-    const progressLabel = totalCards ? `${currentIndex + 1}/${totalCards}` : '0/0';
+    const currentWord = isQueueMode ? wordsById[activeQueue[0]] : sessionWords[currentIndex];
+    const remainingCount = isQueueMode ? activeQueue.length : Math.max(totalCards - currentIndex - 1, 0);
+    const masteredCount = isQueueMode ? totalCards - activeQueue.length : currentIndex;
+    const isLastCard = isQueueMode ? remainingCount === 1 : currentIndex === totalCards - 1;
+    const progressLabel = totalCards
+        ? (isQueueMode ? `${masteredCount}/${totalCards}` : `${currentIndex + 1}/${totalCards}`)
+        : '0/0';
     const currentWordRemembered = currentWord ? selectedWordIds.includes(currentWord.id) : false;
     const currentTheme = getCardTheme(currentWord, currentIndex);
     const languageLabel = LANGUAGE_LABELS[currentWord?.language || topicLang] || 'Từ vựng';
@@ -112,19 +135,50 @@ export default function Flashcard({
         ));
     };
 
+    const resolveQueueAdvance = (isMastered) => {
+        if (!currentWord) return;
+
+        const result = resolveSessionQueueResult(activeQueue, currentWord.id, isMastered, sessionStatsByWordId);
+        setActiveQueue(result.queue);
+        setSessionStatsByWordId(result.statsByWordId);
+
+        if (isMastered) {
+            setSelectedWordIds((prev) => (prev.includes(currentWord.id) ? prev : [...prev, currentWord.id]));
+        }
+
+        if (result.isCompleted) {
+            setIsCompleted(true);
+            setIsFlipped(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     const handlePrevious = () => {
-        if (!totalCards) return;
+        if (!totalCards || isQueueMode) return;
         setCurrentIndex((prev) => Math.max(prev - 1, 0));
         setIsFlipped(false);
     };
 
     const handleNext = () => {
         if (!totalCards) return;
+
+        if (isQueueMode) {
+            setIsFlipped(false);
+            resolveQueueAdvance(currentWordRemembered);
+            return;
+        }
+
         setCurrentIndex((prev) => Math.min(prev + 1, totalCards - 1));
         setIsFlipped(false);
     };
 
     const handleComplete = () => {
+        if (isQueueMode) {
+            setIsFlipped(false);
+            resolveQueueAdvance(currentWordRemembered);
+            return;
+        }
+
         setIsCompleted(true);
         setIsFlipped(false);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -138,7 +192,10 @@ export default function Flashcard({
     };
 
     const handlePlayAgain = () => {
-        setSessionWords(buildFlashcardDeck(words));
+        const nextSessionWords = buildFlashcardDeck(words);
+        setSessionWords(nextSessionWords);
+        setActiveQueue(buildSessionQueue(nextSessionWords));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setIsFlipped(false);
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -185,7 +242,7 @@ export default function Flashcard({
         <section className="flashcard-shell">
             <div className="flashcard-header-meta">
                 <div className="flashcard-progress">
-                    <span>Tiến độ:</span>
+                    <span>{isQueueMode ? 'Đã thuộc trong phiên:' : 'Tiến độ:'}</span>
                     <strong>{isCompleted ? `${totalCards}/${totalCards}` : progressLabel}</strong>
                 </div>
                 <div className="flashcard-header-actions">
@@ -259,8 +316,8 @@ export default function Flashcard({
                         </div>
                     </div>
 
-                    <div className="flashcard-actions">
-                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0}>
+                    <div className="flashcard-actions" style={{ marginBottom: '24px' }}>
+                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0 || isQueueMode}>
                             <span className="flashcard-nav-icon">{ARROW_LEFT_ICON}</span>
                             <span>TRƯỚC</span>
                         </button>
@@ -285,7 +342,12 @@ export default function Flashcard({
                             />
                             <span className="cv-switch-track"><span className="cv-switch-thumb"></span></span>
                         </label>
-                        {isLastCard ? (
+                        {isQueueMode ? (
+                            <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleNext}>
+                                <span>{currentWordRemembered ? 'Tiếp' : 'Quên'}</span>
+                                <span className="flashcard-nav-icon">{ARROW_RIGHT_ICON}</span>
+                            </button>
+                        ) : isLastCard ? (
                             <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleComplete}>
                                 <span>Xong</span>
                             </button>
@@ -312,7 +374,3 @@ export default function Flashcard({
         </section>
     );
 }
-
-
-
-

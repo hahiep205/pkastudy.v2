@@ -217,8 +217,8 @@ export default function Overview() {
         }
     };
 
-    const totalLearn = activeChartData.words.reduce((sum, value) => sum + value, 0);
-    const totalReview = activeChartData.xp.reduce((sum, value) => sum + value, 0);
+    const totalLearn = activeChartData.totalWords;
+    const totalReview = activeChartData.totalXp;
 
     const customTotal = customCourses.reduce((sum, topic) => sum + topic.words.length, 0);
     const customDone = customCourses.reduce(
@@ -302,8 +302,8 @@ export default function Overview() {
                     </div>
 
                     <div className="chart-legend">
-                        <span className="legend-dot" style={{ background: 'var(--blue)' }}></span> Từ mới đã học
-                        <span className="legend-dot" style={{ background: 'var(--green)', marginLeft: '16px' }}></span> EXP thực nhận
+                        <span className="legend-dot" style={{ background: 'var(--blue)' }}></span> EXP thực nhận
+                        <span className="legend-dot" style={{ background: 'var(--green)', marginLeft: '16px' }}></span> Từ mới đã học
                     </div>
                 </div>
 

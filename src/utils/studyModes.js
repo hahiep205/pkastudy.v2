@@ -30,6 +30,90 @@ export function buildFlashcardDeck(words = []) {
     return shuffleArray(words);
 }
 
+export function buildSessionQueue(items = [], idKey = 'id') {
+    return items
+        .map((item) => item?.[idKey])
+        .filter(Boolean);
+}
+
+export function buildWordsMap(words = []) {
+    return words.reduce((map, word) => {
+        if (word?.id) {
+            map[word.id] = word;
+        }
+        return map;
+    }, {});
+}
+
+export function createSessionStats(words = [], initialLearnedWordIds = []) {
+    const initiallyLearned = new Set(initialLearnedWordIds);
+
+    return words.reduce((stats, word) => {
+        if (!word?.id) return stats;
+
+        stats[word.id] = {
+            seenCount: 0,
+            correctCount: 0,
+            wrongCount: 0,
+            masteredInSession: initiallyLearned.has(word.id),
+        };
+
+        return stats;
+    }, {});
+}
+
+export function resolveSessionQueueResult(queue = [], wordId, isMastered, sessionStatsByWordId = {}) {
+    if (!wordId) {
+        return {
+            queue,
+            statsByWordId: sessionStatsByWordId,
+            isCompleted: queue.length === 0,
+        };
+    }
+
+    const nextQueue = [...queue];
+    if (nextQueue[0] === wordId) {
+        nextQueue.shift();
+    } else {
+        const queueIndex = nextQueue.indexOf(wordId);
+        if (queueIndex >= 0) {
+            nextQueue.splice(queueIndex, 1);
+        }
+    }
+
+    const previousStats = sessionStatsByWordId[wordId] || {
+        seenCount: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        masteredInSession: false,
+    };
+
+    const updatedStats = {
+        ...previousStats,
+        seenCount: previousStats.seenCount + 1,
+        correctCount: previousStats.correctCount + (isMastered ? 1 : 0),
+        wrongCount: previousStats.wrongCount + (isMastered ? 0 : 1),
+        masteredInSession: isMastered ? true : previousStats.masteredInSession,
+    };
+
+    if (!isMastered) {
+        const offset = previousStats.wrongCount >= 1
+            ? 1 + Math.floor(Math.random() * 2)
+            : 2 + Math.floor(Math.random() * 3);
+        const insertIndex = Math.min(nextQueue.length, offset);
+        nextQueue.splice(insertIndex, 0, wordId);
+    }
+
+    return {
+        queue: nextQueue,
+        statsByWordId: {
+            ...sessionStatsByWordId,
+            [wordId]: updatedStats,
+        },
+        isCompleted: nextQueue.length === 0,
+    };
+}
+
 function getChoiceText(word) {
     return word.mean?.trim() || word.word?.trim() || 'Chua co nghia';
 }
@@ -102,11 +186,11 @@ export function maskWordInExample(example = '', answer = '') {
     if (!escaped) return example;
 
     const wholeWordPattern = new RegExp(`\\b${escaped}\\b`, 'gi');
-    const maskedWholeWord = example.replace(wholeWordPattern, '__');
+    const maskedWholeWord = example.replace(wholeWordPattern, '_');
     if (maskedWholeWord !== example) return maskedWholeWord;
 
     const loosePattern = new RegExp(escaped, 'gi');
-    return example.replace(loosePattern, '__');
+    return example.replace(loosePattern, '_');
 }
 
 function getRevealableIndices(answer = '') {
@@ -129,7 +213,7 @@ export function buildHintMask(answer = '', revealedIndices = []) {
         .trim();
 }
 
-export function getNextHintState(answer = '', revealedIndices = [], hintLevel = 0) {
+export function getNextHintState(answer = '', revealedIndices = [], hintLevel = 0, maxHintLevel = 4) {
     const revealableIndices = getRevealableIndices(answer);
     const availableIndices = revealableIndices.filter((index) => !revealedIndices.includes(index));
 
@@ -142,7 +226,7 @@ export function getNextHintState(answer = '', revealedIndices = [], hintLevel = 
         };
     }
 
-    if (!availableIndices.length || hintLevel >= 4) {
+    if (!availableIndices.length || hintLevel >= maxHintLevel) {
         return {
             hintLevel,
             revealedIndices,
@@ -186,6 +270,3 @@ export function buildMatchBoard(words = [], limit = 20) {
         }))),
     };
 }
-
-
-

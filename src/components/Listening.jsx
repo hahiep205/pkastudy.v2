@@ -1,17 +1,23 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import StudyCompletionPanel from './studyModes/StudyCompletionPanel';
 import {
-    buildTypingQuestions,
     buildHintMask,
+    buildSessionQueue,
+    buildTypingQuestions,
+    createSessionStats,
     getInitialRememberedSelection,
     getNextHintState,
     getSpeechLang,
     maskWordInExample,
     normalizeTypingAnswer,
+    resolveSessionQueueResult,
 } from '../utils/studyModes';
+import { playCorrectSound, playIncorrectSound } from '../utils/feedbackAudio';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
-const MAX_HINT_LEVEL = 4;
+const MAX_HINT_LEVEL = 6;
+const TRANSCRIPTION_HINT_LEVEL = 5;
+const MEANING_HINT_LEVEL = 6;
 const MAX_EXAMPLE_VIEWS = 1;
 
 const ARROW_LEFT_ICON = (
@@ -65,8 +71,12 @@ export default function Listening({
     onSaveLearnedWords,
     onExit,
     onBackToTopic,
+    learnUntilMastered = false,
 }) {
+    const isQueueMode = learnUntilMastered;
     const [questions, setQuestions] = useState(() => buildTypingQuestions(words));
+    const [activeQueue, setActiveQueue] = useState(() => buildSessionQueue(buildTypingQuestions(words), 'wordId'));
+    const [sessionStatsByWordId, setSessionStatsByWordId] = useState(() => createSessionStats(words, initialLearnedWordIds));
     const [currentIndex, setCurrentIndex] = useState(0);
     const [attemptsByWordId, setAttemptsByWordId] = useState({});
     const [selectedWordIds, setSelectedWordIds] = useState(() => getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -76,7 +86,10 @@ export default function Listening({
     const sessionLockedRef = useRef(false);
 
     useEffect(() => {
-        setQuestions(buildTypingQuestions(words));
+        const nextQuestions = buildTypingQuestions(words);
+        setQuestions(nextQuestions);
+        setActiveQueue(buildSessionQueue(nextQuestions, 'wordId'));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setAttemptsByWordId({});
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -91,11 +104,13 @@ export default function Listening({
         const handleExitClick = (event) => {
             if (sessionLockedRef.current) return;
             if (!event.target.closest(EXIT_CLICK_SELECTOR)) return;
+            event.preventDefault();
+            event.stopPropagation();
             onExit?.();
         };
 
-        document.addEventListener('pointerdown', handleExitClick, true);
-        return () => document.removeEventListener('pointerdown', handleExitClick, true);
+        document.addEventListener('click', handleExitClick, true);
+        return () => document.removeEventListener('click', handleExitClick, true);
     }, [onExit, words.length]);
 
     useEffect(() => {
@@ -106,14 +121,28 @@ export default function Listening({
         if (!isCompleted) {
             inputRef.current?.focus();
         }
-    }, [currentIndex, isCompleted]);
+    }, [currentIndex, isCompleted, activeQueue]);
+
+    const questionsByWordId = useMemo(
+        () => questions.reduce((map, question) => {
+            map[question.wordId] = question;
+            return map;
+        }, {}),
+        [questions],
+    );
 
     const totalQuestions = questions.length;
-    const currentQuestion = questions[currentIndex];
+    const currentQuestion = isQueueMode ? questionsByWordId[activeQueue[0]] : questions[currentIndex];
     const currentAttempt = currentQuestion ? (attemptsByWordId[currentQuestion.wordId] || getEmptyAttempt()) : getEmptyAttempt();
     const answeredCount = Object.values(attemptsByWordId).filter((attempt) => attempt.isChecked).length;
-    const correctCount = Object.values(attemptsByWordId).filter((attempt) => attempt.isCorrect).length;
-    const progressLabel = totalQuestions ? `${currentIndex + 1}/${totalQuestions}` : '0/0';
+    const reviewedCount = Object.values(sessionStatsByWordId).reduce((sum, stats) => sum + stats.seenCount, 0);
+    const correctCount = isQueueMode
+        ? totalQuestions - activeQueue.length
+        : Object.values(attemptsByWordId).filter((attempt) => attempt.isCorrect).length;
+    const remainingCount = isQueueMode ? activeQueue.length : Math.max(totalQuestions - currentIndex - 1, 0);
+    const progressLabel = totalQuestions
+        ? (isQueueMode ? `${correctCount}/${totalQuestions}` : `${currentIndex + 1}/${totalQuestions}`)
+        : '0/0';
     const remainingHints = Math.max(0, MAX_HINT_LEVEL - currentAttempt.hintLevel);
 
     const maskedExample = useMemo(() => {
@@ -170,6 +199,12 @@ export default function Listening({
         const normalizedAnswer = normalizeTypingAnswer(currentQuestion.word.word);
         const isCorrect = normalizedInput === normalizedAnswer;
 
+        if (isCorrect) {
+            playCorrectSound();
+        } else {
+            playIncorrectSound();
+        }
+
         updateAttempt(currentQuestion.wordId, (attempt) => ({
             ...attempt,
             isChecked: true,
@@ -180,11 +215,31 @@ export default function Listening({
     const handleHint = () => {
         if (!currentQuestion || currentAttempt.isChecked || currentAttempt.hintLevel >= MAX_HINT_LEVEL) return;
 
+        if (
+            currentAttempt.hintLevel === TRANSCRIPTION_HINT_LEVEL - 1
+            || currentAttempt.hintLevel === MEANING_HINT_LEVEL - 1
+        ) {
+            updateAttempt(currentQuestion.wordId, (attempt) => ({
+                ...attempt,
+                hintLevel: attempt.hintLevel + 1,
+            }));
+            return;
+        }
+
         const nextHint = getNextHintState(
             currentQuestion.word.word || '',
             currentAttempt.revealedIndices || [],
             currentAttempt.hintLevel || 0,
+            MAX_HINT_LEVEL,
         );
+
+        if (!nextHint.canAdvance) {
+            updateAttempt(currentQuestion.wordId, (attempt) => ({
+                ...attempt,
+                hintLevel: attempt.hintLevel + 1,
+            }));
+            return;
+        }
 
         updateAttempt(currentQuestion.wordId, (attempt) => ({
             ...attempt,
@@ -204,10 +259,40 @@ export default function Listening({
     };
 
     const handlePrevious = () => {
+        if (isQueueMode) return;
         setCurrentIndex((prev) => Math.max(prev - 1, 0));
     };
 
+    const resolveQueueAdvance = () => {
+        if (!currentQuestion || !currentAttempt.isChecked) return;
+
+        const result = resolveSessionQueueResult(activeQueue, currentQuestion.wordId, currentAttempt.isCorrect, sessionStatsByWordId);
+        setActiveQueue(result.queue);
+        setSessionStatsByWordId(result.statsByWordId);
+        setAttemptsByWordId((prev) => {
+            const nextAttempts = { ...prev };
+            if (!currentAttempt.isCorrect) {
+                delete nextAttempts[currentQuestion.wordId];
+            }
+            return nextAttempts;
+        });
+
+        if (currentAttempt.isCorrect) {
+            setSelectedWordIds((prev) => (prev.includes(currentQuestion.wordId) ? prev : [...prev, currentQuestion.wordId]));
+        }
+
+        if (result.isCompleted) {
+            setIsCompleted(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     const handleNext = () => {
+        if (isQueueMode) {
+            resolveQueueAdvance();
+            return;
+        }
+
         setCurrentIndex((prev) => Math.min(prev + 1, totalQuestions - 1));
     };
 
@@ -219,7 +304,10 @@ export default function Listening({
     };
 
     const handlePlayAgain = () => {
-        setQuestions(buildTypingQuestions(words));
+        const nextQuestions = buildTypingQuestions(words);
+        setQuestions(nextQuestions);
+        setActiveQueue(buildSessionQueue(nextQuestions, 'wordId'));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setAttemptsByWordId({});
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -261,7 +349,7 @@ export default function Listening({
         <section className="flashcard-shell listening-shell">
             <div className="flashcard-header-meta">
                 <div className="flashcard-progress">
-                    <span>Tiến độ:</span>
+                    <span>{isQueueMode ? 'Đã thuộc trong phiên:' : 'Tiến độ:'}</span>
                     <strong>{isCompleted ? `${totalQuestions}/${totalQuestions}` : progressLabel}</strong>
                 </div>
                 <div className="flashcard-header-actions">
@@ -280,15 +368,46 @@ export default function Listening({
                         <div className="listening-card">
                             <div className="listening-card-main">
                                 <div className="listening-topline-row">
-                                    <span className="listening-topline">Listening</span>
-                                    <span className="listening-substat">Tiến độ: {answeredCount}/{totalQuestions}</span>
+                                    <span className="listening-topline">Listening: nghe phát âm và nhập lại</span>
+                                    <span className="listening-substat">
+                                        {isQueueMode ? `Còn lại ${remainingCount}/${totalQuestions}` : `Tiến độ: ${answeredCount}/${totalQuestions}`}
+                                    </span>
                                 </div>
 
-                                <div className="listening-prompt-card">
-                                    <span className="listening-prompt-label">Nghe và điền lại</span>
-                                    <h3>Hãy nghe phát âm và nhập lại đúng từ vừa nghe</h3>
-                                    <p>Bạn có {MAX_HINT_LEVEL} lượt gợi ý mỗi câu và chỉ được xem ví dụ 1 lần cho mỗi câu.</p>
-                                </div>
+                                {currentAttempt.hintLevel > 0 || currentAttempt.isExampleVisible ? (
+                                    <div className="listening-support-grid">
+                                        {currentAttempt.hintLevel > 0 ? (
+                                            <div className="listening-support-card">
+                                                <span className="listening-support-label">Gợi ý</span>
+                                                <div className="listening-hint-mask">
+                                                    {currentHintMask}
+                                                </div>
+                                                <div className="listening-hint-meta">
+                                                    <span>
+                                                        Từ này có {(currentQuestion.word.word || '').replace(/\s+/g, '').length} chữ cái
+                                                    </span>
+                                                    {currentAttempt.hintLevel >= TRANSCRIPTION_HINT_LEVEL && currentQuestion.word.transcription ? (
+                                                        <span>Phiên âm: {currentQuestion.word.transcription}</span>
+                                                    ) : null}
+                                                </div>
+                                                {currentAttempt.hintLevel >= MEANING_HINT_LEVEL && currentQuestion.word.mean ? (
+                                                    <div className="listening-hint-meaning">
+                                                        Nghĩa: {currentQuestion.word.mean}
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+
+                                        {currentAttempt.isExampleVisible ? (
+                                            <div className="listening-support-card">
+                                                <span className="listening-support-label">Ví dụ</span>
+                                                <div className="listening-example-copy">
+                                                    {maskedExample || 'Chưa có ví dụ phù hợp để hiển thị.'}
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
 
                                 <div className="listening-tool-row">
                                     <button
@@ -299,7 +418,7 @@ export default function Listening({
                                     >
                                         {SPEAKER_ICON} Nghe
                                     </button>
-                                    <div class="helper-group">
+                                    <div className="helper-group">
                                         <button
                                             type="button"
                                             className="btn btn-secondary listening-helper-btn"
@@ -346,49 +465,31 @@ export default function Listening({
                                     </div>
                                 </div>
 
-                                <div className="listening-support-grid">
-                                    <div className="listening-support-card">
-                                        <span className="listening-support-label">Gợi ý</span>
-                                        <div className="listening-hint-mask">{currentHintMask || 'Nhấn "Gợi ý"'}</div>
-                                    </div>
-
-                                    <div className="listening-support-card">
-                                        <span className="listening-support-label">Ví dụ</span>
-                                        <div className={`listening-example-copy${currentAttempt.isExampleVisible ? '' : ' is-muted'}`}>
-                                            {currentAttempt.isExampleVisible
-                                                ? (maskedExample || 'Chưa có ví dụ phù hợp để hiển thị.')
-                                                : 'Nhấn "Xem ví dụ" để mở ví dụ có ẩn từ khóa.'}
-                                        </div>
-                                    </div>
-                                </div>
-
                                 {currentAttempt.isChecked ? (
                                     <div className={`listening-feedback${currentAttempt.isCorrect ? ' is-correct' : ' is-wrong'}`}>
                                         <strong>{currentAttempt.isCorrect ? 'Chính xác' : 'Chưa đúng'}</strong>
                                         <span>
                                             {currentAttempt.isCorrect
                                                 ? `Bạn đã nhập đúng: ${currentQuestion.word.word}`
-                                                : `Đáp án đúng là ${currentQuestion.word.word}`}
+                                                : `Đáp án đúng là: ${currentQuestion.word.word}`}
                                         </span>
-                                        {currentQuestion.word.transcription ? <span>Phiên âm: {currentQuestion.word.transcription}</span> : null}
-                                        {currentQuestion.word.mean ? <span>Nghĩa: {currentQuestion.word.mean}</span> : null}
                                     </div>
-                                ) : (
-                                    <div className="listening-feedback listening-feedback-pending">
-                                        <strong>Mời nghe và nhập lại</strong>
-                                        <span>Sau khi bấm Check, câu trả lời sẽ được khóa.</span>
-                                    </div>
-                                )}
+                                ) : null}
                             </div>
                         </div>
                     </div>
 
-                    <div className="listening-actions">
-                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0}>
+                    <div className="listening-actions" style={{ marginBottom: '24px' }}>
+                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0 || isQueueMode}>
                             <span className="flashcard-nav-icon">{ARROW_LEFT_ICON}</span>
                             <span>TRƯỚC</span>
                         </button>
-                        {currentIndex === totalQuestions - 1 ? (
+                        {isQueueMode ? (
+                            <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleNext} disabled={!currentAttempt.isChecked}>
+                                <span>Tiếp</span>
+                                <span className="flashcard-nav-icon">{ARROW_RIGHT_ICON}</span>
+                            </button>
+                        ) : currentIndex === totalQuestions - 1 ? (
                             <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleComplete} disabled={!currentAttempt.isChecked}>
                                 <span>Xem kết quả</span>
                             </button>

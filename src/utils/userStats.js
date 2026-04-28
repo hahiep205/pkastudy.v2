@@ -93,7 +93,9 @@ export function recordUserStatsSnapshot(userKey = 'guest', progress, options = {
         ...existingDay,
         date: dateKey,
         dailyXp: Number.isFinite(progress.dailyXp) ? progress.dailyXp : existingDay.dailyXp,
-        learnedWords: Array.isArray(progress.learnedWordIdsToday) ? progress.learnedWordIdsToday.length : existingDay.learnedWords,
+        learnedWords: Array.isArray(progress.learnedWordEventIdsToday)
+            ? progress.learnedWordEventIdsToday.length
+            : (Array.isArray(progress.learnedWordIdsToday) ? progress.learnedWordIdsToday.length : existingDay.learnedWords),
         rememberedTotal,
         totalXp: Number.isFinite(progress.totalXp) ? progress.totalXp : existingDay.totalXp,
         streak: Number.isFinite(progress.streak) ? progress.streak : existingDay.streak,
@@ -167,7 +169,19 @@ export function buildActivityChartData(userKey = 'guest', period = 'week') {
             words.push(bucketWords);
         });
 
-        return { labels, xp, words };
+        const totalXp = xp.reduce((sum, value) => sum + value, 0);
+        const totalWords = words.reduce((sum, value) => sum + value, 0);
+
+        return {
+            labels,
+            xp,
+            words,
+            totalXp,
+            totalWords,
+            peakXp: Math.max(...xp, 0),
+            peakWords: Math.max(...words, 0),
+            activeBuckets: labels.filter((_, index) => xp[index] > 0 || words[index] > 0).length,
+        };
     }
 
     const labels = [];
@@ -185,7 +199,19 @@ export function buildActivityChartData(userKey = 'guest', period = 'week') {
         words.push(day.learnedWords || 0);
     }
 
-    return { labels, xp, words };
+    const totalXp = xp.reduce((sum, value) => sum + value, 0);
+    const totalWords = words.reduce((sum, value) => sum + value, 0);
+
+    return {
+        labels,
+        xp,
+        words,
+        totalXp,
+        totalWords,
+        peakXp: Math.max(...xp, 0),
+        peakWords: Math.max(...words, 0),
+        activeBuckets: labels.filter((_, index) => xp[index] > 0 || words[index] > 0).length,
+    };
 }
 
 export function getStatsSummary(userKey = 'guest') {

@@ -78,6 +78,7 @@ function createDefaultProgress() {
         currentDate: getTodayKey(),
         lastStreakDate: null,
         learnedWordIdsToday: [],
+        learnedWordEventIdsToday: [],
         tasks: createDailyTasks(),
     };
 }
@@ -92,6 +93,7 @@ function normalizeProgress(progress) {
         currentDate: typeof safe.currentDate === 'string' ? safe.currentDate : getTodayKey(),
         lastStreakDate: typeof safe.lastStreakDate === 'string' ? safe.lastStreakDate : null,
         learnedWordIdsToday: Array.isArray(safe.learnedWordIdsToday) ? safe.learnedWordIdsToday : [],
+        learnedWordEventIdsToday: Array.isArray(safe.learnedWordEventIdsToday) ? safe.learnedWordEventIdsToday : [],
         tasks: Array.isArray(safe.tasks) && safe.tasks.length
             ? TASK_TEMPLATES.map((template) => {
                 const existing = safe.tasks.find((task) => task.id === template.id);
@@ -122,6 +124,7 @@ export function ensureTodayProgress(progress) {
         currentDate: today,
         dailyXp: 0,
         learnedWordIdsToday: [],
+        learnedWordEventIdsToday: [],
         tasks: createDailyTasks(),
     };
 }
@@ -290,9 +293,13 @@ export function syncRememberedWordProgress(previousRemembered = {}, nextRemember
     const previousIds = new Set(Object.keys(previousRemembered).filter((id) => previousRemembered[id]));
     const nextIds = new Set(Object.keys(nextRemembered).filter((id) => nextRemembered[id]));
     const learnedToday = new Set(current.learnedWordIdsToday);
+    const learnedEventsToday = new Set(current.learnedWordEventIdsToday);
 
     nextIds.forEach((id) => {
-        if (!previousIds.has(id)) learnedToday.add(id);
+        if (!previousIds.has(id)) {
+            learnedToday.add(id);
+            learnedEventsToday.add(id);
+        }
     });
 
     previousIds.forEach((id) => {
@@ -302,6 +309,7 @@ export function syncRememberedWordProgress(previousRemembered = {}, nextRemember
     let nextProgress = {
         ...current,
         learnedWordIdsToday: Array.from(learnedToday),
+        learnedWordEventIdsToday: Array.from(learnedEventsToday),
     };
 
     const learnTask = nextProgress.tasks.find((task) => task.id === 'learn-ten-words');

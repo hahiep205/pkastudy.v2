@@ -1,6 +1,14 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import StudyCompletionPanel from './studyModes/StudyCompletionPanel';
-import { buildQuizQuestions, getInitialRememberedSelection, getSpeechLang } from '../utils/studyModes';
+import {
+    buildQuizQuestions,
+    buildSessionQueue,
+    createSessionStats,
+    getInitialRememberedSelection,
+    getSpeechLang,
+    resolveSessionQueueResult,
+} from '../utils/studyModes';
+import { playCorrectSound, playIncorrectSound } from '../utils/feedbackAudio';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
 
@@ -43,8 +51,12 @@ export default function Quiz({
     onSaveLearnedWords,
     onExit,
     onBackToTopic,
+    learnUntilMastered = false,
 }) {
+    const isQueueMode = learnUntilMastered;
     const [questions, setQuestions] = useState(() => buildQuizQuestions(words));
+    const [activeQueue, setActiveQueue] = useState(() => buildSessionQueue(buildQuizQuestions(words), 'wordId'));
+    const [sessionStatsByWordId, setSessionStatsByWordId] = useState(() => createSessionStats(words, initialLearnedWordIds));
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answersByWordId, setAnswersByWordId] = useState({});
     const [selectedWordIds, setSelectedWordIds] = useState(() => getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -53,7 +65,10 @@ export default function Quiz({
     const sessionLockedRef = useRef(false);
 
     useEffect(() => {
-        setQuestions(buildQuizQuestions(words));
+        const nextQuestions = buildQuizQuestions(words);
+        setQuestions(nextQuestions);
+        setActiveQueue(buildSessionQueue(nextQuestions, 'wordId'));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setAnswersByWordId({});
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -68,23 +83,39 @@ export default function Quiz({
         const handleExitClick = (event) => {
             if (sessionLockedRef.current) return;
             if (!event.target.closest(EXIT_CLICK_SELECTOR)) return;
+            event.preventDefault();
+            event.stopPropagation();
             onExit?.();
         };
 
-        document.addEventListener('pointerdown', handleExitClick, true);
-        return () => document.removeEventListener('pointerdown', handleExitClick, true);
+        document.addEventListener('click', handleExitClick, true);
+        return () => document.removeEventListener('click', handleExitClick, true);
     }, [onExit, words.length]);
 
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
+    const questionsByWordId = useMemo(
+        () => questions.reduce((map, question) => {
+            map[question.wordId] = question;
+            return map;
+        }, {}),
+        [questions],
+    );
+
     const totalQuestions = questions.length;
-    const currentQuestion = questions[currentIndex];
+    const currentQuestion = isQueueMode ? questionsByWordId[activeQueue[0]] : questions[currentIndex];
     const currentAnswer = currentQuestion ? answersByWordId[currentQuestion.wordId] : null;
     const answeredCount = Object.keys(answersByWordId).length;
-    const correctCount = Object.values(answersByWordId).filter((answer) => answer.isCorrect).length;
-    const progressLabel = totalQuestions ? `${currentIndex + 1}/${totalQuestions}` : '0/0';
+    const reviewedCount = Object.values(sessionStatsByWordId).reduce((sum, stats) => sum + stats.seenCount, 0);
+    const correctCount = isQueueMode
+        ? totalQuestions - activeQueue.length
+        : Object.values(answersByWordId).filter((answer) => answer.isCorrect).length;
+    const remainingCount = isQueueMode ? activeQueue.length : Math.max(totalQuestions - currentIndex - 1, 0);
+    const progressLabel = totalQuestions
+        ? (isQueueMode ? `${correctCount}/${totalQuestions}` : `${currentIndex + 1}/${totalQuestions}`)
+        : '0/0';
     const hasEnoughWords = words.length >= 4;
     const hasFullChoiceSet = questions.every((question) => question.choices.length === 4);
 
@@ -108,6 +139,12 @@ export default function Quiz({
     const handleSelectChoice = (choice) => {
         if (!currentQuestion || currentAnswer) return;
 
+        if (choice.isCorrect) {
+            playCorrectSound();
+        } else {
+            playIncorrectSound();
+        }
+
         setAnswersByWordId((prev) => ({
             ...prev,
             [currentQuestion.wordId]: {
@@ -119,10 +156,40 @@ export default function Quiz({
     };
 
     const handlePrevious = () => {
+        if (isQueueMode) return;
         setCurrentIndex((prev) => Math.max(prev - 1, 0));
     };
 
+    const resolveQueueAdvance = () => {
+        if (!currentQuestion || !currentAnswer) return;
+
+        const result = resolveSessionQueueResult(activeQueue, currentQuestion.wordId, currentAnswer.isCorrect, sessionStatsByWordId);
+        setActiveQueue(result.queue);
+        setSessionStatsByWordId(result.statsByWordId);
+        setAnswersByWordId((prev) => {
+            const nextAnswers = { ...prev };
+            if (!currentAnswer.isCorrect) {
+                delete nextAnswers[currentQuestion.wordId];
+            }
+            return nextAnswers;
+        });
+
+        if (currentAnswer.isCorrect) {
+            setSelectedWordIds((prev) => (prev.includes(currentQuestion.wordId) ? prev : [...prev, currentQuestion.wordId]));
+        }
+
+        if (result.isCompleted) {
+            setIsCompleted(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     const handleNext = () => {
+        if (isQueueMode) {
+            resolveQueueAdvance();
+            return;
+        }
+
         setCurrentIndex((prev) => Math.min(prev + 1, totalQuestions - 1));
     };
 
@@ -134,7 +201,10 @@ export default function Quiz({
     };
 
     const handlePlayAgain = () => {
-        setQuestions(buildQuizQuestions(words));
+        const nextQuestions = buildQuizQuestions(words);
+        setQuestions(nextQuestions);
+        setActiveQueue(buildSessionQueue(nextQuestions, 'wordId'));
+        setSessionStatsByWordId(createSessionStats(words, initialLearnedWordIds));
         setCurrentIndex(0);
         setAnswersByWordId({});
         setSelectedWordIds(getInitialRememberedSelection(words, initialLearnedWordIds));
@@ -186,7 +256,7 @@ export default function Quiz({
         <section className="flashcard-shell quiz-shell">
             <div className="flashcard-header-meta">
                 <div className="flashcard-progress">
-                    <span>Tiến độ:</span>
+                    <span>{isQueueMode ? 'Đã thuộc trong phiên:' : 'Tiến độ:'}</span>
                     <strong>{isCompleted ? `${totalQuestions}/${totalQuestions}` : progressLabel}</strong>
                 </div>
                 <div className="flashcard-header-actions">
@@ -205,8 +275,10 @@ export default function Quiz({
                         <div className="quiz-card">
                             <div className="quiz-card-main">
                                 <div className="quiz-topline-row">
-                                    <span className="quiz-topline">Quiz</span>
-                                    <span className="quiz-substat">Đã trả lời {answeredCount}/{totalQuestions}</span>
+                                    <span className="quiz-topline"><strong>Quiz:</strong> chọn nghĩa tiếng Việt phù hợp nhất</span>
+                                    <span className="quiz-substat">
+                                        {isQueueMode ? `Còn lại ${remainingCount}/${totalQuestions}` : `Đã trả lời ${answeredCount}/${totalQuestions}`}
+                                    </span>
                                 </div>
 
                                 <div className="quiz-word-block">
@@ -215,11 +287,6 @@ export default function Quiz({
                                         <span>{currentQuestion.word.wordtype || 'Vocabulary'}</span>
                                         <span>{currentQuestion.word.transcription || '/dang-cap-nhat/'}</span>
                                     </div>
-                                </div>
-
-                                <div className="quiz-prompt-box">
-                                    <span className="quiz-prompt-label">Chọn nghĩa đúng</span>
-                                    <p className="quiz-prompt-copy">Đâu là nghĩa tiếng Việt phù hợp nhất với từ trên?</p>
                                 </div>
 
                                 <div className="quiz-choice-grid">
@@ -250,18 +317,13 @@ export default function Quiz({
                                             {currentQuestion.word.example ? ` - Ví dụ: ${currentQuestion.word.example}` : ''}
                                         </span>
                                     </div>
-                                ) : (
-                                    <div className="quiz-feedback quiz-feedback-pending">
-                                        <strong>Mời chọn 1 đáp án</strong>
-                                        <span>Quiz sẽ khóa đáp án ngay sau khi bạn chọn.</span>
-                                    </div>
-                                )}
+                                ) : null}
                             </div>
                         </div>
                     </div>
 
-                    <div className="quiz-actions">
-                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0}>
+                    <div className="quiz-actions" style={{ marginBottom: '24px' }}>
+                        <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handlePrevious} disabled={currentIndex === 0 || isQueueMode}>
                             <span className="flashcard-nav-icon">{ARROW_LEFT_ICON}</span>
                             <span>TRƯỚC</span>
                         </button>
@@ -273,7 +335,12 @@ export default function Quiz({
                         >
                             {SPEAKER_ICON} Nghe
                         </button>
-                        {currentIndex === totalQuestions - 1 ? (
+                        {isQueueMode ? (
+                            <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleNext} disabled={!currentAnswer}>
+                                <span>Tiếp</span>
+                                <span className="flashcard-nav-icon">{ARROW_RIGHT_ICON}</span>
+                            </button>
+                        ) : currentIndex === totalQuestions - 1 ? (
                             <button type="button" className="btn btn-primary flashcard-action-btn" onClick={handleComplete} disabled={!currentAnswer}>
                                 <span>Xem kết quả</span>
                             </button>

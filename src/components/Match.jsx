@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import StudyCompletionPanel from './studyModes/StudyCompletionPanel';
 import { buildMatchBoard, getInitialRememberedSelection } from '../utils/studyModes';
+import { playCorrectSound, playIncorrectSound } from '../utils/feedbackAudio';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
 const MAX_PAIRS = 20;
@@ -60,11 +61,13 @@ export default function Match({
         const handleExitClick = (event) => {
             if (sessionLockedRef.current) return;
             if (!event.target.closest(EXIT_CLICK_SELECTOR)) return;
+            event.preventDefault();
+            event.stopPropagation();
             onExit?.();
         };
 
-        document.addEventListener('pointerdown', handleExitClick, true);
-        return () => document.removeEventListener('pointerdown', handleExitClick, true);
+        document.addEventListener('click', handleExitClick, true);
+        return () => document.removeEventListener('click', handleExitClick, true);
     }, [board.pairs.length, onExit]);
 
     useEffect(() => {
@@ -133,12 +136,14 @@ export default function Match({
         }
 
         if (currentSelection.wordId === wordId) {
+            playCorrectSound();
             setMatchedWordIds((prev) => [...prev, wordId]);
             setSelection({ side: null, wordId: null });
             setWrongPair(null);
             return;
         }
 
+        playIncorrectSound();
         setWrongPair({
             leftWordId: side === 'left' ? wordId : currentSelection.wordId,
             rightWordId: side === 'right' ? wordId : currentSelection.wordId,
@@ -218,7 +223,7 @@ export default function Match({
                             <div className="match-board-header">
                                 <div>
                                     <span className="match-topline">Match</span>
-                                    <h3>Nối word với nghĩa đúng</h3>
+                                    <h3>Nối từ vựng với nghĩa đúng</h3>
                                 </div>
                                 <div className="match-status-group">
                                     <span className="match-status-pill">Đã nối đúng {matchedCount}/{totalPairs}</span>
@@ -228,23 +233,9 @@ export default function Match({
                                 </div>
                             </div>
 
-                            <div className="match-feedback-row">
-                                {wrongPair ? (
-                                    <div className="match-feedback match-feedback-wrong">Sai cặp, hãy thử lại.</div>
-                                ) : selection.side ? (
-                                    <div className="match-feedback match-feedback-pending">
-                                        Đã chọn 1 {selection.side === 'left' ? 'word' : 'nghĩa'}, chọn item bên cọt còn lại. Bấm lại chính item đó nếu muốn bỏ chọn.
-                                    </div>
-                                ) : (
-                                    <div className="match-feedback match-feedback-idle">
-                                        Bạn có thể chọn word trước rồi chọn nghĩa, hoặc ngược lại.
-                                    </div>
-                                )}
-                            </div>
-
                             <div className="match-board">
                                 <div className="match-column">
-                                    <div className="match-column-head">Words</div>
+                                    <div className="match-column-head">Từ vựng</div>
                                     <div className="match-column-list">
                                         {activeLeftItems.map((item) => {
                                             const isSelected = selection.side === 'left' && selection.wordId === item.wordId;
@@ -264,7 +255,7 @@ export default function Match({
                                 </div>
 
                                 <div className="match-column">
-                                    <div className="match-column-head">Means</div>
+                                    <div className="match-column-head">Nghĩa</div>
                                     <div className="match-column-list">
                                         {activeRightItems.map((item) => {
                                             const isSelected = selection.side === 'right' && selection.wordId === item.wordId;
