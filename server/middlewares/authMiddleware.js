@@ -1,3 +1,6 @@
+require('dotenv').config();
+const jwt = require('jsonwebtoken');
+
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
@@ -6,14 +9,17 @@ function authMiddleware(req, res, next) {
   }
 
   const token = authHeader.split(' ')[1];
-
-  // TODO: Replace with JWT validation and actual user lookup
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  req.userId = 'placeholder-user-id';
-  next();
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_jwt_secret');
+    req.userId = decoded.id;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 }
 
 module.exports = {
