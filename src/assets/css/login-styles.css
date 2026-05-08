@@ -692,3 +692,590 @@ body.mobile-menu-open {
         width: 62%;
     }
 }
+
+/* ==========================================================================
+   AUTH LAYOUT - TWO COLUMN (SIDEBAR + FORM)
+   ========================================================================== */
+.auth-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, rgba(28, 176, 246, 0.06) 0%, #fff 60%);
+    min-height: calc(100vh - 64px);
+}
+
+.auth-container {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    max-width: 900px;
+    width: 100%;
+    background: white;
+    border-radius: 24px;
+    border: 2px solid var(--border-color);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.10);
+    overflow: hidden;
+    min-height: 580px;
+}
+
+/* ==========================================================================
+   AUTH SIDEBAR (LEFT PANEL)
+   ========================================================================== */
+.auth-sidebar {
+    background: linear-gradient(160deg, var(--blue) 0%, var(--dark-blue) 100%);
+    padding: 48px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.brand-logo-large {
+    font-family: 'Feather Bold', var(--font-stack);
+    font-size: 52px;
+    color: white;
+    line-height: 1;
+}
+
+.sidebar-title {
+    font-family: 'Feather Bold', var(--font-stack);
+    font-size: 32px;
+    color: white;
+    line-height: 1.3;
+    font-weight: 800;
+}
+
+.sidebar-subtitle {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.6;
+    font-weight: 500;
+}
+
+.modern-benefits-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 8px;
+}
+
+.modern-benefits-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.b-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    font-size: 13px;
+    color: white;
+    flex-shrink: 0;
+    font-weight: 800;
+}
+
+/* ==========================================================================
+   AUTH MAIN (RIGHT PANEL - FORM)
+   ========================================================================== */
+.auth-main {
+    padding: 48px 48px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+}
+
+.auth-form-header {
+    margin-bottom: 32px;
+}
+
+.auth-form-header h1 {
+    font-family: 'Feather Bold', var(--font-stack);
+    font-size: 36px;
+    color: var(--dark-blue);
+    margin-bottom: 8px;
+    line-height: 1.2;
+}
+
+.auth-form-header p {
+    font-size: 15px;
+    color: var(--gray-light);
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   MODERN FORM & FLOATING LABELS
+   ========================================================================== */
+.modern-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-floating {
+    position: relative;
+}
+
+.form-floating input {
+    width: 100%;
+    height: 56px;
+    padding: 20px 16px 8px;
+    font-size: 15px;
+    font-family: var(--font-stack);
+    font-weight: 600;
+    color: var(--gray-text);
+    background: #f8f9fa;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.form-floating input:focus {
+    border-color: var(--blue);
+    background: white;
+}
+
+.form-floating label {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    transform: translateY(-50%);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-light);
+    pointer-events: none;
+    transition: all 0.2s ease;
+}
+
+/* Float label khi input có nội dung hoặc đang focus */
+.form-floating input:focus~label,
+.form-floating input:not(:placeholder-shown)~label {
+    top: 10px;
+    transform: translateY(0);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   FORM OPTIONS (REMEMBER + FORGOT PASSWORD)
+   ========================================================================== */
+.form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: -4px 0;
+}
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-container input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--blue);
+    cursor: pointer;
+}
+
+.checkmark {
+    display: none;
+    /* Using native checkbox with accent-color */
+}
+
+.text-link-small {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--blue);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.text-link-small:hover {
+    color: var(--blue-hover);
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   MODERN BUTTONS
+   ========================================================================== */
+.btn-modern-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--blue);
+    color: white;
+    font-family: var(--font-stack);
+    font-weight: 700;
+    font-size: 15px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--blue-shadow);
+    transition: filter 0.1s ease, transform 0.1s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-modern-primary:hover {
+    filter: brightness(1.05);
+}
+
+.btn-modern-primary:active {
+    transform: translateY(4px);
+    box-shadow: none;
+}
+
+.btn-modern-primary:disabled,
+.btn-google:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 0 var(--blue-shadow);
+    filter: none;
+}
+
+.btn-lg {
+    height: 52px;
+    padding: 0 24px;
+}
+
+.btn-block {
+    width: 100%;
+}
+
+/* ==========================================================================
+   ALERT / ERROR BOX
+   ========================================================================== */
+.alert-box {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.alert-box.error {
+    background: rgba(255, 75, 75, 0.08);
+    border: 1.5px solid rgba(255, 75, 75, 0.3);
+    color: var(--red);
+}
+
+/* ==========================================================================
+   LOADING SPINNER
+   ========================================================================== */
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ==========================================================================
+   AUTH FORM FOOTER
+   ========================================================================== */
+.auth-form-footer {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+}
+
+.auth-form-footer p {
+    font-size: 14px;
+    color: var(--gray-light);
+    font-weight: 600;
+}
+
+.text-link-bold {
+    color: var(--blue);
+    font-weight: 800;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.text-link-bold:hover {
+    color: var(--blue-hover);
+    text-decoration: underline;
+}
+
+.legal-text {
+    font-size: 12px !important;
+    color: var(--nav-text) !important;
+    font-weight: 500 !important;
+    margin-top: 4px;
+}
+
+/* ==========================================================================
+   AUTH DIVIDER (override cho màu nền trắng đúng)
+   ========================================================================== */
+.auth-divider span {
+    background: white;
+}
+
+/* ==========================================================================
+   RESPONSIVE - AUTH TWO-COLUMN
+   ========================================================================== */
+@media (max-width: 768px) {
+    .auth-container {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+    }
+
+    .auth-sidebar {
+        padding: 32px 28px;
+    }
+
+    .brand-logo-large {
+        font-size: 40px;
+    }
+
+    .sidebar-title {
+        font-size: 26px;
+    }
+
+    .auth-main {
+        padding: 36px 28px 32px;
+    }
+
+    .auth-form-header h1 {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-wrapper {
+        padding: 0;
+        align-items: flex-start;
+    }
+
+    .auth-container {
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        max-width: 100%;
+        min-height: 100vh;
+    }
+
+    .auth-main {
+        padding: 28px 20px 40px;
+    }
+
+    .auth-sidebar {
+        padding: 28px 20px;
+    }
+}
+
+/* ==========================================================================
+   FORM ROW - SIDE BY SIDE FIELDS
+   ========================================================================== */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+/* Row email + nút lấy mã: email chiếm phần lớn, nút cố định */
+.split-email-code {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+}
+
+.email-field {
+    min-width: 0;
+    /* Tránh overflow trong grid */
+}
+
+/* ==========================================================================
+   BTN GET CODE (NÚT LẤY MÃ XÁC THỰC)
+   ========================================================================== */
+.btn-get-code {
+    height: 56px;
+    padding: 0 18px;
+    background: var(--blue);
+    color: white;
+    font-family: var(--font-stack);
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 4px 0 var(--blue-shadow);
+    transition: filter 0.1s ease, transform 0.1s ease;
+    flex-shrink: 0;
+}
+
+.btn-get-code:hover {
+    filter: brightness(1.05);
+}
+
+.btn-get-code:active {
+    transform: translateY(4px);
+    box-shadow: none;
+}
+
+.btn-get-code:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 0 var(--blue-shadow);
+    filter: none;
+}
+
+/* Trạng thái đã gửi mã */
+.btn-get-code.sent {
+    background: var(--gray-light);
+    box-shadow: 0 4px 0 #555;
+}
+
+.btn-get-code.sent:hover {
+    filter: brightness(1.05);
+}
+
+/* ==========================================================================
+   ALERT BOX - SUCCESS VARIANT
+   ========================================================================== */
+.alert-box.success {
+    background: rgba(88, 204, 2, 0.08);
+    border: 1.5px solid rgba(88, 204, 2, 0.35);
+    color: var(--green-shadow);
+}
+
+/* ==========================================================================
+   TEXT LINK (inline trong legal text)
+   ========================================================================== */
+.text-link {
+    color: var(--blue);
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.text-link:hover {
+    color: var(--blue-hover);
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   FADE IN ANIMATION (cho ô nhập mã xác thực)
+   ========================================================================== */
+.animated {
+    animation-duration: 0.3s;
+    animation-fill-mode: both;
+}
+
+.fadeIn {
+    animation-name: fadeIn;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE - REGISTER FORM
+   ========================================================================== */
+@media (max-width: 600px) {
+
+    /* 2 ô password xếp thành 1 cột trên mobile */
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* Riêng email + nút lấy mã vẫn giữ nằm ngang */
+    .split-email-code {
+        grid-template-columns: 1fr auto;
+    }
+
+    .btn-get-code {
+        height: 56px;
+        padding: 0 14px;
+        font-size: 13px;
+    }
+}
+
+/* Ô bị khóa chưa nhận mã */
+.field-locked input {
+    background: #f3f4f6;
+    color: var(--gray-light);
+    cursor: not-allowed;
+    border-color: var(--border-color);
+}
+
+.field-locked label {
+    font-size: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--nav-text);
+}
+
+/* Hint "Mã đã gửi tới..." */
+.code-field {
+    position: relative;
+}
+
+.code-hint {
+    position: absolute;
+    bottom: -20px;
+    left: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--green-shadow);
+}
+
+/* Spinner nhỏ cho nút Lấy mã */
+.spinner-sm {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}

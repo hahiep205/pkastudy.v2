@@ -25,10 +25,9 @@ export default function Register() {
                 {/* Phần bên trái: Hình ảnh hoặc Giới thiệu */}
                 <div className="auth-sidebar">
                     <div className="auth-sidebar-content">
-                        <div className="brand-logo-large">Pка</div>
-                        <h2 className="sidebar-title">Học ngoại ngữ<br/>Miễn phí. Thông minh.</h2>
+                        <h2 className="sidebar-title">Học ngoại ngữ<br />Miễn phí. Thông minh.</h2>
                         <p className="sidebar-subtitle">Lưu tiến trình, học với AI và kết nối cộng đồng.</p>
-                        
+
                         <ul className="modern-benefits-list">
                             <li><span className="b-icon">✦</span> 100% Miễn phí trọn đời</li>
                             <li><span className="b-icon">✦</span> Trợ lý AI hỗ trợ 24/7</li>
@@ -40,7 +39,7 @@ export default function Register() {
                 {/* Phần bên phải: Form đăng ký */}
                 <div className="auth-main">
                     <div className="auth-form-header">
-                        <h1>Đăng ký ngay</h1>
+                        <h1 className="be-vietnam-pro-extrabold">Đăng ký ngay</h1>
                         <p>Chào mừng bạn! Vui lòng nhập thông tin để bắt đầu.</p>
                     </div>
 
@@ -52,17 +51,44 @@ export default function Register() {
 
                         <div className="form-row split-email-code">
                             <div className="form-floating email-field">
-                                <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder=" " required />
+                                <input
+                                    type="email"
+                                    id="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder=" "
+                                    required
+                                />
                                 <label htmlFor="email">Email</label>
                             </div>
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 className={`btn-get-code ${codeSent ? 'sent' : ''}`}
                                 onClick={handleSendVerificationCode}
                                 disabled={sendingCode || !email.trim()}
                             >
-                                {sendingCode ? '...' : codeSent ? 'Gửi lại' : 'Lấy mã'}
+                                {sendingCode ? <span className="spinner-sm"></span> : codeSent ? 'Gửi lại' : 'Lấy mã'}
                             </button>
+                        </div>
+
+                        {/* Ô nhập mã — luôn hiển thị, disable cho đến khi gửi mã */}
+                        <div className={`form-floating code-field ${!codeSent ? 'field-locked' : 'animated fadeIn'}`}>
+                            <input
+                                type="text"
+                                id="code"
+                                value={verificationCode}
+                                onChange={(e) => setVerificationCode(e.target.value)}
+                                placeholder=" "
+                                maxLength="6"
+                                disabled={!codeSent}
+                                required
+                            />
+                            <label htmlFor="code">
+                                {codeSent ? 'Mã xác thực (6 số)' : 'Nhập mã xác thực sau khi gửi email'}
+                            </label>
+                            {codeSent && sendCodeMessage && (
+                                <span className="code-hint">✓ Mã đã gửi tới {email}</span>
+                            )}
                         </div>
 
                         {codeSent && (
@@ -87,10 +113,10 @@ export default function Register() {
                         {errorMessage && <div className="alert-box error">{errorMessage}</div>}
                         {sendCodeMessage && <div className="alert-box success">{sendCodeMessage}</div>}
 
-                        <button 
-                            type="button" 
-                            className="btn-modern-primary btn-lg btn-block" 
-                            onClick={handleRegister} 
+                        <button
+                            type="button"
+                            className="btn-modern-primary btn-lg btn-block"
+                            onClick={handleRegister}
                             disabled={registering}
                         >
                             {registering ? <span className="spinner"></span> : 'Tạo tài khoản Pkastudy'}
