@@ -892,6 +892,20 @@
   .toeic-answered-count {
     display: none;
   }
+
+  .toeic-test-progress-badge {
+    display: flex;
+  }
+
+  .toeic-part-switch-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .toeic-part-switch-cell {
+    min-height: 44px;
+    padding: 10px 6px;
+  }
 }
 
 .toeic-timer {
@@ -1011,6 +1025,38 @@
   gap: 6px;
 }
 
+.toeic-part-switch-grid {
+  width: 100%;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.toeic-part-switch-cell {
+  min-width: 0;
+  aspect-ratio: auto;
+  min-height: 46px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.toeic-part-switch-name {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.toeic-part-switch-progress {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.1;
+  margin-top: 4px;
+}
+
 .toeic-nav-cell {
   width: 100%;
   aspect-ratio: 1;
@@ -1121,6 +1167,7 @@
 
 /* Test Result */
 .toeic-result {
+  width: 100%;
   max-width: 720px;
   margin: 0 auto;
 }
@@ -1187,6 +1234,46 @@
   color: var(--text-secondary, #666);
 }
 
+.toeic-fulltest-summary {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.toeic-fulltest-summary-card {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border, #e5e7eb);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  text-align: left;
+}
+
+.toeic-fulltest-summary-card-accent {
+  border-color: rgba(59, 130, 246, 0.25);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(96, 165, 250, 0.06));
+}
+
+.toeic-fulltest-summary-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary, #64748b);
+  text-transform: uppercase;
+}
+
+.toeic-fulltest-summary-value {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text, #0f172a);
+  line-height: 1.25;
+}
+
 .toeic-unanswered-note {
   color: #f59e0b;
   font-weight: 600;
@@ -1194,6 +1281,7 @@
 
 /* Result Stats - Part Scores */
 .toeic-result-stats {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1217,6 +1305,24 @@
   border: 1.5px solid var(--border, #e5e7eb);
   border-radius: 12px;
   padding: 14px;
+}
+
+.toeic-part-score-tab {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.toeic-part-score-tab:hover {
+  border-color: rgba(59, 130, 246, 0.28);
+  transform: translateY(-1px);
+}
+
+.toeic-part-score-tab.active {
+  border-color: var(--blue, #3b82f6);
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.12);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08), rgba(255, 255, 255, 0.96));
 }
 
 .toeic-part-score-header {
@@ -1259,6 +1365,8 @@
 }
 
 .toeic-result-review {
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1271,11 +1379,53 @@
   margin: 0 0 4px;
 }
 
+.toeic-review-part-tabs {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.toeic-review-part-grid {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.toeic-review-part-btn {
+  min-height: 44px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border, #e5e7eb);
+  background: var(--card-bg, #fff);
+  color: var(--text, #111827);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.toeic-review-part-btn:hover {
+  border-color: rgba(59, 130, 246, 0.32);
+  transform: translateY(-1px);
+}
+
+.toeic-review-part-btn.active {
+  border-color: var(--blue, #3b82f6);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.1), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 10px 22px rgba(59, 130, 246, 0.12);
+  color: var(--blue, #2563eb);
+}
+
 .toeic-review-item {
+  width: 100%;
+  min-width: 0;
   padding: 16px;
   border-radius: 12px;
   border: 1.5px solid var(--border, #e5e7eb);
   background: var(--card-bg, #fff);
+  box-sizing: border-box;
 }
 
 .toeic-review-item.review-correct {
@@ -1372,6 +1522,7 @@
   background: rgba(59, 130, 246, 0.06);
   padding: 8px 12px;
   border-radius: 8px;
+  display: none;
 }
 
 .toeic-retry-btn {
@@ -1381,9 +1532,9 @@
   border-radius: 14px;
   background: var(--blue, #3b82f6);
   color: #fff;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 16px;
-  border: 2px solid var(--border-color, var(--blue, #3b82f6));
+  border: 2px solid var(--blue, #3b82f6);
   cursor: pointer;
   margin-bottom: 32px;
   box-shadow: 0 5px 0 var(--blue-shadow, #2563eb);
@@ -1391,7 +1542,8 @@
 }
 
 .toeic-retry-btn:hover {
-  filter: brightness(1.06);
+  background: var(--blue-hover, #2563eb);
+  border-color: var(--blue-hover, #2563eb);
   transform: translateY(-2px);
 }
 
@@ -2517,6 +2669,44 @@
 }
 
 @media (max-width: 600px) {
+  .toeic-review-part-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .toeic-review-part-btn {
+    min-height: 42px;
+    padding: 9px 6px;
+    font-size: 11px;
+  }
+
+  .toeic-fulltest-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .toeic-fulltest-summary-card {
+    padding: 12px;
+  }
+
+  .toeic-fulltest-summary-value {
+    font-size: 0.95rem;
+  }
+
+  .toeic-tab-switch {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .toeic-tab-btn {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 8px;
+    text-align: center;
+  }
+
   .toeic-test-cards {
     grid-template-columns: 1fr;
   }
@@ -2557,6 +2747,17 @@
     gap: 4px;
   }
 
+  .toeic-part-switch-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .toeic-part-switch-cell {
+    min-height: 44px;
+    padding: 10px 6px;
+    font-size: 11px;
+  }
+
   .toeic-nav-cell {
     font-size: 11px;
   }
@@ -2581,6 +2782,10 @@
     align-items: center;
     justify-content: center;
     text-align: center;
+  }
+
+  .toeic-test-info .toeic-test-badge:nth-child(-n+3) {
+    width: 100%;
   }
 
   .toeic-timer,
@@ -2639,6 +2844,56 @@ body.app-dark-mode .toeic-listening-topic-hero p,
 body.app-dark-mode .toeic-visual-copy p,
 body.app-dark-mode .toeic-option-code-only {
   color: #94a3b8;
+}
+
+@media (min-width: 601px) and (max-width: 1440px) {
+  .toeic-fulltest-summary {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .toeic-review-part-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .toeic-fulltest-summary-card {
+    padding: 12px 14px;
+  }
+
+  .toeic-fulltest-summary-value {
+    font-size: 0.96rem;
+  }
+}
+
+body.app-dark-mode .toeic-fulltest-summary-card {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.92));
+  border-color: rgba(148, 163, 184, 0.22);
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.28);
+}
+
+body.app-dark-mode .toeic-fulltest-summary-card-accent {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(14, 165, 233, 0.12));
+  border-color: rgba(96, 165, 250, 0.32);
+}
+
+body.app-dark-mode .toeic-fulltest-summary-label {
+  color: #93c5fd;
+}
+
+body.app-dark-mode .toeic-fulltest-summary-value {
+  color: #f8fafc;
+}
+
+body.app-dark-mode .toeic-review-part-btn {
+  background: #111827;
+  border-color: rgba(148, 163, 184, 0.18);
+  color: #e2e8f0;
+}
+
+body.app-dark-mode .toeic-review-part-btn.active {
+  border-color: rgba(96, 165, 250, 0.8);
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.26), rgba(15, 23, 42, 0.96));
+  color: #bfdbfe;
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.3);
 }
 
 body.app-dark-mode .toeic-tab-btn,
@@ -2713,6 +2968,7 @@ body.app-dark-mode .toeic-nav-next:hover:not(:disabled) {
 }
 
 body.app-dark-mode .toeic-listening-topic-hero,
+body.app-dark-mode .toeic-listening-test-hero,
 body.app-dark-mode .toeic-test-hero,
 body.app-dark-mode .toeic-result-header {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(14, 165, 233, 0.1));
@@ -2727,6 +2983,7 @@ body.app-dark-mode .toeic-result-header {
 }
 
 body.app-dark-mode .toeic-listening-topic-hero h2,
+body.app-dark-mode .toeic-listening-test-hero h2,
 body.app-dark-mode .toeic-test-hero h2,
 body.app-dark-mode .toeic-test-card h3,
 body.app-dark-mode .toeic-result-header h2,
@@ -2745,8 +3002,65 @@ body.app-dark-mode .toeic-qcard-part {
 body.app-dark-mode .toeic-part-card-count,
 body.app-dark-mode .toeic-part-card-desc,
 body.app-dark-mode .toeic-test-progress,
-body.app-dark-mode .toeic-review-part {
+body.app-dark-mode .toeic-review-part,
+body.app-dark-mode .toeic-listening-test-note,
+body.app-dark-mode .review-empty-card p,
+body.app-dark-mode .toeic-confirm-modal p,
+body.app-dark-mode .toeic-listening-test-hero p {
   color: #cbd5e1;
+}
+
+body.app-dark-mode .toeic-listening-test-hero::after {
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.18), transparent 68%);
+}
+
+body.app-dark-mode .toeic-listening-test-parts {
+  padding: 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(17, 24, 39, 0.88));
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.22);
+}
+
+body.app-dark-mode .toeic-listening-test-part-label {
+  background: rgba(37, 99, 235, 0.2);
+  color: #bfdbfe;
+}
+
+body.app-dark-mode .review-empty-card {
+  background: #111827;
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 16px 36px rgba(2, 6, 23, 0.26);
+}
+
+body.app-dark-mode .review-empty-card h2,
+body.app-dark-mode .review-empty-icon {
+  color: #f8fafc;
+}
+
+body.app-dark-mode .toeic-confirm-modal {
+  background: #111827;
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 20px 44px rgba(2, 6, 23, 0.42);
+}
+
+body.app-dark-mode .toeic-confirm-modal h3 {
+  color: #f8fafc;
+}
+
+body.app-dark-mode .toeic-part-card-icon {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(14, 165, 233, 0.12));
+  border-color: rgba(96, 165, 250, 0.24);
+  color: #bfdbfe;
+}
+
+body.app-dark-mode .toeic-q-image {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+body.app-dark-mode .toeic-audio-shell audio {
+  filter: brightness(0.92) contrast(1.05);
 }
 
 body.app-dark-mode .toeic-visual-card {

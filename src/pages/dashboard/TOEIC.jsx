@@ -1,8 +1,9 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { TOEIC_PARTS, convertToToeicScore } from "../../data/toeicData";
+import { convertToToeicScore } from "../../data/toeicData";
 import { TOEIC_LISTENING_PRACTICE_MODES } from "../../data/toeicListeningPracticeData";
 import { TOEIC_READING_PRACTICE_MODES } from "../../data/toeicReadingPracticeData";
 import listeningTestCatalog from "../../data/toeicListeningTests.generated.json";
+import readingTestCatalog from "../../data/toeicReadingTests.generated.json";
 import { xpToeicFullTest, xpToeicPartComplete } from "../../utils/xpSystem";
 
 function formatTime(s) {
@@ -31,58 +32,49 @@ function speakToeicText(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-function clonePartsForFullTest(parts, suffix, transformQuestions) {
-  return {
-    listening: parts.listening.map((part) => ({
-      ...part,
-      id: `${part.id}-${suffix}`,
-      questions: transformQuestions(part.questions).map((q, index) => ({
-        ...q,
-        id: `${q.id}-${suffix}-${index + 1}`,
-      })),
-    })),
-    reading: parts.reading.map((part) => ({
-      ...part,
-      id: `${part.id}-${suffix}`,
-      questions: transformQuestions(part.questions).map((q, index) => ({
-        ...q,
-        id: `${q.id}-${suffix}-${index + 1}`,
-      })),
-    })),
-  };
+function getFullTestPartKey(partLabel = "") {
+  return String(partLabel || "").toUpperCase().replace(/\s+/g, " ").trim();
 }
 
-function getBasePartId(partId = "") {
-  return partId.split("-")[0];
+function shouldHideListeningTranscriptInFullTest(question) {
+  return question?.skill === "Listening";
 }
 
-function getBaseQuestionId(questionId = "") {
-  return questionId.split("-")[0];
+function buildFullTestPartGroups(questions) {
+  const groups = [];
+  let current = null;
+
+  questions.forEach((question, index) => {
+    const partKey = getFullTestPartKey(question.partLabel);
+    if (!current || current.partKey !== partKey) {
+      current = {
+        partKey,
+        partLabel: question.partLabel,
+        skill: question.skill,
+        startIndex: index,
+        endIndex: index,
+        questions: [question],
+      };
+      groups.push(current);
+      return;
+    }
+
+    current.endIndex = index;
+    current.questions.push(question);
+  });
+
+  return groups;
 }
 
-function getFullTestQuestionImageSrc(question) {
-  if (question.image) return question.image;
-  if (question.imageUrl) return question.imageUrl;
-  if (getBasePartId(question.partId) === "part1") {
-    return `/toeic-fulltest/placeholders/${getBaseQuestionId(question.id)}.svg`;
-  }
-  return "";
-}
-
-const FULL_TEST_VARIANTS = [
-  {
-    id: "fulltest-a",
-    name: "Đề 1",
-    desc: "Bộ đề chuẩn hiện tại với thứ tự câu mặc định.",
-    parts: TOEIC_PARTS,
-  },
-  {
-    id: "fulltest-b",
-    name: "Đề 2",
-    desc: "Biến thể tương tự với thứ tự câu đảo lại theo từng part để luyện thêm.",
-    parts: clonePartsForFullTest(TOEIC_PARTS, "set2", (questions) => [...questions].reverse()),
-  },
-];
+const FULL_TEST_PART_META = {
+  "PART 1": { title: "Photographs", count: 6 },
+  "PART 2": { title: "Question-Response", count: 25 },
+  "PART 3": { title: "Conversations", count: 39 },
+  "PART 4": { title: "Talks", count: 30 },
+  "PART 5": { title: "Incomplete Sentences", count: 30 },
+  "PART 6": { title: "Text Completion", count: 16 },
+  "PART 7": { title: "Reading Comprehension", count: 54 },
+};
 
 const LISTENING_TEST_SECTION_DURATIONS = {
   "lt1-part1": 14 * 60,
@@ -91,6 +83,15 @@ const LISTENING_TEST_SECTION_DURATIONS = {
   "lt2-part1": 14 * 60,
   "lt2-part2": 18 * 60,
   "lt2-part3": 13 * 60,
+};
+
+const READING_TEST_SECTION_DURATIONS = {
+  "rt1-part1": 18 * 60,
+  "rt1-part2": 18 * 60,
+  "rt1-part3": 19 * 60,
+  "rt2-part1": 18 * 60,
+  "rt2-part2": 18 * 60,
+  "rt2-part3": 19 * 60,
 };
 
 const LISTENING_TEST_SETS = [
@@ -116,6 +117,100 @@ const LISTENING_TEST_SETS = [
     })),
   })),
 ];
+
+const READING_TEST_SETS = [
+  ...readingTestCatalog.tests.map((test) => ({
+    ...test,
+    name: test.id === "reading-test-1" ? "Đề Reading 1" : test.id === "reading-test-2" ? "Đề Reading 2" : test.name,
+    desc: test.id === "reading-test-1"
+      ? "Đề Reading TOEIC 1."
+      : test.id === "reading-test-2"
+        ? "Đề Reading TOEIC 2."
+        : test.desc,
+    sections: (test.sections || []).map((section) => ({
+      ...section,
+      desc:
+        test.id === "reading-test-1" || test.id === "reading-test-2"
+          ? section.id.endsWith("part1")
+            ? "46 câu đầu tiên, gồm TOEIC Part 5 và Part 6."
+            : section.id.endsWith("part2")
+              ? "29 câu đọc hiểu đầu của Part 7."
+              : "29 câu đọc hiểu tiếp theo của Part 7."
+          : section.desc,
+      durationSeconds: READING_TEST_SECTION_DURATIONS[section.id] || Math.max(section.questionCount * 40, 12 * 60),
+    })),
+  })),
+];
+
+function normalizeListeningQuestionsForFullTest(test) {
+  return (test?.sections || []).flatMap((section) =>
+    (section.questions || []).map((question) => {
+      const correctIndex = Array.isArray(question.options)
+        ? question.options.findIndex((option) => option.key === question.correctKey)
+        : -1;
+
+      return {
+        id: `ft-${question.id}`,
+        displayNumber: question.displayNumber,
+        skill: "Listening",
+        sectionId: section.id,
+        sectionLabel: section.label,
+        partLabel: question.toeicPart || section.label,
+        prompt: getListeningTestPrompt(question.prompt),
+        passage: question.transcript || "",
+        imageUrl: question.imageUrl || "",
+        audioUrl: question.audioUrl || section.audioUrl || "",
+        instruction: question.instruction || "",
+        options: (question.options || []).map((option) => option.text),
+        correct: correctIndex,
+        explanation: question.explanation || "",
+      };
+    })
+  );
+}
+
+function normalizeReadingQuestionsForFullTest(test) {
+  return (test?.sections || []).flatMap((section) =>
+    (section.questions || []).map((question) => {
+      const correctIndex = Array.isArray(question.options)
+        ? question.options.findIndex((option) => option.key === question.correctKey)
+        : -1;
+
+      return {
+        id: `ft-${question.id}`,
+        displayNumber: question.displayNumber,
+        skill: "Reading",
+        sectionId: section.id,
+        sectionLabel: section.label,
+        partLabel: question.toeicPart || section.label,
+        prompt: getReadingTestPrompt(question.prompt),
+        passage: question.sharedPassage || "",
+        imageUrl: question.imageUrl || "",
+        options: (question.options || []).map((option) => option.text),
+        correct: correctIndex,
+        explanation: question.explanation || "",
+      };
+    })
+  );
+}
+
+const FULL_TEST_VARIANTS = (() => {
+  const listeningTest1 = LISTENING_TEST_SETS.find((test) => test.id === "listening-test-1");
+  const readingTest1 = READING_TEST_SETS.find((test) => test.id === "reading-test-1");
+  const de1Questions = [
+    ...normalizeListeningQuestionsForFullTest(listeningTest1),
+    ...normalizeReadingQuestionsForFullTest(readingTest1),
+  ].sort((a, b) => a.displayNumber - b.displayNumber);
+
+  return [
+    {
+      id: "fulltest-a",
+      name: "Đề 1",
+      desc: "Listening Test Đề 1 + Reading Test Đề 1, ghép thành bài Full Test 120 phút hoàn chỉnh.",
+      questions: de1Questions,
+    },
+  ];
+})();
 
 function ModeGrid({ modes, onSelect }) {
   return (
@@ -183,7 +278,7 @@ function ListeningTestGrid({ tests, onSelect }) {
               <span className="toeic-part-card-desc">{test.desc}</span>
               <span className="toeic-part-card-count">
                 {test.id === "listening-test-1"
-                  ? "Target 350+"
+                  ? "Target 450+"
                   : test.id === "listening-test-2"
                     ? "Target 450+"
                     : `${(test.sections || []).length} phần`}
@@ -223,6 +318,66 @@ function ListeningTestParts({ test, onBack, onSelectPart }) {
   );
 }
 
+function ReadingTestGrid({ tests, onSelect }) {
+  return (
+    <div className="toeic-practice-layout">
+      <div className="toeic-listening-test-hero">
+        <div className="toeic-listening-test-hero-copy">
+          <h2>Reading Test</h2>
+          <p>Chọn đề reading để làm bài theo giao diện thi thử, tập trung vào tốc độ đọc và xử lý câu hỏi.</p>
+        </div>
+      </div>
+      <div className="toeic-parts-grid">
+        {tests.map((test) => (
+          <button key={test.id} className="toeic-part-card" onClick={() => onSelect(test)}>
+            <span className="toeic-part-card-icon">
+              {test.id === "reading-test-1" ? "A2" : test.id === "reading-test-2" ? "B1" : "Đề"}
+            </span>
+            <div className="toeic-part-card-body">
+              <strong>{test.name}</strong>
+              <span className="toeic-part-card-desc">{test.desc}</span>
+              <span className="toeic-part-card-count">
+                {test.id === "reading-test-1"
+                  ? "Target 450+"
+                  : test.id === "reading-test-2"
+                    ? "Target 450+"
+                    : `${(test.sections || []).length} phần`}
+              </span>
+            </div>
+            <span className="toeic-part-card-arrow">→</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReadingTestParts({ test, onBack, onSelectPart }) {
+  return (
+    <div className="toeic-practice-layout">
+      <button className="toeic-back-link" onClick={onBack}>← Quay lại chọn đề reading</button>
+      <div className="toeic-listening-test-hero">
+        <div className="toeic-listening-test-hero-copy">
+          <div>
+            <h2>{test.name}</h2>
+            <p>Chọn part để vào giao diện làm bài.</p>
+          </div>
+        </div>
+      </div>
+      <div className="toeic-listening-test-parts">
+        {(test.sections || []).map((part) => (
+          <button key={part.id} className="toeic-listening-test-part-card" onClick={() => onSelectPart(part)}>
+            <span className="toeic-listening-test-part-label">{part.label}</span>
+            <strong>{part.title}</strong>
+            <span className="toeic-part-card-desc">{part.desc || "Mở đề thi"}</span>
+            <span className="toeic-part-card-count">{part.questionCount || 0} câu hỏi</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ListeningTestPlaceholder({ test, part, onBack }) {
   return (
     <div className="toeic-practice-layout">
@@ -231,6 +386,19 @@ function ListeningTestPlaceholder({ test, part, onBack }) {
         <div className="review-empty-icon">LT</div>
         <h2>{test.name} · {part.label}</h2>
         <p>{part.title} chưa có dữ liệu hoàn chỉnh. Khung này đã sẵn sàng để nối tiếp bộ đề thật ở bước sau.</p>
+      </div>
+    </div>
+  );
+}
+
+function ReadingTestPlaceholder({ test, part, onBack }) {
+  return (
+    <div className="toeic-practice-layout">
+      <button className="toeic-back-link" onClick={onBack}>← Quay lại chọn part</button>
+      <div className="review-empty-card toeic-listening-test-empty">
+        <div className="review-empty-icon">RT</div>
+        <h2>{test.name} · {part.label}</h2>
+        <p>{part.title} chưa có dữ liệu hoàn chỉnh. Khung này đã sẵn sàng để nối bộ đề thật ở bước sau.</p>
       </div>
     </div>
   );
@@ -246,9 +414,47 @@ function getListeningTestPrompt(prompt) {
     .trim();
 }
 
+function getReadingTestPrompt(prompt) {
+  if (!prompt) return "";
+  return String(prompt).replace(/\s+/g, " ").trim();
+}
+
+function formatReadingPassage(passage) {
+  if (!passage) return "";
+
+  let formatted = String(passage)
+    .replace(/\/n/g, "\n")
+    .replace(/\s*\n\s*/g, "\n")
+    .replace(/(Directions:[\s\S]*?answer sheet\.)\s*(Questions\s+\d+-\d+\s+refer to the following[^.]*\.)/i, "$1\n\n$2")
+    .replace(/(Questions\s+\d+-\d+\s+refer to the following[^.]*\.)\s*/gi, "$1\n\n")
+    .replace(/\s+(From:|To:|Subject:|Date:|Dear\s)/g, "\n$1")
+    .replace(/(Date:[^\n]*)(\nDear\s)/g, "$1\n\n$2")
+    .replace(/\s+(Sincerely,|Regards,|Best regards,)/g, "\n\n$1")
+    .replace(/\s+Câu\s+\d+\s*$/i, "")
+    .replace(/[^\S\n]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  formatted = formatted.replace(/(Questions\s+\d+-\d+\s+refer to the following e-mail\.)\n(From:)/gi, "$1\n\n$2");
+  formatted = formatted.replace(/(Dear [^\n,]+,)\s+/i, "$1\n\n");
+  formatted = formatted.replace(/(Sincerely,|Regards,|Best regards,)\s+([^\n]+)/i, "$1\n$2");
+
+  return formatted;
+}
+
 function getListeningCorrectIndex(question) {
   if (!question?.correctKey || !Array.isArray(question.options)) return -1;
   return question.options.findIndex((option) => option.key === question.correctKey);
+}
+
+function getEstimatedToeicPartScore(test, section, correctCount, gradableCount) {
+  if (!test?.sections?.length || !section?.id || !gradableCount) return null;
+  const totalQuestions = test.sections.reduce((sum, item) => sum + (item.questions?.length || 0), 0);
+  if (!totalQuestions) return null;
+
+  const sectionQuestions = section.questions?.length || gradableCount;
+  const sectionMaxScore = Math.round((495 * sectionQuestions) / totalQuestions);
+  return Math.round((sectionMaxScore * correctCount) / gradableCount);
 }
 
 function ListeningTestSession({ test, section, onBack }) {
@@ -407,6 +613,9 @@ function ListeningTestSession({ test, section, onBack }) {
   const scorePercent = hasAnswerKey
     ? Math.round((correctCount / gradableCount) * 100)
     : Math.round((answeredCount / questions.length) * 100);
+  const estimatedPartScore = hasAnswerKey
+    ? getEstimatedToeicPartScore(test, section, correctCount, gradableCount)
+    : null;
   const resultTitle = hasAnswerKey
     ? scorePercent >= 80
       ? "Làm rất tốt"
@@ -436,6 +645,13 @@ function ListeningTestSession({ test, section, onBack }) {
               <div className="toeic-part-score-header"><span className="toeic-part-score-name">Câu đúng</span><span className="toeic-part-score-pct">{scorePercent}%</span></div>
               <div className="toeic-part-score-bar"><div className="toeic-part-score-fill" style={{ width: `${scorePercent}%` }} /></div>
               <span className="toeic-part-score-detail">{correctCount} đúng · {wrongCount} sai · {gradableCount} câu chấm được</span>
+            </div>
+          )}
+          {hasAnswerKey && estimatedPartScore !== null && (
+            <div className="toeic-part-score-card">
+              <div className="toeic-part-score-header"><span className="toeic-part-score-name">Điểm {section.label}</span><span className="toeic-part-score-pct">{estimatedPartScore}</span></div>
+              <div className="toeic-part-score-bar"><div className="toeic-part-score-fill" style={{ width: `${Math.min(100, (estimatedPartScore / 495) * 100)}%` }} /></div>
+              <span className="toeic-part-score-detail">Điểm ước tính của bạn tại {section.label}</span>
             </div>
           )}
           <div className="toeic-part-score-card">
@@ -474,37 +690,303 @@ function ListeningTestSession({ test, section, onBack }) {
           return (
             <div
               key={question.id}
-              className={`toeic-review-item ${
-                isGradable
-                  ? isCorrect
-                    ? "review-correct"
-                    : selectedOption
-                      ? "review-wrong"
-                      : "review-unanswered"
+              className={`toeic-review-item ${isGradable
+                ? isCorrect
+                  ? "review-correct"
                   : selectedOption
-                    ? "review-correct"
+                    ? "review-wrong"
                     : "review-unanswered"
-              }`}
+                : selectedOption
+                  ? "review-correct"
+                  : "review-unanswered"
+                }`}
             >
               <div className="toeic-review-top">
                 <span className="toeic-review-num">Câu {question.displayNumber}</span>
                 <span className="toeic-review-part">{question.toeicPart}</span>
-                <span className={`toeic-review-badge ${
-                  isGradable
-                    ? isCorrect
-                      ? "badge-ok"
-                      : selectedOption
-                        ? "badge-err"
-                        : "badge-unanswered"
+                <span className={`toeic-review-badge ${isGradable
+                  ? isCorrect
+                    ? "badge-ok"
                     : selectedOption
-                      ? "badge-ok"
+                      ? "badge-err"
                       : "badge-unanswered"
-                }`}>
+                  : selectedOption
+                    ? "badge-ok"
+                    : "badge-unanswered"
+                  }`}>
                   {isGradable ? (isCorrect ? "✓ Đúng" : selectedOption ? "✗ Sai" : "○ Bỏ trống") : "Chưa chấm"}
                 </span>
               </div>
               {question.imageUrl && <div className="toeic-q-image"><img src={question.imageUrl} alt={`Review ${question.displayNumber}`} /></div>}
               {showTranscriptBlock && <div className="toeic-reading-passage">{question.transcript}</div>}
+              {reviewPrompt && <p className="toeic-review-q"><strong>{reviewPrompt}</strong></p>}
+              {isGradable && correctOption && (
+                <p className="toeic-review-ans">Đáp án đúng: <strong>{correctOption.key}. {correctOption.text}</strong></p>
+              )}
+              {selectedOption ? (
+                <p className="toeic-review-user">Bạn chọn: {selectedOption.key}. {selectedOption.text}</p>
+              ) : (
+                <p className="toeic-review-user">Bạn chưa chọn đáp án cho câu này.</p>
+              )}
+              {!isGradable && <p className="toeic-review-user">Câu này hiện chưa có dữ liệu đáp án để chấm.</p>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="toeic-result-actions">
+        <button className="toeic-retry-btn" onClick={() => { setPhase("running"); setAnswers({}); setQi(0); setTimeLeft(durationSeconds); }}>Làm lại</button>
+        <button className="toeic-back-btn" onClick={onBack}>← Quay lại chọn part</button>
+      </div>
+    </div>
+  );
+}
+
+function ReadingTestSession({ test, section, onBack }) {
+  const questions = section.questions || [];
+  const gradableQuestions = questions.filter((question) => getListeningCorrectIndex(question) !== -1);
+  const gradableCount = gradableQuestions.length;
+  const hasAnswerKey = gradableCount > 0;
+  const hasFullAnswerKey = gradableCount === questions.length;
+  const durationSeconds = section.durationSeconds || Math.max(questions.length * 40, 12 * 60);
+  const [phase, setPhase] = useState("running");
+  const [qi, setQi] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [timeLeft, setTimeLeft] = useState(durationSeconds);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const timerRef = useRef(null);
+  const q = questions[qi];
+
+  useEffect(() => {
+    setPhase("running");
+    setQi(0);
+    setAnswers({});
+    setTimeLeft(durationSeconds);
+    setShowSubmitConfirm(false);
+    clearInterval(timerRef.current);
+    return () => clearInterval(timerRef.current);
+  }, [section.id, durationSeconds]);
+
+  useEffect(() => {
+    if (phase !== "running") return undefined;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          setPhase("result");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [phase]);
+
+  const submit = () => {
+    clearInterval(timerRef.current);
+    setPhase("result");
+    setShowSubmitConfirm(false);
+  };
+
+  const requestSubmit = () => {
+    setShowSubmitConfirm(true);
+  };
+
+  if (!q) {
+    return <ReadingTestPlaceholder test={test} part={section} onBack={onBack} />;
+  }
+
+  if (phase === "running") {
+    const answered = Object.keys(answers).length;
+    const isUrgent = timeLeft < 60;
+    const prompt = getReadingTestPrompt(q.prompt);
+    return (
+      <div className="toeic-test-running">
+        <div className="toeic-test-topbar">
+          <div className="toeic-test-info">
+            <span className="toeic-test-badge">Reading Test</span>
+            <span className="toeic-test-badge">{test.name}</span>
+            <span className="toeic-test-badge">{section.label}</span>
+            <span className="toeic-test-progress">Câu {qi + 1} / {questions.length}</span>
+            <span className="toeic-answered-count">{answered} đã trả lời</span>
+          </div>
+          <div className={`toeic-timer${isUrgent ? " urgent" : ""}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10Zm1-10V7h-2v7h6v-2h-4Z" /></svg>
+            {formatTime(timeLeft)}
+          </div>
+          <button className="toeic-submit-early-btn" onClick={requestSubmit}>Nộp bài</button>
+        </div>
+        <div className="toeic-timer-bar"><div className="toeic-timer-fill" style={{ width: `${(timeLeft / durationSeconds) * 100}%`, background: isUrgent ? "var(--red,#ef4444)" : "var(--blue,#3b82f6)" }} /></div>
+        <div className="toeic-question-nav"><div className="toeic-nav-grid">
+          {questions.map((question, index) => (
+            <button key={question.id} className={`toeic-nav-cell${index === qi ? " active" : ""}${answers[question.id] !== undefined ? " answered" : ""}`} onClick={() => setQi(index)}>{question.displayNumber}</button>
+          ))}
+        </div></div>
+        <div className="toeic-test-question-area">
+          <div className="toeic-test-part-label">{q.toeicPart}{q.groupIndex ? ` · Nhóm ${q.groupIndex}` : ""}</div>
+          {q.sharedPassage && <div className="toeic-reading-passage">{formatReadingPassage(q.sharedPassage)}</div>}
+          {q.imageUrl && <div className="toeic-q-image"><img src={q.imageUrl} alt={`Question ${q.displayNumber}`} /></div>}
+          {prompt && <div className="toeic-test-q-text"><strong>{prompt}</strong></div>}
+          <div className="toeic-options-grid">
+            {q.options.map((opt, index) => (
+              <button key={opt.key} className={`toeic-option${answers[q.id] === index ? " selected" : ""}`} onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: index }))}>
+                <span className="toeic-option-letter">{opt.key}</span>{opt.text}
+              </button>
+            ))}
+          </div>
+          <div className="toeic-test-nav">
+            <button disabled={qi === 0} onClick={() => setQi(qi - 1)} className="toeic-nav-btn">← Trước</button>
+            {qi < questions.length - 1
+              ? <button onClick={() => setQi(qi + 1)} className="toeic-nav-btn toeic-nav-next">Tiếp theo →</button>
+              : <button onClick={requestSubmit} className="toeic-nav-btn toeic-nav-submit">Nộp bài ✓</button>}
+          </div>
+        </div>
+        {showSubmitConfirm && (
+          <div className="toeic-confirm-overlay" role="presentation" onClick={() => setShowSubmitConfirm(false)}>
+            <div
+              className="toeic-confirm-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="toeic-submit-reading-confirm-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h3 id="toeic-submit-reading-confirm-title">Xác nhận nộp bài</h3>
+              <p>
+                Bạn đã trả lời {answered}/{questions.length} câu.
+                {answered < questions.length ? ` Vẫn còn ${questions.length - answered} câu chưa chọn.` : ""}
+              </p>
+              <div className="toeic-confirm-actions">
+                <button className="toeic-nav-btn" onClick={() => setShowSubmitConfirm(false)}>Làm tiếp</button>
+                <button className="toeic-nav-btn toeic-nav-next" onClick={submit}>Xác nhận nộp</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const answeredCount = Object.keys(answers).length;
+  const correctCount = hasAnswerKey
+    ? gradableQuestions.filter((question) => answers[question.id] === getListeningCorrectIndex(question)).length
+    : 0;
+  const wrongCount = hasAnswerKey
+    ? gradableQuestions.filter((question) => {
+      const selectedIndex = answers[question.id];
+      const correctIndex = getListeningCorrectIndex(question);
+      return selectedIndex !== undefined && selectedIndex !== correctIndex;
+    }).length
+    : 0;
+  const scorePercent = hasAnswerKey
+    ? Math.round((correctCount / gradableCount) * 100)
+    : Math.round((answeredCount / questions.length) * 100);
+  const estimatedPartScore = hasAnswerKey
+    ? getEstimatedToeicPartScore(test, section, correctCount, gradableCount)
+    : null;
+  const resultTitle = hasAnswerKey
+    ? scorePercent >= 80
+      ? "Làm rất tốt"
+      : scorePercent >= 60
+        ? "Tiếp tục phát huy"
+        : "Tiếp tục luyện thêm"
+    : answeredCount === questions.length
+      ? "Hoàn thành part"
+      : "Đã lưu bài làm";
+
+  return (
+    <div className="toeic-result">
+      <div className="toeic-result-header">
+        {timeLeft === 0 && <div className="toeic-timeout-badge">Hết giờ - bài đã được nộp tự động</div>}
+        <div className="toeic-result-score-circle"><div className="toeic-score-inner">
+          <span className="toeic-score-num">{hasAnswerKey ? `${correctCount}/${gradableCount}` : `${answeredCount}/${questions.length}`}</span>
+          <span className="toeic-score-label">{hasAnswerKey ? "câu đúng" : "đã chọn"}</span>
+        </div></div>
+        <h2>{resultTitle}</h2>
+      </div>
+
+      <div className="toeic-result-stats">
+        <h3>Tổng quan bài làm</h3>
+        <div className="toeic-part-scores">
+          {hasAnswerKey && (
+            <div className="toeic-part-score-card">
+              <div className="toeic-part-score-header"><span className="toeic-part-score-name">Câu đúng</span><span className="toeic-part-score-pct">{scorePercent}%</span></div>
+              <div className="toeic-part-score-bar"><div className="toeic-part-score-fill" style={{ width: `${scorePercent}%` }} /></div>
+              <span className="toeic-part-score-detail">{correctCount} đúng · {wrongCount} sai · {gradableCount} câu chấm được</span>
+            </div>
+          )}
+          {hasAnswerKey && estimatedPartScore !== null && (
+            <div className="toeic-part-score-card">
+              <div className="toeic-part-score-header"><span className="toeic-part-score-name">Điểm {section.label}</span><span className="toeic-part-score-pct">{estimatedPartScore}</span></div>
+              <div className="toeic-part-score-bar"><div className="toeic-part-score-fill" style={{ width: `${Math.min(100, (estimatedPartScore / 495) * 100)}%` }} /></div>
+              <span className="toeic-part-score-detail">Điểm ước tính của riêng part này để bạn tự cộng với các part còn lại</span>
+            </div>
+          )}
+          <div className="toeic-part-score-card">
+            <div className="toeic-part-score-header"><span className="toeic-part-score-name">Đã trả lời</span><span className="toeic-part-score-pct">{Math.round((answeredCount / questions.length) * 100)}%</span></div>
+            <div className="toeic-part-score-bar"><div className="toeic-part-score-fill" style={{ width: `${(answeredCount / questions.length) * 100}%` }} /></div>
+            <span className="toeic-part-score-detail">{answeredCount}/{questions.length} câu</span>
+          </div>
+        </div>
+      </div>
+
+      {!hasAnswerKey && (
+        <div className="toeic-feedback feedback-wrong toeic-listening-review-note">
+          <strong>Đề này chưa có đáp án đúng trong file nguồn</strong>
+          <p>Màn Reading Test đã hoàn thiện full flow làm bài và review. Khi bổ sung answer key, phần này sẽ tự động mở chấm điểm và review đúng-sai.</p>
+        </div>
+      )}
+      {hasAnswerKey && !hasFullAnswerKey && (
+        <div className="toeic-feedback feedback-wrong toeic-listening-review-note">
+          <strong>Phần này mới chấm được một phần</strong>
+          <p>Hiện có đáp án cho {gradableCount}/{questions.length} câu. Các câu còn lại vẫn đang chờ bổ sung từ bộ dữ liệu nguồn.</p>
+        </div>
+      )}
+
+      <div className="toeic-result-review">
+        <h3>{hasAnswerKey ? "Xem lại đáp án" : "Xem lại bài làm"}</h3>
+        {questions.map((question, index) => {
+          const selectedIndex = answers[question.id];
+          const selectedOption = selectedIndex !== undefined ? question.options[selectedIndex] : null;
+          const correctIndex = getListeningCorrectIndex(question);
+          const correctOption = correctIndex !== -1 ? question.options[correctIndex] : null;
+          const isGradable = correctIndex !== -1;
+          const isCorrect = isGradable && selectedIndex === correctIndex;
+          const previousQuestion = questions[index - 1];
+          const showPassageBlock = Boolean(question.sharedPassage) && (!previousQuestion || previousQuestion.sharedPassage !== question.sharedPassage);
+          const showImageBlock = Boolean(question.imageUrl) && (!previousQuestion || previousQuestion.imageUrl !== question.imageUrl);
+          const reviewPrompt = getReadingTestPrompt(question.prompt);
+
+          return (
+            <div
+              key={question.id}
+              className={`toeic-review-item ${isGradable
+                ? isCorrect
+                  ? "review-correct"
+                  : selectedOption
+                    ? "review-wrong"
+                    : "review-unanswered"
+                : selectedOption
+                  ? "review-correct"
+                  : "review-unanswered"
+                }`}
+            >
+              <div className="toeic-review-top">
+                <span className="toeic-review-num">Câu {question.displayNumber}</span>
+                <span className="toeic-review-part">{question.toeicPart}</span>
+                <span className={`toeic-review-badge ${isGradable
+                  ? isCorrect
+                    ? "badge-ok"
+                    : selectedOption
+                      ? "badge-err"
+                      : "badge-unanswered"
+                  : selectedOption
+                    ? "badge-ok"
+                    : "badge-unanswered"
+                  }`}>
+                  {isGradable ? (isCorrect ? "✓ Đúng" : selectedOption ? "✗ Sai" : "○ Bỏ trống") : "Chưa chấm"}
+                </span>
+              </div>
+              {showPassageBlock && <div className="toeic-reading-passage">{formatReadingPassage(question.sharedPassage)}</div>}
+              {showImageBlock && <div className="toeic-q-image"><img src={question.imageUrl} alt={`Review ${question.displayNumber}`} /></div>}
               {reviewPrompt && <p className="toeic-review-q"><strong>{reviewPrompt}</strong></p>}
               {isGradable && correctOption && (
                 <p className="toeic-review-ans">Đáp án đúng: <strong>{correctOption.key}. {correctOption.text}</strong></p>
@@ -767,22 +1249,16 @@ function PracticeSession({ part, onBack, backLabel = "← Quay lại" }) {
 
 function FullTestMode({ onBack }) {
   const [selectedVariantId, setSelectedVariantId] = useState("fulltest-a");
-  const [savedSession, setSavedSession] = useState(null);
   const selectedVariant = FULL_TEST_VARIANTS.find((variant) => variant.id === selectedVariantId) || FULL_TEST_VARIANTS[0];
-  const allParts = [...selectedVariant.parts.listening, ...selectedVariant.parts.reading];
-  const allQs = allParts.flatMap((part) =>
-    part.questions.map((q) => ({
-      ...q,
-      partId: part.id,
-      partLabel: part.label,
-      skill: allParts.indexOf(part) < selectedVariant.parts.listening.length ? "Listening" : "Reading",
-    }))
-  );
+  const allQs = selectedVariant?.questions || [];
+  const partGroups = buildFullTestPartGroups(allQs);
 
   const [phase, setPhase] = useState("intro");
   const [qi, setQi] = useState(0);
   const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(120 * 60);
+  const [activeReviewPartKey, setActiveReviewPartKey] = useState("");
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const timerRef = useRef(null);
   const xpAwardedRef = useRef(false);
 
@@ -793,17 +1269,21 @@ function FullTestMode({ onBack }) {
       const parsed = JSON.parse(saved);
       if (parsed.timeLeft > 0 && parsed.phase === "running") {
         setSelectedVariantId(parsed.variantId || "fulltest-a");
-        setSavedSession({
-          variantId: parsed.variantId || "fulltest-a",
-          qi: parsed.qi || 0,
-          answers: parsed.answers || {},
-          timeLeft: parsed.timeLeft,
-        });
       }
     } catch {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    setActiveReviewPartKey(partGroups[0]?.partKey || "");
+  }, [selectedVariantId]);
+
+  useEffect(() => {
+    if (phase !== "running") {
+      setShowSubmitConfirm(false);
+    }
+  }, [phase, selectedVariantId]);
 
   useEffect(() => {
     if (phase === "running") {
@@ -834,41 +1314,47 @@ function FullTestMode({ onBack }) {
     return () => clearInterval(timerRef.current);
   }, [phase]);
 
+  const activePartGroup = partGroups.find((group) => qi >= group.startIndex && qi <= group.endIndex) || partGroups[0] || null;
+  const visibleQuestions = activePartGroup?.questions || allQs;
+
   const submit = () => {
     clearInterval(timerRef.current);
     setPhase("result");
+    setShowSubmitConfirm(false);
+  };
+
+  const requestSubmit = () => {
+    setShowSubmitConfirm(true);
+  };
+
+  const jumpToPartGroup = (group) => {
+    if (!group) return;
+    setQi(group.startIndex);
   };
 
   const getFullTestInstruction = (q) => {
-    const basePartId = getBasePartId(q.partId);
-    if (basePartId === "part1") return "Quan sát hình và chọn câu mô tả đúng nhất.";
-    if (basePartId === "part2") return "Nghe câu hỏi hoặc câu nói và chọn phản hồi phù hợp nhất.";
-    if (basePartId === "part3") return "Nghe đoạn hội thoại và chọn đáp án đúng cho câu hỏi.";
-    if (basePartId === "part4") return "Nghe bài nói ngắn và chọn đáp án đúng cho câu hỏi.";
-    if (basePartId === "part5") return "Đọc câu chưa hoàn chỉnh và chọn đáp án đúng nhất để điền vào chỗ trống.";
-    if (basePartId === "part6") return "Đọc đoạn văn và chọn đáp án phù hợp nhất để hoàn thành nội dung.";
-    if (basePartId === "part7") return "Đọc bài đọc và chọn đáp án đúng cho câu hỏi.";
+    const partKey = getFullTestPartKey(q.partLabel);
+    if (partKey === "PART 1") return "Quan sát hình và chọn câu mô tả đúng nhất.";
+    if (partKey === "PART 2") return "Nghe câu hỏi hoặc câu nói và chọn phản hồi phù hợp nhất.";
+    if (partKey === "PART 3") return "Nghe đoạn hội thoại và chọn đáp án đúng cho câu hỏi.";
+    if (partKey === "PART 4") return "Nghe bài nói ngắn và chọn đáp án đúng cho câu hỏi.";
+    if (partKey === "PART 5") return "Đọc câu chưa hoàn chỉnh và chọn đáp án đúng nhất để điền vào chỗ trống.";
+    if (partKey === "PART 6") return "Đọc đoạn văn và chọn đáp án phù hợp nhất để hoàn thành nội dung.";
+    if (partKey === "PART 7") return "Đọc bài đọc và chọn đáp án đúng cho câu hỏi.";
     return "";
   };
 
   const getFullTestPrompt = (q) => {
-    const basePartId = getBasePartId(q.partId);
-    if (basePartId === "part3" || basePartId === "part4" || basePartId === "part7") return q.question || "";
-    if (basePartId === "part5") return q.text || "";
-    if (basePartId === "part6") return q.question || "";
-    return "";
+    return q.prompt || "";
   };
 
   const getFullTestPassage = (q) => {
-    const basePartId = getBasePartId(q.partId);
-    if (basePartId === "part6") return q.text || q.passage || "";
-    if (basePartId === "part7") return q.passage || "";
     return q.passage || "";
   };
 
   const renderFullTestOptionLabel = (q, opt, idx) => {
-    const basePartId = getBasePartId(q.partId);
-    if (basePartId === "part1" || basePartId === "part2") {
+    const partKey = getFullTestPartKey(q.partLabel);
+    if (partKey === "PART 1" || partKey === "PART 2") {
       return <span className="toeic-option-code-only">Đáp án {String.fromCharCode(65 + idx)}</span>;
     }
     return opt;
@@ -890,7 +1376,7 @@ function FullTestMode({ onBack }) {
               <h3>{variant.name}</h3>
               <p>{variant.desc}</p>
               <ul className="toeic-test-features">
-                <li>{[...variant.parts.listening, ...variant.parts.reading].flatMap((part) => part.questions).length} câu hỏi</li>
+                <li>{variant.questions.length} câu hỏi</li>
                 <li>120 phút</li>
                 <li>Listening + Reading</li>
               </ul>
@@ -898,12 +1384,12 @@ function FullTestMode({ onBack }) {
                 className="toeic-start-btn toeic-start-btn-full"
                 onClick={() => {
                   localStorage.removeItem("toeic_fulltest_state");
-                  setSavedSession(null);
                   setSelectedVariantId(variant.id);
                   setPhase("running");
                   setQi(0);
                   setAnswers({});
                   setTimeLeft(120 * 60);
+                  setShowSubmitConfirm(false);
                   xpAwardedRef.current = false;
                 }}
               >
@@ -918,7 +1404,7 @@ function FullTestMode({ onBack }) {
 
   if (phase === "running") {
     const q = allQs[qi];
-    const questionImageSrc = getFullTestQuestionImageSrc(q);
+    const currentAudioUrl = q?.audioUrl || "";
     const answered = Object.keys(answers).length;
     const isUrgent = timeLeft < 120;
     return (
@@ -927,44 +1413,62 @@ function FullTestMode({ onBack }) {
           <div className="toeic-test-info">
             <span className="toeic-test-badge">Full Test</span>
             <span className="toeic-test-badge">{selectedVariant.name}</span>
-            <span className="toeic-test-progress">Câu {qi + 1} / {allQs.length}</span>
+            <span className="toeic-test-badge toeic-test-progress-badge">Câu {qi + 1} / {allQs.length}</span>
             <span className="toeic-answered-count">{answered} đã trả lời</span>
           </div>
           <div className={`toeic-timer${isUrgent ? " urgent" : ""}`}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10Zm1-10V7h-2v7h6v-2h-4Z" /></svg>
             {formatTime(timeLeft)}
           </div>
-          <button className="toeic-submit-early-btn" onClick={submit}>Nộp bài</button>
+          <button className="toeic-submit-early-btn" onClick={requestSubmit}>Nộp bài</button>
         </div>
         <div className="toeic-timer-bar"><div className="toeic-timer-fill" style={{ width: `${(timeLeft / (120 * 60)) * 100}%`, background: isUrgent ? "var(--red,#ef4444)" : "var(--blue,#3b82f6)" }} /></div>
+        <div className="toeic-question-nav toeic-part-switch-nav"><div className="toeic-nav-grid toeic-part-switch-grid">
+          {partGroups.map((group) => {
+            const answeredInPart = group.questions.filter((item) => answers[item.id] !== undefined).length;
+            return (
+              <button
+                key={`${group.skill}-${group.partKey}`}
+                className={`toeic-nav-cell toeic-part-switch-cell${activePartGroup?.partKey === group.partKey ? " active" : ""}`}
+                onClick={() => jumpToPartGroup(group)}
+                title={FULL_TEST_PART_META[group.partKey]?.title || group.partLabel}
+              >
+                <span className="toeic-part-switch-name">{group.partLabel}</span>
+                <span className="toeic-part-switch-progress">Đã làm {answeredInPart}/{group.questions.length}</span>
+              </button>
+            );
+          })}
+        </div></div>
         <div className="toeic-question-nav"><div className="toeic-nav-grid">
-          {allQs.map((qq, i) => (
-            <button key={qq.id} className={`toeic-nav-cell${i === qi ? " active" : ""}${answers[qq.id] !== undefined ? " answered" : ""}`} onClick={() => setQi(i)}>{i + 1}</button>
-          ))}
+          {visibleQuestions.map((qq) => {
+            const absoluteIndex = allQs.findIndex((item) => item.id === qq.id);
+            return (
+              <button
+                key={qq.id}
+                className={`toeic-nav-cell${absoluteIndex === qi ? " active" : ""}${answers[qq.id] !== undefined ? " answered" : ""}`}
+                onClick={() => setQi(absoluteIndex)}
+              >
+                {qq.displayNumber}
+              </button>
+            );
+          })}
         </div></div>
         <div className="toeic-test-question-area">
           <div className="toeic-test-part-label">{q.partLabel} · {q.skill}</div>
-          {questionImageSrc && <div className="toeic-q-image"><img src={questionImageSrc} alt="Question figure" /></div>}
-          {q.imageEmoji && !questionImageSrc && (
-            <div className="toeic-visual-card">
-              <div className="toeic-visual-emoji">{q.imageEmoji}</div>
-              <div className="toeic-visual-copy">
-                <strong>{q.imageTitle}</strong>
-                <p>{q.imageDetail}</p>
-              </div>
+          {q.imageUrl && <div className="toeic-q-image"><img src={q.imageUrl} alt={`Question ${q.displayNumber}`} /></div>}
+          {q.skill === "Listening" && currentAudioUrl && (
+            <div className="toeic-audio-shell">
+              <audio key={currentAudioUrl} className="toeic-audio-player" controls preload="none" src={currentAudioUrl}>
+                Trinh duyet nay khong ho tro audio.
+              </audio>
             </div>
           )}
-          {q.skill === "Listening" && q.audioText && (
-            <div className="toeic-audio-row toeic-audio-row-spaced">
-              <button className="toeic-audio-btn" onClick={() => speakToeicText(q.audioText || "")}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2 16H5.889L11.183 20.332C11.273 20.405 11.385 20.445 11.5 20.445C11.776 20.445 12 20.221 12 19.945V4.055C12 3.94 11.96 3.828 11.887 3.739C11.713 3.525 11.399 3.493 11.185 3.668L5.889 8H2C1.448 8 1 8.448 1 9V15C1 15.552 1.448 16 2 16ZM23 12C23 15.292 21.554 18.246 19.262 20.262L17.845 18.844C19.776 17.194 21 14.74 21 12C21 9.26 19.776 6.806 17.845 5.156L19.262 3.738C21.554 5.754 23 8.708 23 12Z" /></svg>
-                Phát audio
-              </button>
-            </div>
-          )}
-          {q.skill === "Listening" && q.audioText && <div className="toeic-reading-passage">{q.audioText}</div>}
           <div className="toeic-test-q-text">{getFullTestInstruction(q)}</div>
-          {getFullTestPassage(q) && <div className="toeic-reading-passage">{getFullTestPassage(q)}</div>}
+          {getFullTestPassage(q) && !shouldHideListeningTranscriptInFullTest(q) && (
+            <div className="toeic-reading-passage">
+              {q.skill === "Reading" ? formatReadingPassage(getFullTestPassage(q)) : getFullTestPassage(q)}
+            </div>
+          )}
           {getFullTestPrompt(q) && <div className="toeic-test-q-text"><strong>{getFullTestPrompt(q)}</strong></div>}
           <div className="toeic-options-grid">
             {q.options.map((opt, idx) => (
@@ -977,9 +1481,30 @@ function FullTestMode({ onBack }) {
             <button disabled={qi === 0} onClick={() => setQi(qi - 1)} className="toeic-nav-btn">← Trước</button>
             {qi < allQs.length - 1
               ? <button onClick={() => setQi(qi + 1)} className="toeic-nav-btn toeic-nav-next">Tiếp theo →</button>
-              : <button onClick={submit} className="toeic-nav-btn toeic-nav-submit">Nộp bài ✓</button>}
+              : <button onClick={requestSubmit} className="toeic-nav-btn toeic-nav-submit">Nộp bài ✓</button>}
           </div>
         </div>
+        {showSubmitConfirm && (
+          <div className="toeic-confirm-overlay" role="presentation" onClick={() => setShowSubmitConfirm(false)}>
+            <div
+              className="toeic-confirm-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="toeic-submit-fulltest-confirm-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h3 id="toeic-submit-fulltest-confirm-title">Xác nhận nộp bài</h3>
+              <p>
+                Bạn đã trả lời {answered}/{allQs.length} câu.
+                {answered < allQs.length ? ` Vẫn còn ${allQs.length - answered} câu chưa chọn.` : ""}
+              </p>
+              <div className="toeic-confirm-actions">
+                <button className="toeic-nav-btn" onClick={() => setShowSubmitConfirm(false)}>Làm tiếp</button>
+                <button className="toeic-nav-btn toeic-nav-next" onClick={submit}>Xác nhận nộp</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -999,6 +1524,10 @@ function FullTestMode({ onBack }) {
     if (answers[q.id] === q.correct) byPart[q.partLabel].correct += 1;
   });
 
+  const reviewQuestions = activeReviewPartKey
+    ? allQs.filter((question) => getFullTestPartKey(question.partLabel) === activeReviewPartKey)
+    : allQs;
+
   return (
     <div className="toeic-result">
       <div className="toeic-result-header">
@@ -1008,8 +1537,28 @@ function FullTestMode({ onBack }) {
           <span className="toeic-score-label">điểm TOEIC</span>
         </div></div>
         <h2>{pct >= 80 ? "Excellent" : pct >= 60 ? "Good job" : "Keep practicing"}</h2>
-        <p>Listening: {score.listening} · Reading: {score.reading} · Tổng: {score.total}/990</p>
-        <p className="toeic-result-meta">{totalCorrect}/{allQs.length} câu đúng ({pct}%) · Thời gian: {formatTime(120 * 60 - timeLeft)}</p>
+        <div className="toeic-fulltest-summary">
+          <div className="toeic-fulltest-summary-card">
+            <span className="toeic-fulltest-summary-label">Listening</span>
+            <strong className="toeic-fulltest-summary-value">{score.listening}</strong>
+          </div>
+          <div className="toeic-fulltest-summary-card">
+            <span className="toeic-fulltest-summary-label">Reading</span>
+            <strong className="toeic-fulltest-summary-value">{score.reading}</strong>
+          </div>
+          <div className="toeic-fulltest-summary-card toeic-fulltest-summary-card-accent">
+            <span className="toeic-fulltest-summary-label">Tổng điểm</span>
+            <strong className="toeic-fulltest-summary-value">{score.total}/990</strong>
+          </div>
+          <div className="toeic-fulltest-summary-card">
+            <span className="toeic-fulltest-summary-label">Độ chính xác</span>
+            <strong className="toeic-fulltest-summary-value">{totalCorrect}/{allQs.length} câu ({pct}%)</strong>
+          </div>
+          <div className="toeic-fulltest-summary-card">
+            <span className="toeic-fulltest-summary-label">Thời gian làm bài</span>
+            <strong className="toeic-fulltest-summary-value">{formatTime(120 * 60 - timeLeft)}</strong>
+          </div>
+        </div>
       </div>
 
       <div className="toeic-result-stats">
@@ -1029,23 +1578,41 @@ function FullTestMode({ onBack }) {
       </div>
 
       <div className="toeic-result-review">
-        <h3>Xem giải thích</h3>
-        {allQs.map((q, i) => {
+        <h3>Xem giải thích{activeReviewPartKey ? ` · ${activeReviewPartKey}` : ""}</h3>
+        <div className="toeic-review-part-tabs">
+          <div className="toeic-review-part-grid">
+            {partGroups.map((group) => (
+              <button
+                key={`review-${group.partKey}`}
+                type="button"
+                className={`toeic-review-part-btn${activeReviewPartKey === group.partKey ? " active" : ""}`}
+                onClick={() => setActiveReviewPartKey(group.partKey)}
+                title={FULL_TEST_PART_META[group.partKey]?.title || group.partLabel}
+              >
+                {group.partLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+        {reviewQuestions.map((q) => {
           const ua = answers[q.id];
           const ok = ua === q.correct;
           const skip = ua === undefined;
           return (
             <div key={q.id} className={`toeic-review-item ${ok ? "review-correct" : skip ? "review-unanswered" : "review-wrong"}`}>
               <div className="toeic-review-top">
-                <span className="toeic-review-num">Câu {i + 1}</span>
+                <span className="toeic-review-num">Câu {q.displayNumber}</span>
                 <span className="toeic-review-part">{q.partLabel}</span>
                 <span className={`toeic-review-badge ${ok ? "badge-ok" : skip ? "badge-unanswered" : "badge-err"}`}>{ok ? "✓ Đúng" : skip ? "○ Bỏ qua" : "✗ Sai"}</span>
               </div>
-              <p className="toeic-review-q">{q.passage || q.text || q.audioText}</p>
-              {q.question && <p className="toeic-review-q"><strong>{q.question}</strong></p>}
+              {q.imageUrl && <div className="toeic-q-image"><img src={q.imageUrl} alt={`Review ${q.displayNumber}`} /></div>}
+              {q.passage && !shouldHideListeningTranscriptInFullTest(q) && (
+                <p className="toeic-review-q">{q.skill === "Reading" ? formatReadingPassage(q.passage) : q.passage}</p>
+              )}
+              {q.prompt && <p className="toeic-review-q"><strong>{q.prompt}</strong></p>}
               <p className="toeic-review-ans">Đáp án: <strong>{String.fromCharCode(65 + q.correct)}. {q.options[q.correct]}</strong></p>
               {!ok && ua !== undefined && <p className="toeic-review-user">Bạn chọn: {String.fromCharCode(65 + ua)}. {q.options[ua]}</p>}
-              <p className="toeic-review-explain">💡 {q.explanation}</p>
+              {q.explanation && <p className="toeic-review-explain">💡 {q.explanation}</p>}
             </div>
           );
         })}
@@ -1066,6 +1633,8 @@ export default function TOEIC() {
   const [activeReadingTopic, setActiveReadingTopic] = useState(null);
   const [activeListeningTest, setActiveListeningTest] = useState(null);
   const [activeListeningTestPart, setActiveListeningTestPart] = useState(null);
+  const [activeReadingTest, setActiveReadingTest] = useState(null);
+  const [activeReadingTestPart, setActiveReadingTestPart] = useState(null);
 
   const handleTabChange = (nextTab) => {
     setTab(nextTab);
@@ -1080,6 +1649,10 @@ export default function TOEIC() {
     if (nextTab !== "listening-test") {
       setActiveListeningTest(null);
       setActiveListeningTestPart(null);
+    }
+    if (nextTab !== "reading-test") {
+      setActiveReadingTest(null);
+      setActiveReadingTestPart(null);
     }
   };
 
@@ -1107,21 +1680,28 @@ export default function TOEIC() {
     );
   }
 
+  const shouldHideToeicHero =
+    (tab === "listening-test" && activeListeningTestPart && (activeListeningTestPart.questions || []).length > 0) ||
+    (tab === "reading-test" && activeReadingTestPart && (activeReadingTestPart.questions || []).length > 0);
+
   return (
     <main className="dash-main toeic-page" id="page-toeic">
-      <section className="toeic-hero">
-        <div className="toeic-hero-copy">
-          <div className="toeic-eyebrow">TOEIC</div>
-          <h1>Luyện tập và thi thử TOEIC</h1>
-          <p>Chọn kỹ năng và dạng bài để luyện tập. Listening và Reading hiện được chia theo đúng từng part để bám sát cấu trúc đề TOEIC hơn.</p>
-        </div>
-        <div className="toeic-tab-switch">
-          <button className={`toeic-tab-btn${tab === "listening-test" ? " active" : ""}`} onClick={() => handleTabChange("listening-test")}>Listening Test</button>
-          <button className={`toeic-tab-btn${tab === "listening" ? " active" : ""}`} onClick={() => handleTabChange("listening")}>🎧 Listening</button>
-          <button className={`toeic-tab-btn${tab === "reading" ? " active" : ""}`} onClick={() => handleTabChange("reading")}>📖 Reading</button>
-          <button className={`toeic-tab-btn${tab === "fulltest" ? " active" : ""}`} onClick={() => handleTabChange("fulltest")}>📋 Full Test</button>
-        </div>
-      </section>
+      {!shouldHideToeicHero && (
+        <section className="toeic-hero">
+          <div className="toeic-hero-copy">
+            <div className="toeic-eyebrow">TOEIC</div>
+            <h1>Luyện tập và thi thử TOEIC</h1>
+            <p>Chọn kỹ năng và dạng bài để luyện tập. Listening và Reading hiện được chia theo đúng từng part để bám sát cấu trúc đề TOEIC hơn.</p>
+          </div>
+          <div className="toeic-tab-switch">
+            <button className={`toeic-tab-btn${tab === "listening-test" ? " active" : ""}`} onClick={() => handleTabChange("listening-test")}>Listening Test</button>
+            <button className={`toeic-tab-btn${tab === "reading-test" ? " active" : ""}`} onClick={() => handleTabChange("reading-test")}>Reading Test</button>
+            <button className={`toeic-tab-btn${tab === "fulltest" ? " active" : ""}`} onClick={() => handleTabChange("fulltest")}>Full Test</button>
+            <button className={`toeic-tab-btn${tab === "listening" ? " active" : ""}`} onClick={() => handleTabChange("listening")}>🎧 Listening</button>
+            <button className={`toeic-tab-btn${tab === "reading" ? " active" : ""}`} onClick={() => handleTabChange("reading")}>📖 Reading</button>
+          </div>
+        </section>
+      )}
 
       <div className="toeic-content">
         {tab === "listening" ? (
@@ -1166,6 +1746,35 @@ export default function TOEIC() {
             )
           ) : (
             <ListeningTestGrid tests={LISTENING_TEST_SETS} onSelect={setActiveListeningTest} />
+          )
+        ) : tab === "reading-test" ? (
+          activeReadingTest ? (
+            activeReadingTestPart ? (
+              (activeReadingTestPart.questions || []).length > 0 ? (
+                <ReadingTestSession
+                  test={activeReadingTest}
+                  section={activeReadingTestPart}
+                  onBack={() => setActiveReadingTestPart(null)}
+                />
+              ) : (
+                <ReadingTestPlaceholder
+                  test={activeReadingTest}
+                  part={activeReadingTestPart}
+                  onBack={() => setActiveReadingTestPart(null)}
+                />
+              )
+            ) : (
+              <ReadingTestParts
+                test={activeReadingTest}
+                onSelectPart={setActiveReadingTestPart}
+                onBack={() => {
+                  setActiveReadingTest(null);
+                  setActiveReadingTestPart(null);
+                }}
+              />
+            )
+          ) : (
+            <ReadingTestGrid tests={READING_TEST_SETS} onSelect={setActiveReadingTest} />
           )
         ) : activeReadingMode ? (
           <TopicGrid
