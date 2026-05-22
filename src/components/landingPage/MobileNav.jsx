@@ -33,14 +33,14 @@ export default function MobileNav() {
                 </span>
                 TOEIC
             </NavLink>
-            <NavLink to="/dashboard/review" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+            {/* <NavLink to="/dashboard/games#games-srs-label" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
                 <span>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
                     </svg>
                 </span>
                 Ôn tập
-            </NavLink>
+            </NavLink> */}
             <NavLink to="/dashboard/stats" className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
                 <span>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">

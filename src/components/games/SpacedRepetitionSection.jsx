@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   getDueItems as getLocalDueItems,
   getFullQueue as getLocalFullQueue,
@@ -22,6 +21,11 @@ const RATINGS = [
   { key: 'good', label: 'Nhớ tốt', emoji: '😊', className: 'rating-btn rating-good', desc: 'Tăng theo nhịp SM-2 chuẩn' },
   { key: 'easy', label: 'Quá dễ', emoji: '🚀', className: 'rating-btn rating-easy', desc: 'Tăng nhanh nhất' },
 ];
+
+const REVIEW_THEME = {
+  front: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+  back: 'linear-gradient(135deg, #2dd4bf 0%, #3b82f6 100%)',
+};
 
 function formatIntervalLabel(days) {
   return `${days} ngày`;
@@ -52,33 +56,68 @@ function mapServerDueItem(item) {
   };
 }
 
+function ReviewHero({ dueCount, totalCount, totalCountLabel }) {
+  return (
+    <section className="review-hero review-hero-collapsed">
+      <div>
+        <span className="review-eyebrow">Spaced Repetition</span>
+        <h1>Ôn tập đúng lúc với SM-2</h1>
+        <p className="review-hero-caption">Một khu ôn tập riêng cho các từ đã đến hạn hôm nay.</p>
+      </div>
+
+      <div className="review-hero-stats">
+        <div className="review-hero-stat">
+          <strong>{dueCount}</strong>
+          <span>Đến hạn hôm nay</span>
+        </div>
+        <div className="review-hero-stat">
+          <strong>{totalCount}</strong>
+          <span>{totalCountLabel}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FlashcardCard({ item, flipped, onFlip }) {
   return (
-    <div
-      className={`review-card${flipped ? ' flipped' : ''}`}
-      onClick={onFlip}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onFlip();
-        }
-      }}
-    >
-      <div className="review-card-inner">
-        <div className="review-card-front">
-          <span className="review-card-hint">Bạn còn nhớ nghĩa của từ này không?</span>
-          <h2 className="review-card-word">{item.word}</h2>
-          {item.transcription ? <span className="review-card-trans">{item.transcription}</span> : null}
-          <span className="review-flip-hint">↩ Nhấn để lật thẻ</span>
-        </div>
+    <div className="flashcard-stage review-stage">
+      <div className={`flashcard-card review-card-shell${flipped ? ' is-flipped' : ''}`}>
+        <div
+          className="flashcard-card-inner review-card-inner-shell"
+          onClick={onFlip}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onFlip();
+            }
+          }}
+        >
+          <div className="flashcard-face flashcard-face-front review-card-front-shell" style={{ background: REVIEW_THEME.front }}>
+            <div className="flashcard-face-topline">Spaced Repetition</div>
+            <div className="flashcard-face-center">
+              <span className="review-card-hint">Bạn còn nhớ nghĩa của từ này không?</span>
+              <strong className="flashcard-word review-card-word">{item.word}</strong>
+              {item.wordtype ? <span className="flashcard-wordtype flashcard-wordtype-front">{item.wordtype}</span> : null}
+              {item.transcription ? <span className="flashcard-transcription review-card-trans">{item.transcription}</span> : null}
+            </div>
+            <div className="flashcard-face-hint flashcard-face-hint-spaced">Nhấn space hoặc click để lật thẻ</div>
+          </div>
 
-        <div className="review-card-back">
-          <span className="review-card-meaning-label">Nghĩa</span>
-          <h2 className="review-card-meaning">{item.mean}</h2>
-          {item.wordtype ? <span className="review-card-type">{item.wordtype}</span> : null}
-          {item.example ? <p className="review-card-example">"{item.example}"</p> : null}
+          <div className="flashcard-face flashcard-face-back review-card-back-shell" style={{ background: REVIEW_THEME.back }}>
+            <div className="flashcard-back-layout">
+              <div className="flashcard-face-topline">Nghĩa tiếng Việt</div>
+              <div className="flashcard-back-center">
+                <span className="review-card-meaning-label">Nghĩa</span>
+                <strong className="flashcard-meaning flashcard-meaning-hero review-card-meaning">{item.mean}</strong>
+                {item.wordtype ? <span className="review-card-type">{item.wordtype}</span> : null}
+                {item.example ? <p className="review-card-example">"{item.example}"</p> : null}
+              </div>
+              <div className="flashcard-face-hint flashcard-face-hint-back">Nhấn space hoặc click để lật lại</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -87,15 +126,14 @@ function FlashcardCard({ item, flipped, onFlip }) {
 
 function RatingButtons({ item, onRate, useServerSrs }) {
   return (
-    <div className="rating-row">
+    <div className="flashcard-actions review-rating-grid">
       {RATINGS.map((rating) => (
         <button
           key={rating.key}
-          className={rating.className}
+          className={`btn btn-primary flashcard-action-btn review-rating-btn ${rating.className}`}
           onClick={() => onRate(rating.key)}
           title={rating.desc}
         >
-          <span className="rating-emoji">{rating.emoji}</span>
           <span className="rating-label">{rating.label}</span>
           <span className="rating-next">
             {useServerSrs
@@ -122,8 +160,8 @@ function FeedbackBanner({ quality, nextLabel, onNext, isLast }) {
         <strong>{config.icon} {config.msg}</strong>{' '}
         Ôn lại sau <strong>{nextLabel}</strong>.
       </p>
-      <button className="review-next-btn" onClick={onNext}>
-        {isLast ? 'Xem kết quả 🏁' : 'Từ tiếp theo →'}
+      <button className="btn btn-primary flashcard-action-btn flashcard-action-btn-compact review-next-btn" onClick={onNext}>
+        {isLast ? 'Xem kết quả' : 'Từ tiếp theo'}
       </button>
     </div>
   );
@@ -146,6 +184,7 @@ function ReviewSession({ dueItems, onFinish, useServerSrs }) {
 
     setIsSubmitting(true);
     setSubmitError('');
+
     try {
       let label;
 
@@ -182,11 +221,12 @@ function ReviewSession({ dueItems, onFinish, useServerSrs }) {
       setNextLabel('');
       return;
     }
+
     onFinish(results);
   };
 
   return (
-    <div className="review-session">
+    <div className="review-session flashcard-shell review-session-shell">
       <div className="review-progress-bar-wrap">
         <div className="review-progress-bar">
           <div className="review-progress-fill" style={{ width: `${(index / dueItems.length) * 100}%` }} />
@@ -202,7 +242,7 @@ function ReviewSession({ dueItems, onFinish, useServerSrs }) {
         }}
       />
 
-      {flipped && !ratedQuality ? <RatingButtons item={item} onRate={handleRate} useServerSrs={useServerSrs} /> : null}
+      {!ratedQuality ? <RatingButtons item={item} onRate={handleRate} useServerSrs={useServerSrs} /> : null}
 
       {submitError ? (
         <div className="review-answer-feedback feedback-miss" role="alert">
@@ -339,8 +379,7 @@ function UpcomingSection({ queue }) {
   );
 }
 
-export default function Review() {
-  const navigate = useNavigate();
+export default function SpacedRepetitionSection({ variant = 'preview', onOpen, onClose, onGoHome }) {
   const useServerSrs = hasServerSrsAccess();
   const [dueItems, setDueItems] = useState([]);
   const [fullQueue, setFullQueue] = useState([]);
@@ -379,36 +418,45 @@ export default function Review() {
     loadData();
   }, [loadData, sessionKey]);
 
-  const handleFinish = (sessionResults) => {
-    setResults(sessionResults);
-  };
-
   const handleRestart = () => {
     setResults(null);
     setSessionKey((current) => current + 1);
   };
 
-  const dueCount = dueItems.length;
+  if (variant === 'preview') {
+    return (
+      <div
+        id="page-review-preview"
+        className="review-page review-page-preview review-page-trigger"
+        role="button"
+        tabIndex={0}
+        onClick={onOpen}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onOpen?.();
+          }
+        }}
+      >
+        <ReviewHero
+          dueCount={dueItems.length}
+          totalCount={totalCount}
+          totalCountLabel={totalCountLabel}
+        />
+      </div>
+    );
+  }
 
   return (
-    <main className="dash-main review-page" id="page-review">
-      <section className="review-hero">
-        <div>
-          <span className="review-eyebrow">Spaced Repetition</span>
-          <h1>Ôn tập đúng lúc với SM-2</h1>
-          <p>Hệ thống SRS nhắc bạn ôn lại đúng thời điểm để giữ từ vựng lâu hơn trong trí nhớ.</p>
+    <div id="page-review" className="review-page review-screen-standalone">
+      <section className="review-screen-inline-topbar">
+        <div className="review-screen-title-wrap">
+          <span className="review-screen-kicker">Spaced Repetition</span>
+          <h2>Màn hình ôn tập</h2>
         </div>
-
-        <div className="review-hero-stats">
-          <div className="review-hero-stat">
-            <strong>{dueCount}</strong>
-            <span>Đến hạn hôm nay</span>
-          </div>
-          <div className="review-hero-stat">
-            <strong>{totalCount}</strong>
-            <span>{totalCountLabel}</span>
-          </div>
-        </div>
+        <button type="button" className="btn btn-secondary review-screen-close" onClick={onClose}>
+          Đóng
+        </button>
       </section>
 
       <section className="review-sm2-info">
@@ -442,13 +490,13 @@ export default function Review() {
           results={results}
           dueItems={dueItems}
           onRestart={handleRestart}
-          onGoHome={() => navigate('/dashboard')}
+          onGoHome={onGoHome}
         />
-      ) : dueCount > 0 ? (
+      ) : dueItems.length > 0 ? (
         <ReviewSession
           key={sessionKey}
           dueItems={dueItems}
-          onFinish={handleFinish}
+          onFinish={setResults}
           useServerSrs={useServerSrs}
         />
       ) : (
@@ -456,6 +504,6 @@ export default function Review() {
       )}
 
       {!useServerSrs ? <UpcomingSection queue={fullQueue} /> : null}
-    </main>
+    </div>
   );
 }

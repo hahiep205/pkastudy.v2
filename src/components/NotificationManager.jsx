@@ -5,18 +5,18 @@ import { checkStreak } from '../utils/streakSystem';
 import { getDueCount } from '../utils/srsStorage';
 
 /* ── Inline styles (no external CSS needed) ── */
-const overlay = { position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(6px)',animation:'fadeIn .3s ease' };
-const card = { background:'linear-gradient(135deg,#1a1a2e,#16213e)',borderRadius:20,padding:'40px 32px',textAlign:'center',maxWidth:360,width:'90%',boxShadow:'0 20px 60px rgba(0,0,0,0.5)',border:'2px solid rgba(255,255,255,0.1)',animation:'scaleIn .4s cubic-bezier(.22,1,.36,1)' };
-const badgeStyle = { fontSize:'4rem',display:'block',marginBottom:16,animation:'bounce 1s ease infinite' };
-const titleStyle = { fontSize:'1.5rem',fontWeight:800,color:'#fff',margin:'0 0 4px' };
-const subtitleStyle = { fontSize:'14px',color:'rgba(255,255,255,0.6)',margin:'0 0 20px' };
-const btnStyle = { padding:'12px 32px',borderRadius:12,border:'none',background:'linear-gradient(135deg,#3b82f6,#8b5cf6)',color:'#fff',fontWeight:700,fontSize:15,cursor:'pointer',transition:'transform .2s' };
+const overlay = { position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', animation: 'fadeIn .3s ease' };
+const card = { background: 'linear-gradient(135deg,#1a1a2e,#16213e)', borderRadius: 20, padding: '40px 32px', textAlign: 'center', maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.1)', animation: 'scaleIn .4s cubic-bezier(.22,1,.36,1)' };
+const badgeStyle = { fontSize: '4rem', display: 'block', marginBottom: 16, animation: 'bounce 1s ease infinite' };
+const titleStyle = { fontSize: '1.5rem', fontWeight: 800, color: '#fff', margin: '0 0 4px' };
+const subtitleStyle = { fontSize: '14px', color: 'rgba(255,255,255,0.6)', margin: '0 0 20px' };
+const btnStyle = { padding: '12px 32px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', transition: 'transform .2s' };
 
 const streakOverlay = { ...overlay };
-const streakCard = { ...card, background:'linear-gradient(135deg,#1a1a2e,#2d1810)' };
-const streakLostCard = { ...card, background:'linear-gradient(135deg,#1a1a2e,#2d1015)' };
+const streakCard = { ...card, background: 'linear-gradient(135deg,#1a1a2e,#2d1810)' };
+const streakLostCard = { ...card, background: 'linear-gradient(135deg,#1a1a2e,#2d1015)' };
 
-const toastStyle = { position:'fixed',bottom:24,right:24,zIndex:9998,background:'linear-gradient(135deg,#1e293b,#334155)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:14,padding:'14px 20px',color:'#fff',fontSize:14,fontWeight:600,boxShadow:'0 8px 32px rgba(0,0,0,0.3)',animation:'slideUp .4s ease',display:'flex',alignItems:'center',gap:10,cursor:'pointer' };
+const toastStyle = { position: 'fixed', bottom: 24, right: 24, zIndex: 9998, background: 'linear-gradient(135deg,#1e293b,#334155)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '14px 20px', color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', animation: 'slideUp .4s ease', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' };
 
 /* ── Keyframes (injected once) ── */
 const keyframesId = 'pka-notif-keyframes';
@@ -37,8 +37,8 @@ function injectKeyframes() {
 /* ── Confetti particles ── */
 function Confetti() {
   const particles = useMemo(() => {
-    const colors = ['#fbbf24','#3b82f6','#ef4444','#22c55e','#8b5cf6','#f97316'];
-    return Array.from({length:20}, (_,i) => ({
+    const colors = ['#fbbf24', '#3b82f6', '#ef4444', '#22c55e', '#8b5cf6', '#f97316'];
+    return Array.from({ length: 20 }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
       delay: Math.random() * 0.5,
@@ -47,14 +47,14 @@ function Confetti() {
     }));
   }, []);
   return (
-    <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none'}}>
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
       {particles.map(p => (
         <div key={p.id} style={{
-          position:'absolute', bottom:0, left:`${p.left}%`,
-          width:p.size, height:p.size, borderRadius:'50%',
-          background:p.color,
-          animation:`confetti 1.5s ease-out ${p.delay}s forwards`,
-        }}/>
+          position: 'absolute', bottom: 0, left: `${p.left}%`,
+          width: p.size, height: p.size, borderRadius: '50%',
+          background: p.color,
+          animation: `confetti 1.5s ease-out ${p.delay}s forwards`,
+        }} />
       ))}
     </div>
   );
@@ -65,13 +65,13 @@ function LevelUpModal({ data, onClose }) {
   if (!data) return null;
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={{...card, position:'relative'}} onClick={e => e.stopPropagation()}>
+      <div style={{ ...card, position: 'relative' }} onClick={e => e.stopPropagation()}>
         <Confetti />
         <span style={badgeStyle}>{data.badge}</span>
         <h2 style={titleStyle}>Level Up!</h2>
-        <p style={{color:'#fbbf24',fontWeight:700,fontSize:18,margin:'0 0 8px'}}>Level {data.to} – {data.title}</p>
+        <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 18, margin: '0 0 8px' }}>Level {data.to} – {data.title}</p>
         <p style={subtitleStyle}>Bạn đã mở khóa badge mới!</p>
-        <button style={btnStyle} onClick={onClose} onMouseOver={e=>e.target.style.transform='translateY(-2px)'} onMouseOut={e=>e.target.style.transform='none'}>
+        <button style={btnStyle} onClick={onClose} onMouseOver={e => e.target.style.transform = 'translateY(-2px)'} onMouseOut={e => e.target.style.transform = 'none'}>
           Tuyệt vời! 🎉
         </button>
       </div>
@@ -91,7 +91,7 @@ function StreakModal({ streak, lost, onClose }) {
           {lost ? 'Đừng lo, hãy bắt đầu lại từ hôm nay!' : 'Giữ vững phong độ nhé!'}
         </p>
         <button style={btnStyle} onClick={onClose}>
-          {lost ? 'Bắt đầu lại 💪' : 'Tiếp tục học! 📚'}
+          {lost ? 'Bắt đầu lại' : 'Tiếp tục học!'}
         </button>
       </div>
     </div>
@@ -102,19 +102,19 @@ function StreakModal({ streak, lost, onClose }) {
 function SrsToast({ count, onClose, onReview }) {
   if (!count) return null;
   return (
-    <div style={{...toastStyle, background:'linear-gradient(135deg,#0f2027,#1a3a2a)', borderColor:'rgba(34,197,94,0.35)', minWidth:280}}>
-      <span style={{fontSize:20}}>📋</span>
-      <div style={{display:'flex',flexDirection:'column',gap:2}}>
-        <span style={{fontWeight:700}}>Bạn có <strong style={{color:'#4ade80'}}>{count}</strong> từ cần ôn tập!</span>
-        <span style={{fontSize:12,opacity:0.6,fontWeight:400}}>Nhấn để bắt đầu ôn tập ngay</span>
+    <div style={{ ...toastStyle, background: 'linear-gradient(135deg,#0f2027,#1a3a2a)', borderColor: 'rgba(34,197,94,0.35)', minWidth: 280 }}>
+      <span style={{ fontSize: 20 }}>📋</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontWeight: 700 }}>Bạn có <strong style={{ color: '#4ade80' }}>{count}</strong> từ cần ôn tập!</span>
+        <span style={{ fontSize: 12, opacity: 0.6, fontWeight: 400 }}>Nhấn để bắt đầu ôn tập ngay</span>
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); onReview(); }}
-        style={{marginLeft:'auto',padding:'6px 14px',borderRadius:8,border:'none',background:'#22c55e',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'}}
+        style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: 8, border: 'none', background: '#22c55e', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
       >
         Ôn ngay →
       </button>
-      <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',opacity:0.4,color:'#fff',fontSize:16,padding:'0 2px'}}>✕</button>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, color: '#fff', fontSize: 16, padding: '0 2px' }}>✕</button>
     </div>
   );
 }
@@ -128,7 +128,7 @@ export function XpToast({ amount, reason, onDone }) {
 
   if (!amount) return null;
   return (
-    <div style={{...toastStyle, background:'linear-gradient(135deg,#065f46,#064e3b)', borderColor:'rgba(34,197,94,0.3)'}}>
+    <div style={{ ...toastStyle, background: 'linear-gradient(135deg,#065f46,#064e3b)', borderColor: 'rgba(34,197,94,0.3)' }}>
       <span>⚡</span>
       <span>+{amount} XP{reason ? ` · ${reason}` : ''}</span>
     </div>
@@ -166,7 +166,7 @@ export default function NotificationManager() {
   const closeLevelUp = () => { markLevelUpSeen(); setLevelUp(null); };
   const closeStreak = () => setStreakInfo(null);
   const closeSrs = () => setSrsCount(0);
-  const goReview = () => { setSrsCount(0); navigate('/dashboard/review'); };
+  const goReview = () => { setSrsCount(0); navigate('/dashboard/games#games-srs-label'); };
 
   return (
     <>

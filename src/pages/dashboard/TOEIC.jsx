@@ -1701,7 +1701,7 @@ function FullTestMode({ onBack }) {
       </div>
       <div className="toeic-result-actions">
         <button className="toeic-retry-btn" onClick={() => { setPhase("intro"); setAnswers({}); setQi(0); setTimeLeft(120 * 60); xpAwardedRef.current = false; }}>↻ Làm lại</button>
-        <button className="toeic-back-btn" onClick={onBack}>← Luyện part khác</button>
+        <button className="toeic-back-btn" onClick={onBack}>Luyện part khác</button>
       </div>
     </div>
   );

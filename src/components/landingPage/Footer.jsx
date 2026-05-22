@@ -27,9 +27,10 @@ export default function Footer() {
                 <div className="footer-col col-links">
                     <h3 className="footer-heading">Dịch Vụ</h3>
                     <ul className="footer-list">
-                        <li><Link to="/dashboard/courses?tab=english" className="footer-link">Học Tiếng Anh</Link></li>
-                        <li><Link to="/dashboard/courses?tab=custom" className="footer-link">Tạo bộ từ của bạn</Link></li>
-                        <li><Link to="/dashboard" className="footer-link">Học Thử</Link></li>
+                        <li><Link to="/dashboard/courses" className="footer-link">Danh sách tài liệu</Link></li>
+                        <li><Link to="/dashboard/games" className="footer-link">Học từ vựng</Link></li>
+                        <li><Link to="/dashboard/toeic" className="footer-link">Ôn luyện TOEIC</Link></li>
+                        <li><Link to="/dashboard" className="footer-link">Học Thử ngay</Link></li>
                     </ul>
                 </div>
 

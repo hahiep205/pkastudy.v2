@@ -2576,10 +2576,16 @@ body.app-dark-mode .settings2-role-card small {
     font-weight: 800;
 }
 
-.settings2-btn-primary {
-    background: linear-gradient(135deg, var(--blue), #1295d6);
+.btn.settings2-btn.settings2-btn-primary {
+    background: var(--blue);
     color: #fff;
+    border: none;
     box-shadow: 0 5px 0 var(--blue-shadow);
+}
+
+.btn.settings2-btn.settings2-btn-primary:hover {
+    background: var(--blue);
+    filter: brightness(1.06);
 }
 
 .btn.settings2-btn.settings2-btn-secondary {
@@ -2587,6 +2593,12 @@ body.app-dark-mode .settings2-role-card small {
     color: var(--blue);
     border: 2px solid var(--border-color);
     box-shadow: 0 4px 0 var(--border-color);
+}
+
+.btn.settings2-btn.settings2-btn-secondary:hover {
+    background: #fff;
+    color: var(--blue);
+    filter: none;
 }
 
 .settings2-modal-backdrop {

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import flappyLogo from '../../assets/images/logo-flappybird.png';
 import FlappyBirdExperience, { BIRD_OPTIONS, GAME_CARD, GAME_ID } from '../../components/games/FlappyBirdExperience';
+import SpacedRepetitionSection from '../../components/games/SpacedRepetitionSection';
 import Quiz from '../../components/Quiz';
 import Typing from '../../components/Typing';
 import Listening from '../../components/Listening';
@@ -285,7 +287,9 @@ function FlappyBirdPicker({ selectedBird, onPickBird, onContinue, onBack }) {
 }
 
 export default function Games() {
+  const location = useLocation();
   const [activeGameId, setActiveGameId] = useState(null);
+  const [isSrsScreenOpen, setIsSrsScreenOpen] = useState(false);
   const [activeFunGamePhase, setActiveFunGamePhase] = useState('hub');
   const [selectedFlappyBird, setSelectedFlappyBird] = useState(BIRD_OPTIONS[0]?.id || 'yellow');
   const [selectedFlappyTopic, setSelectedFlappyTopic] = useState(null);
@@ -370,6 +374,23 @@ export default function Games() {
     };
   }, [useServerSrs]);
 
+  useEffect(() => {
+    if (location.hash === '#games-srs-label') {
+      setIsSrsScreenOpen(true);
+      return;
+    }
+
+    if (phase !== 'hub' || activeGameId || isSrsScreenOpen) return;
+    if (!location.hash) return;
+
+    const target = document.querySelector(location.hash);
+    if (!target) return;
+
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [activeGameId, isSrsScreenOpen, location.hash, phase]);
+
   const handleVocabGameClick = (game) => {
     setVocabGame(game);
     setPhase('picker');
@@ -379,6 +400,18 @@ export default function Games() {
     setActiveGameId(GAME_ID);
     setActiveFunGamePhase('bird');
     setSelectedFlappyTopic(null);
+  };
+
+  const handleSrsOpen = () => {
+    setIsSrsScreenOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSrsClose = () => {
+    setIsSrsScreenOpen(false);
+    if (location.hash === '#games-srs-label') {
+      window.history.replaceState(null, '', '/dashboard/games');
+    }
   };
 
   const handleTopicSelect = (topic) => {
@@ -520,6 +553,18 @@ export default function Games() {
     );
   }
 
+  if (isSrsScreenOpen) {
+    return (
+      <main ref={pageRef} className="dash-main games-page" id="page-games">
+        <SpacedRepetitionSection
+          variant="full"
+          onClose={handleSrsClose}
+          onGoHome={() => window.location.assign('/dashboard')}
+        />
+      </main>
+    );
+  }
+
   if (phase === 'playing' && selectedTopic && studyModeProps) {
     const modeMap = {
       quiz: <Quiz {...studyModeProps} />,
@@ -593,6 +638,9 @@ export default function Games() {
             <img className="game-card-image" src={flappyLogo} alt={GAME_CARD.title} />
           </button>
         </div>
+
+        <div className="games-section-label" id="games-srs-label">Ôn tập Spaced Repetition</div>
+        <SpacedRepetitionSection variant="preview" onOpen={handleSrsOpen} />
       </section>
     </main>
   );
