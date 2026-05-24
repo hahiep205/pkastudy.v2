@@ -1,4 +1,4 @@
-const { getTestsList, getTestDetails, submitTest, getPracticeModes: getPracticeModesService } = require('../services/toeicService');
+const { getTestsList, getTestDetails, submitTest, getPracticeModes: getPracticeModesService, getTestHistory: getTestHistoryService } = require('../services/toeicService');
 
 async function getTests(req, res, next) {
   try {
@@ -33,20 +33,29 @@ async function getTest(req, res, next) {
   }
 }
 
-  async function submitTestAnswers(req, res, next) {
-    try {
-      const { test_id, answers, isPartial } = req.body;
-      
-      if (!test_id || !Array.isArray(answers)) {
-        return res.status(400).json({ error: 'Invalid input data' });
-      }
-      
-      const result = await submitTest(req.userId, test_id, answers, isPartial);
-      res.json({ data: result });
+async function submitTestAnswers(req, res, next) {
+  try {
+    const { test_id, answers, isPartial } = req.body;
+    
+    if (!test_id || !Array.isArray(answers)) {
+      return res.status(400).json({ error: 'Invalid input data' });
+    }
+    
+    const result = await submitTest(req.userId, test_id, answers, isPartial);
+    res.json({ data: result });
   } catch (error) {
     if (error.message === 'Test not found') {
       return res.status(404).json({ error: error.message });
     }
+    next(error);
+  }
+}
+
+async function getTestHistory(req, res, next) {
+  try {
+    const history = await getTestHistoryService(req.userId);
+    res.json({ data: history });
+  } catch (error) {
     next(error);
   }
 }
@@ -56,4 +65,5 @@ module.exports = {
   getTest,
   submitTestAnswers,
   getPracticeModes,
+  getTestHistory,
 };

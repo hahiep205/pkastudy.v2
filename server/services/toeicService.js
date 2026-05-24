@@ -1,4 +1,4 @@
-const { getTests, getTestById, getTestGroupsByTestId, getQuestionsByTestId, insertTestRecord } = require('../models/toeicModel');
+const { getTests, getTestById, getTestGroupsByTestId, getQuestionsByTestId, insertTestRecord, getTestHistoryByUserId } = require('../models/toeicModel');
 const { addXpService } = require('./progressService');
 const { getListeningScaledScore, getReadingScaledScore } = require('../utils/toeicScoreMapping');
 
@@ -177,9 +177,14 @@ async function getPracticeModes() {
   return modes;
 }
 
+async function getTestHistory(userId) {
+  return await getTestHistoryByUserId(userId);
+}
+
 module.exports = {
   getTestsList,
   getTestDetails,
   submitTest,
   getPracticeModes,
+  getTestHistory,
 };

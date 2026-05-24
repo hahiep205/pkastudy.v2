@@ -2623,8 +2623,550 @@ function FullTestMode({ onBack, variants }) {
   );
 }
 
+function getToeicBand(score) {
+  if (score >= 855) return { color: "#eab308", bg: "#fef9c3", text: "#854d0e", label: "Vàng (Cận bản xứ / Xuất sắc)", band: "Gold" };
+  if (score >= 730) return { color: "#3b82f6", bg: "#dbeafe", text: "#1e40af", label: "Xanh dương (Chuyên nghiệp)", band: "Blue" };
+  if (score >= 470) return { color: "#22c55e", bg: "#dcfce7", text: "#166534", label: "Xanh lá (Trung cấp)", band: "Green" };
+  if (score >= 220) return { color: "#a16207", bg: "#fef3c7", text: "#78350f", label: "Nâu (Sơ cấp)", band: "Brown" };
+  return { color: "#f97316", bg: "#ffedd5", text: "#9a3412", label: "Cam (Mất gốc / Bắt đầu)", band: "Orange" };
+}
+
+const getRecommendedResources = (score) => {
+  if (score >= 850) {
+    return [
+      {
+        title: "Hackers TOEIC 1000 Vol 3",
+        desc: "Bộ đề thi thử TOEIC mức độ cực khó để cọ xát và rèn luyện tâm lý phòng thi.",
+        tag: "Nâng cao (Target 850+)",
+        icon: "🏆",
+        link: "/dashboard/courses/toeic-hackers",
+        linkLabel: "Học từ vựng Hackers"
+      },
+      {
+        title: "ETS 2024 Advanced Tests",
+        desc: "Bộ đề nâng cao mới nhất được cập nhật bám sát đề thi thực tế năm 2024.",
+        tag: "Chuyên sâu (Target 900+)",
+        icon: "🔥",
+        link: "/dashboard/toeic",
+        linkLabel: "Luyện đề Full Test"
+      }
+    ];
+  }
+  if (score >= 650) {
+    return [
+      {
+        title: "Hackers TOEIC Vocabulary",
+        desc: "Từ vựng nâng cao chuyên sâu thường xuất hiện trong các bài đọc Part 7 dài.",
+        tag: "Phù hợp với bạn",
+        icon: "📖",
+        link: "/dashboard/courses/toeic-hackers",
+        linkLabel: "Học từ vựng Hackers"
+      },
+      {
+        title: "ETS 2023 Practice Tests",
+        desc: "Luyện đề thi thử có độ khó tương đương 99% đề thi thật tại IIG.",
+        tag: "Thực chiến",
+        icon: "⚡",
+        link: "/dashboard/toeic",
+        linkLabel: "Luyện đề Full Test"
+      }
+    ];
+  }
+  if (score >= 450) {
+    return [
+      {
+        title: "Starter TOEIC Vocabulary",
+        desc: "Bộ từ vựng khởi động nâng cao khả năng nghe hiểu Part 3 & đọc hiểu Part 6.",
+        tag: "Phù hợp với bạn",
+        icon: "🌱",
+        link: "/dashboard/courses/toeic-starter",
+        linkLabel: "Học từ vựng Starter"
+      },
+      {
+        title: "600 Essential Words",
+        desc: "Bộ 50 chủ đề từ vựng cốt lõi bắt buộc phải biết của kỳ thi TOEIC.",
+        tag: "Khuyên dùng",
+        icon: "📕",
+        link: "/dashboard/courses/toeic-basic",
+        linkLabel: "Xem 50 bài học"
+      }
+    ];
+  }
+  return [
+    {
+      title: "Very Easy TOEIC Vocabulary",
+      desc: "Từ vựng căn bản cực kỳ dễ học, dễ nhớ dành cho người mất gốc tiếng Anh.",
+      tag: "Phù hợp với bạn",
+      icon: "🐣",
+      link: "/dashboard/courses/toeic-very-easy",
+      linkLabel: "Học từ vựng cơ bản"
+    },
+    {
+      title: "600 Essential Words",
+      desc: "Bộ từ vựng nền tảng giúp bạn làm quen ngữ cảnh làm việc văn phòng.",
+      tag: "Nền tảng",
+      icon: "📕",
+      link: "/dashboard/courses/toeic-basic",
+      linkLabel: "Xem 50 bài học"
+    }
+  ];
+};
+
+function ToeicDashboard({ onStartTest, onStartPractice }) {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [targetScore, setTargetScore] = useState(() => {
+    return parseInt(localStorage.getItem("toeic_target_score") || "650", 10);
+  });
+  const [showEditTarget, setShowEditTarget] = useState(false);
+  const [tempTarget, setTempTarget] = useState(targetScore);
+
+  useEffect(() => {
+    axiosClient.get("/toeic/history")
+      .then((res) => {
+        setHistory(res || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
+  const handleSaveTarget = () => {
+    const val = Math.max(10, Math.min(990, tempTarget));
+    setTargetScore(val);
+    localStorage.setItem("toeic_target_score", val.toString());
+    setShowEditTarget(false);
+  };
+
+  const latestRecord = history[0] || null;
+  const currentScore = latestRecord ? latestRecord.total_score : 0;
+  const currentBand = getToeicBand(currentScore);
+  const targetBand = getToeicBand(targetScore);
+  const percent = Math.min(100, Math.round((currentScore / targetScore) * 100));
+
+  let readingAvg = 0;
+  let listeningAvg = 0;
+  if (history.length > 0) {
+    const sumR = history.reduce((acc, r) => acc + r.reading_score, 0);
+    const sumL = history.reduce((acc, r) => acc + r.listening_score, 0);
+    readingAvg = Math.round(sumR / history.length);
+    listeningAvg = Math.round(sumL / history.length);
+  }
+
+  return (
+    <div className="toeic-dashboard-view">
+      <div className="toeic-db-grid">
+        {/* Left Column: Stats & Target */}
+        <div className="toeic-db-card toeic-target-card">
+          <div className="toeic-card-header">
+            <h3>Mục Tiêu & Tiến Độ</h3>
+            <button className="toeic-edit-btn" onClick={() => { setTempTarget(targetScore); setShowEditTarget(true); }}>
+              ✏️ Sửa mục tiêu
+            </button>
+          </div>
+
+          {showEditTarget ? (
+            <div className="toeic-target-edit-box">
+              <label>Nhập điểm mục tiêu (10 - 990):</label>
+              <div className="toeic-target-input-row">
+                <input
+                  type="number"
+                  value={tempTarget}
+                  onChange={(e) => setTempTarget(parseInt(e.target.value, 10) || 0)}
+                  min="10"
+                  max="990"
+                />
+                <button className="toeic-save-btn" onClick={handleSaveTarget}>Lưu</button>
+                <button className="toeic-cancel-btn" onClick={() => setShowEditTarget(false)}>Hủy</button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="toeic-progress-circle-area">
+            <div className="toeic-progress-info">
+              <div className="toeic-current-score-label">Điểm hiện tại</div>
+              <div className="toeic-current-score-val" style={{ color: currentBand.color }}>
+                {currentScore} <span className="toeic-score-slash">/ 990</span>
+              </div>
+              <div className="toeic-percent-label">Hoàn thành {percent}% mục tiêu</div>
+            </div>
+            
+            <div className="toeic-progress-bar-container">
+              <div className="toeic-progress-bar-track">
+                <div 
+                  className="toeic-progress-bar-fill" 
+                  style={{ 
+                    width: `${Math.min(100, Math.round((currentScore / 990) * 100))}%`,
+                    background: `linear-gradient(90deg, ${currentBand.color}, #3b82f6)` 
+                  }} 
+                />
+                <div 
+                  className="toeic-target-marker-pin"
+                  style={{ left: `${Math.min(100, Math.round((targetScore / 990) * 100))}%` }}
+                  title={`Mục tiêu: ${targetScore}`}
+                />
+              </div>
+              <div className="toeic-progress-bar-markers">
+                <span className="toeic-marker-start">0</span>
+                <span 
+                  className="toeic-target-marker-label"
+                  style={{ left: `${Math.min(100, Math.round((targetScore / 990) * 100))}%` }}
+                >
+                  🎯 {targetScore}
+                </span>
+                <span className="toeic-marker-end">990</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="toeic-level-details">
+            <div className="toeic-level-row">
+              <span className="toeic-level-label">Trình độ hiện tại:</span>
+              <span className="toeic-level-badge" style={{ backgroundColor: currentBand.bg, color: currentBand.text }}>
+                {currentBand.label}
+              </span>
+            </div>
+            <div className="toeic-level-row">
+              <span className="toeic-level-label">Mục tiêu hướng tới:</span>
+              <span className="toeic-level-badge" style={{ backgroundColor: targetBand.bg, color: targetBand.text }}>
+                {targetBand.label}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Recommendations & Strength */}
+        <div className="toeic-db-card toeic-analysis-card">
+          <h3>Phân Tích Kỹ Năng</h3>
+          {history.length === 0 ? (
+            <div className="toeic-empty-analysis">
+              <p>Bạn chưa hoàn thành bài thi thử Full Test nào để hệ thống phân tích.</p>
+              <button className="toeic-action-btn" onClick={onStartTest}>Làm đề thi thử ngay</button>
+            </div>
+          ) : (
+            <div className="toeic-analysis-content">
+              <div className="toeic-skill-split">
+                <div className="toeic-skill-progress">
+                  <div className="toeic-skill-header">
+                    <span>🎧 Listening (Trung bình: {listeningAvg})</span>
+                    <span>{Math.round(listeningAvg / 4.95)}%</span>
+                  </div>
+                  <div className="toeic-skill-track">
+                    <div className="toeic-skill-fill listening" style={{ width: `${(listeningAvg / 495) * 100}%` }} />
+                  </div>
+                </div>
+
+                <div className="toeic-skill-progress">
+                  <div className="toeic-skill-header">
+                    <span>📖 Reading (Trung bình: {readingAvg})</span>
+                    <span>{Math.round(readingAvg / 4.95)}%</span>
+                  </div>
+                  <div className="toeic-skill-track">
+                    <div className="toeic-skill-fill reading" style={{ width: `${(readingAvg / 495) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="toeic-tip-box">
+                <h4>💡 Lời khuyên cho lộ trình học:</h4>
+                {listeningAvg < readingAvg ? (
+                  <p>Điểm Listening của bạn đang thấp hơn Reading. Hãy luyện nghe nhiều hơn ở các phần dễ lấy điểm như <strong>Part 1 & Part 2</strong> để bứt phá điểm số nhanh chóng.</p>
+                ) : (
+                  <p>Điểm Reading của bạn đang thấp hơn Listening. Bạn nên chú ý cải thiện từ vựng và quản lý thời gian tốt hơn ở <strong>Part 5 & Part 6</strong>, và cố gắng đọc lướt nhanh hơn ở Part 7.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recommended Resources */}
+      <div className="toeic-db-card toeic-resources-card">
+        <h3>📚 Giáo Trình & Tài Liệu Khuyên Dùng</h3>
+        <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "-8px 0 16px 0" }}>
+          Được cá nhân hóa dựa trên điểm số hiện tại của bạn (<strong>{currentScore} điểm</strong>)
+        </p>
+        <div className="toeic-resources-grid">
+          {getRecommendedResources(currentScore).map((res, idx) => (
+            <div key={idx} className="toeic-resource-item-card">
+              <span className="toeic-resource-item-icon">{res.icon}</span>
+              <div className="toeic-resource-item-body">
+                <div className="toeic-resource-item-header">
+                  <h4>{res.title}</h4>
+                  <span className="toeic-resource-item-badge">{res.tag}</span>
+                </div>
+                <p>{res.desc}</p>
+                <a href={res.link} className="toeic-resource-item-link">
+                  {res.linkLabel} →
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Score History Section */}
+      <div className="toeic-db-card toeic-history-card">
+        <h3>Lịch Sử Thi Thử</h3>
+        {loading ? (
+          <div className="toeic-loading-text">Đang tải lịch sử...</div>
+        ) : history.length === 0 ? (
+          <div className="toeic-empty-history">
+            <p>Lịch sử thi của bạn hiện tại đang trống.</p>
+            <button className="toeic-action-btn" onClick={onStartTest}>Làm bài thi thử</button>
+          </div>
+        ) : (
+          <div className="toeic-table-wrapper">
+            <table className="toeic-history-table">
+              <thead>
+                <tr>
+                  <th>Đề thi</th>
+                  <th>Ngày làm bài</th>
+                  <th>Điểm Nghe</th>
+                  <th>Điểm Đọc</th>
+                  <th>Tổng Điểm</th>
+                  <th>Xếp loại</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((record) => {
+                  const band = getToeicBand(record.total_score);
+                  const dateStr = new Date(record.created_at).toLocaleDateString("vi-VN", {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  });
+                  return (
+                    <tr key={record.id}>
+                      <td><strong>{record.test_title}</strong></td>
+                      <td>{dateStr}</td>
+                      <td className="toeic-cell-listening">{record.listening_score}</td>
+                      <td className="toeic-cell-reading">{record.reading_score}</td>
+                      <td className="toeic-cell-total"><strong>{record.total_score}</strong></td>
+                      <td>
+                        <span className="toeic-table-badge" style={{ backgroundColor: band.bg, color: band.text }}>
+                          {band.band}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SaveWordModal({ isOpen, onClose, defaultWord = "" }) {
+  const [word, setWord] = useState(defaultWord);
+  const [transcription, setTranscription] = useState("");
+  const [wordtype, setWordtype] = useState("n.");
+  const [mean, setMean] = useState("");
+  const [example, setExample] = useState("");
+  const [exampleVi, setExampleVi] = useState("");
+  
+  const [topics, setTopics] = useState([]);
+  const [selectedTopicId, setSelectedTopicId] = useState("");
+  const [loadingTopics, setLoadingTopics] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setWord(defaultWord);
+      setTranscription("");
+      setWordtype("n.");
+      setMean("");
+      setExample("");
+      setExampleVi("");
+      
+      setLoadingTopics(true);
+      axiosClient.get("/courses/custom/topics")
+        .then((res) => {
+          const list = res || [];
+          setTopics(list);
+          if (list.length > 0) {
+            setSelectedTopicId(list[0].id.toString());
+          }
+          setLoadingTopics(false);
+        })
+        .catch((err) => {
+          console.error("Failed to load custom topics", err);
+          setLoadingTopics(false);
+        });
+    }
+  }, [isOpen, defaultWord]);
+
+  if (!isOpen) return null;
+
+  const handleSave = async () => {
+    if (!word.trim()) {
+      alert("Vui lòng nhập từ vựng.");
+      return;
+    }
+    if (!mean.trim()) {
+      alert("Vui lòng nhập nghĩa của từ.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      let topicId = selectedTopicId;
+      
+      if (!topicId) {
+        const newTopicRes = await axiosClient.post("/courses/custom/topics", {
+          title: "Từ vựng TOEIC",
+          description: "Các từ vựng được lưu trong quá trình luyện thi TOEIC."
+        });
+        const createdTopic = newTopicRes;
+        topicId = createdTopic.id.toString();
+      }
+
+      await axiosClient.post(`/courses/custom/topics/${topicId}/words`, {
+        word: word.trim(),
+        mean: mean.trim(),
+        transcription: transcription.trim() || null,
+        wordtype: wordtype || null,
+        example: example.trim() || null,
+        example_vi: exampleVi.trim() || null,
+        language: "en"
+      });
+
+      alert("Đã lưu từ vựng vào sổ từ thành công!");
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert("Không thể lưu từ vựng. Vui lòng thử lại!");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="toeic-confirm-overlay" style={{ zIndex: 1000 }}>
+      <div className="toeic-confirm-modal toeic-vocab-modal" style={{ width: "min(100%, 480px)" }}>
+        <div className="toeic-card-header" style={{ marginBottom: "16px" }}>
+          <h3 style={{ margin: 0 }}>🗂️ Lưu vào Sổ từ / Flashcard</h3>
+          <button className="toeic-close-modal-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--text-secondary)" }}>×</button>
+        </div>
+
+        <div className="toeic-vocab-form">
+          <div className="toeic-form-group">
+            <label>Từ mới / Cụm từ <span style={{ color: "#ef4444" }}>*</span></label>
+            <input 
+              type="text" 
+              placeholder="Ví dụ: contract, establish..." 
+              value={word} 
+              onChange={(e) => setWord(e.target.value)} 
+            />
+          </div>
+
+          <div className="toeic-form-row">
+            <div className="toeic-form-group">
+              <label>Phiên âm</label>
+              <input 
+                type="text" 
+                placeholder="Ví dụ: /'kɒntrækt/" 
+                value={transcription} 
+                onChange={(e) => setTranscription(e.target.value)} 
+              />
+            </div>
+            <div className="toeic-form-group">
+              <label>Từ loại</label>
+              <select value={wordtype} onChange={(e) => setWordtype(e.target.value)}>
+                <option value="n.">Danh từ (n.)</option>
+                <option value="v.">Động từ (v.)</option>
+                <option value="adj.">Tính từ (adj.)</option>
+                <option value="adv.">Trạng từ (adv.)</option>
+                <option value="prep.">Giới từ (prep.)</option>
+                <option value="phrase">Cụm từ (phrase)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="toeic-form-group">
+            <label>Nghĩa của từ <span style={{ color: "#ef4444" }}>*</span></label>
+            <input 
+              type="text" 
+              placeholder="Ví dụ: hợp đồng, ký kết..." 
+              value={mean} 
+              onChange={(e) => setMean(e.target.value)} 
+            />
+          </div>
+
+          <div className="toeic-form-group">
+            <label>Ví dụ câu</label>
+            <textarea 
+              placeholder="Ví dụ: They signed a contract yesterday." 
+              value={example} 
+              onChange={(e) => setExample(e.target.value)} 
+              rows={2}
+            />
+          </div>
+
+          <div className="toeic-form-group">
+            <label>Dịch nghĩa ví dụ</label>
+            <input 
+              type="text" 
+              placeholder="Ví dụ: Họ đã ký một hợp đồng vào hôm qua." 
+              value={exampleVi} 
+              onChange={(e) => setExampleVi(e.target.value)} 
+            />
+          </div>
+
+          <div className="toeic-form-group">
+            <label>Chọn chủ đề lưu từ</label>
+            {loadingTopics ? (
+              <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>Đang tải danh sách chủ đề...</div>
+            ) : topics.length === 0 ? (
+              <div style={{ fontSize: "13px", color: "#f59e0b", fontWeight: "600" }}>
+                Chưa có chủ đề cá nhân. Hệ thống sẽ tự động tạo chủ đề "Từ vựng TOEIC" cho bạn.
+              </div>
+            ) : (
+              <select value={selectedTopicId} onChange={(e) => setSelectedTopicId(e.target.value)}>
+                {topics.map((t) => (
+                  <option key={t.id} value={t.id}>{t.title} ({t.word_count || 0} từ)</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+
+        <div className="toeic-confirm-actions" style={{ marginTop: "24px" }}>
+          <button className="toeic-nav-btn" onClick={onClose} disabled={saving}>Hủy</button>
+          <button 
+            className="toeic-nav-btn toeic-nav-next" 
+            onClick={handleSave} 
+            disabled={saving}
+          >
+            {saving ? "Đang lưu..." : "Lưu vào sổ từ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TOEIC() {
-  const [tab, setTab] = useState("listening-test");
+  const [tab, setTab] = useState("dashboard");
+  const [vocabModalOpen, setVocabModalOpen] = useState(false);
+  const [selectedText, setSelectedText] = useState("");
+
+  const handleOpenVocabModal = () => {
+    const selection = window.getSelection().toString().trim();
+    if (selection && selection.length < 50) {
+      setSelectedText(selection);
+    } else {
+      setSelectedText("");
+    }
+    setVocabModalOpen(true);
+  };
   const [activeListeningMode, setActiveListeningMode] = useState(null);
   const [activeListeningTopic, setActiveListeningTopic] = useState(null);
   const [activeReadingMode, setActiveReadingMode] = useState(null);
@@ -2757,7 +3299,7 @@ export default function TOEIC() {
       <main className="dash-main toeic-page" id="page-toeic">
         <FullTestMode
           variants={FULL_TEST_VARIANTS}
-          onBack={() => handleTabChange("listening")}
+          onBack={() => handleTabChange("dashboard")}
         />
       </main>
     );
@@ -2809,6 +3351,12 @@ export default function TOEIC() {
           </div>
           <div className="toeic-tab-switch">
             <button
+              className={`toeic-tab-btn${tab === "dashboard" ? " active" : ""}`}
+              onClick={() => handleTabChange("dashboard")}
+            >
+              Mục tiêu & Điểm số
+            </button>
+            <button
               className={`toeic-tab-btn${tab === "listening-test" ? " active" : ""}`}
               onClick={() => handleTabChange("listening-test")}
             >
@@ -2843,7 +3391,12 @@ export default function TOEIC() {
       )}
 
       <div className="toeic-content">
-        {tab === "listening" ? (
+        {tab === "dashboard" ? (
+          <ToeicDashboard
+            onStartTest={() => handleTabChange("fulltest")}
+            onStartPractice={() => handleTabChange("listening-test")}
+          />
+        ) : tab === "listening" ? (
           activeListeningMode ? (
             <TopicGrid
               mode={activeListeningMode}
@@ -2945,6 +3498,21 @@ export default function TOEIC() {
           />
         )}
       </div>
+
+      {/* Floating Vocab Button */}
+      <button 
+        className="toeic-floating-vocab-btn" 
+        onClick={handleOpenVocabModal}
+        title="Lưu từ mới vào sổ từ (Quét chọn từ trên màn hình để lưu nhanh)"
+      >
+        📖
+      </button>
+
+      <SaveWordModal 
+        isOpen={vocabModalOpen} 
+        onClose={() => setVocabModalOpen(false)} 
+        defaultWord={selectedText}
+      />
     </main>
   );
 }

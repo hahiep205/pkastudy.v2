@@ -28,10 +28,23 @@ async function insertTestRecord(userId, testId, readingScore, listeningScore, to
   return result.insertId;
 }
 
+async function getTestHistoryByUserId(userId) {
+  const [rows] = await pool.query(
+    `SELECT r.*, t.title as test_title 
+     FROM Toeic_Test_Records r
+     JOIN Toeic_Tests t ON r.test_id = t.id
+     WHERE r.user_id = ?
+     ORDER BY r.created_at DESC`,
+    [userId]
+  );
+  return rows;
+}
+
 module.exports = {
   getTests,
   getTestById,
   getTestGroupsByTestId,
   getQuestionsByTestId,
   insertTestRecord,
+  getTestHistoryByUserId,
 };
