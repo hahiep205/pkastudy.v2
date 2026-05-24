@@ -4,6 +4,7 @@
 ═══════════════════════════════════════════════════════ */
 
 const XP_STORAGE_KEY = 'pka_xp_system_v1';
+import axiosClient from './axiosClient';
 
 /* ── XP Rewards ── */
 export const XP_REWARDS = {
@@ -112,9 +113,34 @@ export function addXp(amount, reason = '') {
     }
   }
 
+  // Sync with backend
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (user && (user.token || user.id)) {
+    axiosClient.post('/progress/add-xp', { xp: amount }).catch(e => console.error("Failed to sync XP:", e));
+  }
+
   saveStorage(data);
 
   return { totalXp: data.totalXp, levelInfo: newLevel, leveledUp, xpGained: amount };
+}
+
+export async function syncXpWithServer() {
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!user || (!user.token && !user.id)) return;
+  try {
+    const res = await axiosClient.get('/progress');
+    if (res) {
+      const serverData = res;
+      const localData = getXpData();
+      
+      if (serverData.current_xp > localData.totalXp) {
+        localData.totalXp = serverData.current_xp;
+        saveStorage(localData);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to sync progress:", error);
+  }
 }
 
 /* ── Specific XP actions ── */

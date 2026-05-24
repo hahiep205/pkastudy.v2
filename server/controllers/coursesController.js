@@ -1,8 +1,8 @@
-const Joi = require('joi');
+const Joi = require("joi");
 const {
   fetchCourses,
   fetchTopicsByCourseSlug,
-} = require('../services/coursesService');
+} = require("../services/coursesService");
 
 const courseSlugSchema = Joi.string()
   .trim()
@@ -22,11 +22,11 @@ async function getCourseTopics(req, res, next) {
   try {
     const { error, value } = courseSlugSchema.validate(req.params.id);
     if (error) {
-      return res.status(400).json({ error: 'Invalid course id' });
+      return res.status(400).json({ error: "Invalid course id" });
     }
 
-    const topics = await fetchTopicsByCourseSlug(value);
-    res.json({ data: topics });
+    const courseData = await fetchTopicsByCourseSlug(value);
+    res.json({ data: courseData });
   } catch (error) {
     next(error);
   }

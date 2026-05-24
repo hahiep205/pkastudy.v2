@@ -30,7 +30,8 @@ async function getFlashcardsByTopicId(topicId) {
       f.meaning AS mean,
       f.word_type AS wordtype,
       f.example,
-      f.example_vi AS example_vi
+      f.example_vi AS example_vi,
+      f.language
     FROM Flashcards f
     WHERE f.topic_id = ?
     ORDER BY f.id ASC`,

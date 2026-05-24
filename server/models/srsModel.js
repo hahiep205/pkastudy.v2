@@ -22,6 +22,7 @@ async function getDueReviewsByUserId(userId) {
       f.word_type AS wordtype,
       f.example,
       f.example_vi AS example_vi,
+      f.language,
       f.created_at AS flashcardCreatedAt,
       f.updated_at AS flashcardUpdatedAt
     FROM SRS_Reviews r
@@ -48,7 +49,8 @@ async function getFlashcardsByIds(flashcardIds, db = pool) {
       f.meaning AS mean,
       f.word_type AS wordtype,
       f.example,
-      f.example_vi AS example_vi
+      f.example_vi AS example_vi,
+      f.language
     FROM Flashcards f
     WHERE f.id IN (?)`,
     [flashcardIds]

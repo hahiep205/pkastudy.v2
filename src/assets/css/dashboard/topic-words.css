@@ -316,7 +316,7 @@
 
 
 .cv-modes-section {
-    display: none;
+    display: block;
     margin-bottom: 24px;
 }
 
@@ -804,10 +804,4 @@
     .cv-word-row {
         grid-template-columns: 1.5fr 1.3fr 64px !important;
     }
-}
-
-@media (min-width: 3001px) {
-    .cv-modes-section {
-        display: block;
-    }
-}
+}

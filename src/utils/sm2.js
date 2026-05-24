@@ -59,7 +59,7 @@ export function calculateSM2(quality, interval, ef, repetition) {
     interval: nextInterval,
     ef: nextEf,
     repetition: nextRepetition,
-    next_review_date: addDaysFromToday(nextInterval),
+    nextReviewDate: addDaysFromToday(nextInterval),
   };
 }
 

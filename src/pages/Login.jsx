@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
-import { buildApiUrl } from '../utils/apiClient';
+import axiosClient from '../utils/axiosClient';
 import '../assets/css/login-styles.css';
 
 export default function Login() {
@@ -13,16 +13,6 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [loading, setLoading] = useState(false);
-
-    const parseJsonResponse = async (response) => {
-        const text = await response.text();
-        if (!text) return null;
-        try {
-            return JSON.parse(text);
-        } catch (err) {
-            return null;
-        }
-    };
 
     const handleEmailLogin = async () => {
         setErrorMessage('');
@@ -34,28 +24,19 @@ export default function Login() {
 
         setLoading(true);
         try {
-            const response = await fetch(buildApiUrl('api/auth/login'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email, password }),
-            });
-            const result = await parseJsonResponse(response);
-            if (!response.ok) {
-                throw new Error(result?.error || 'Đăng nhập thất bại.');
-            }
-            if (!result?.data?.user || !result?.data?.token) {
+            const result = await axiosClient.post('/auth/login', { email, password });
+            
+            if (!result?.user || !result?.token) {
                 throw new Error('Phản hồi đăng nhập không hợp lệ.');
             }
             login({
-                name: result.data.user.name,
-                email: result.data.user.email,
-                token: result.data.token,
+                name: result.user.name,
+                email: result.user.email,
+                token: result.token,
             });
             navigate('/dashboard');
         } catch (error) {
-            setErrorMessage(error.message);
+            setErrorMessage(error.response?.data?.error || error.message || 'Đăng nhập thất bại');
         } finally {
             setLoading(false);
         }
@@ -68,28 +49,19 @@ export default function Login() {
             const result = await signInWithPopup(auth, googleProvider);
             const idToken = await result.user.getIdToken();
 
-            const response = await fetch(buildApiUrl('api/auth/google'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ idToken }),
-            });
-            const data = await parseJsonResponse(response);
-            if (!response.ok) {
-                throw new Error(data?.error || 'Đăng nhập Google thất bại.');
-            }
-            if (!data?.data?.user || !data?.data?.token) {
+            const data = await axiosClient.post('/auth/google', { idToken });
+            
+            if (!data?.user || !data?.token) {
                 throw new Error('Phản hồi đăng nhập Google không hợp lệ.');
             }
             login({
-                name: data.data.user.name,
-                email: data.data.user.email,
-                token: data.data.token,
+                name: data.user.name,
+                email: data.user.email,
+                token: data.token,
             });
             navigate('/dashboard');
         } catch (error) {
-            setErrorMessage(error.message);
+            setErrorMessage(error.response?.data?.error || error.message || 'Đăng nhập Google thất bại');
         } finally {
             setLoading(false);
         }

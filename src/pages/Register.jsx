@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import axiosClient from '../utils/axiosClient';
 import '../assets/css/login-styles.css';
 
 export default function Register() {
@@ -8,16 +9,59 @@ export default function Register() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [verificationCode, setVerificationCode] = useState('');
-    const [codeSent] = useState(false);
-    const [sendCodeMessage] = useState('');
-    const [errorMessage] = useState('');
-    const [sendingCode] = useState(false);
-    const [registering] = useState(false);
+    const navigate = useNavigate();
+    const [codeSent, setCodeSent] = useState(false);
+    const [sendCodeMessage, setSendCodeMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+    const [sendingCode, setSendingCode] = useState(false);
+    const [registering, setRegistering] = useState(false);
 
-    // --- Giữ nguyên các hàm handle của bạn (không thay đổi logic) ---
-    const handleSendVerificationCode = async () => { /* logic cũ */ };
-    const handleRegister = async () => { /* logic cũ */ };
-    // -----------------------------------------------------------------
+    const handleSendVerificationCode = async () => {
+        setErrorMessage('');
+        setSendCodeMessage('');
+        if (!email.trim()) {
+            setErrorMessage('Vui lòng nhập email');
+            return;
+        }
+
+        setSendingCode(true);
+        try {
+            const res = await axiosClient.post('/auth/send-verification', { email });
+            setCodeSent(true);
+            setSendCodeMessage(res.message || 'Đã gửi mã xác thực. Vui lòng kiểm tra email.');
+        } catch (error) {
+            setErrorMessage(error.response?.data?.error || error.message || 'Lỗi gửi mã xác thực');
+        } finally {
+            setSendingCode(false);
+        }
+    };
+
+    const handleRegister = async () => {
+        setErrorMessage('');
+        if (!name.trim() || !email.trim() || !password.trim() || !verificationCode.trim()) {
+            setErrorMessage('Vui lòng điền đủ thông tin và mã xác thực');
+            return;
+        }
+        if (password !== confirmPassword) {
+            setErrorMessage('Mật khẩu xác nhận không khớp');
+            return;
+        }
+
+        setRegistering(true);
+        try {
+            await axiosClient.post('/auth/register', {
+                name,
+                email,
+                password,
+                verificationCode
+            });
+            navigate('/login');
+        } catch (error) {
+            setErrorMessage(error.response?.data?.error || error.message || 'Đăng ký thất bại');
+        } finally {
+            setRegistering(false);
+        }
+    };
 
     return (
         <main className="auth-wrapper">

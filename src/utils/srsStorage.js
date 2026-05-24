@@ -41,11 +41,12 @@ function formatIntervalLabel(days) {
 }
 
 function getItemEf(item) {
-  return typeof item.easeFactor === 'number' ? item.easeFactor : SM2_DEFAULT_EF;
+  return typeof item.ef === 'number' ? item.ef : (typeof item.easeFactor === 'number' ? item.easeFactor : SM2_DEFAULT_EF);
 }
 
 function getItemRepetitions(item) {
-  return Number.isInteger(item.repetitions) && item.repetitions >= 0 ? item.repetitions : 0;
+  const rep = item.repetition ?? item.repetitions;
+  return Number.isInteger(rep) && rep >= 0 ? rep : 0;
 }
 
 function getPreviewSchedule(item, quality) {
@@ -64,8 +65,8 @@ export function addToSrs(word, topicId, courseId) {
 
   if (existingItem) {
     existingItem.interval = 1;
-    existingItem.repetitions = 0;
-    existingItem.easeFactor = getItemEf(existingItem);
+    existingItem.repetition = 0;
+    existingItem.ef = getItemEf(existingItem);
     existingItem.nextReview = addDays(1);
     existingItem.failCount = (existingItem.failCount || 0) + 1;
     saveQueue(queue);
@@ -83,8 +84,8 @@ export function addToSrs(word, topicId, courseId) {
     topicId,
     courseId,
     interval: 1,
-    repetitions: 0,
-    easeFactor: SM2_DEFAULT_EF,
+    repetition: 0,
+    ef: SM2_DEFAULT_EF,
     nextReview: addDays(1),
     addedAt: new Date().toISOString(),
     failCount: 0,
@@ -128,9 +129,9 @@ export function reviewItem(wordId, quality) {
   const schedule = getPreviewSchedule(item, quality);
 
   item.interval = schedule.interval;
-  item.repetitions = schedule.repetition;
-  item.easeFactor = schedule.ef;
-  item.nextReview = schedule.next_review_date;
+  item.repetition = schedule.repetition;
+  item.ef = schedule.ef;
+  item.nextReview = schedule.nextReviewDate;
   item.lastReviewedAt = new Date().toISOString();
 
   if (quality === 'forgot') {

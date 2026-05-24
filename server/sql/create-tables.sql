@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS Flashcards (
   word_type VARCHAR(100) DEFAULT NULL,
   example TEXT DEFAULT NULL,
   example_vi TEXT DEFAULT NULL,
+  language VARCHAR(20) DEFAULT 'en',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_flashcards_topic FOREIGN KEY (topic_id) REFERENCES Topics(id) ON DELETE CASCADE,
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS SRS_Reviews (
   repetition INT NOT NULL DEFAULT 0,
   next_review_date DATE NOT NULL,
   last_reviewed_at DATETIME DEFAULT NULL,
+  fail_count INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_srs_reviews_user FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
@@ -79,12 +81,6 @@ CREATE TABLE IF NOT EXISTS SRS_Reviews (
   INDEX idx_srs_reviews_user_due (user_id, next_review_date),
   INDEX idx_srs_reviews_flashcard_id (flashcard_id)
 );
-
-ALTER TABLE Topics ADD COLUMN IF NOT EXISTS slug VARCHAR(120) DEFAULT NULL AFTER course_id;
-ALTER TABLE Flashcards ADD COLUMN IF NOT EXISTS external_id VARCHAR(50) DEFAULT NULL AFTER topic_id;
-ALTER TABLE Flashcards ADD COLUMN IF NOT EXISTS transcription VARCHAR(255) DEFAULT NULL AFTER word;
-ALTER TABLE Flashcards ADD COLUMN IF NOT EXISTS word_type VARCHAR(100) DEFAULT NULL AFTER meaning;
-ALTER TABLE Flashcards ADD COLUMN IF NOT EXISTS example_vi TEXT DEFAULT NULL AFTER example;
 
 INSERT INTO Courses (slug, title, description, language, sort_order)
 SELECT 'toeic-basic', 'TOEIC Basic', 'Foundational TOEIC vocabulary and themes.', 'en', 1
@@ -596,3 +592,72 @@ INSERT INTO Flashcards (topic_id, external_id, word, transcription, meaning, wor
 SELECT t.id, 'w058', 'petition', '/pəˈtɪʃən/', 'bản kiến nghị', 'noun', 'Attendees signed a petition to extend the workshop series.', 'Người tham dự đã ký vào một bản kiến nghị để kéo dài chuỗi hội thảo.'
 FROM Topics t
 WHERE t.slug = 'toeic-marketing';
+
+CREATE TABLE IF NOT EXISTS Toeic_Tests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS Toeic_Question_Groups (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  test_id INT NOT NULL,
+  part INT NOT NULL,
+  audio_url VARCHAR(255) DEFAULT NULL,
+  image_url VARCHAR(255) DEFAULT NULL,
+  passage_text TEXT DEFAULT NULL,
+  CONSTRAINT fk_toeic_group_test FOREIGN KEY (test_id) REFERENCES Toeic_Tests(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Toeic_Questions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  test_id INT NOT NULL,
+  group_id INT DEFAULT NULL,
+  question_number INT NOT NULL,
+  part INT NOT NULL,
+  question_text TEXT DEFAULT NULL,
+  options JSON NOT NULL,
+  correct_answer VARCHAR(10) NOT NULL,
+  audio_url VARCHAR(255) DEFAULT NULL,
+  image_url VARCHAR(255) DEFAULT NULL,
+  CONSTRAINT fk_toeic_questions_test FOREIGN KEY (test_id) REFERENCES Toeic_Tests(id) ON DELETE CASCADE,
+  CONSTRAINT fk_toeic_questions_group FOREIGN KEY (group_id) REFERENCES Toeic_Question_Groups(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Toeic_Test_Records (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  test_id INT NOT NULL,
+  reading_score INT NOT NULL DEFAULT 0,
+  listening_score INT NOT NULL DEFAULT 0,
+  total_score INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_toeic_test_records_user FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_toeic_test_records_test FOREIGN KEY (test_id) REFERENCES Toeic_Tests(id) ON DELETE CASCADE
+);
+
+INSERT INTO Toeic_Tests (title, description)
+SELECT 'Full Test 1', 'Đề thi thử TOEIC mô phỏng thực tế'
+WHERE NOT EXISTS (SELECT 1 FROM Toeic_Tests WHERE title = 'Full Test 1');
+
+-- Seed Group for Part 3 (Conversation)
+INSERT INTO Toeic_Question_Groups (test_id, part, audio_url, passage_text)
+SELECT id, 3, 'part3_audio_1.mp3', NULL
+FROM Toeic_Tests WHERE title = 'Full Test 1';
+
+-- Seed Questions for that Group
+INSERT INTO Toeic_Questions (test_id, group_id, question_number, part, question_text, options, correct_answer)
+SELECT t.id, g.id, 32, 3, 'What are the speakers discussing?', '{"A":"A travel itinerary","B":"A new software program","C":"A marketing campaign","D":"A job applicant"}', 'B'
+FROM Toeic_Tests t JOIN Toeic_Question_Groups g ON t.id = g.test_id
+WHERE t.title = 'Full Test 1' AND g.part = 3 LIMIT 1;
+
+INSERT INTO Toeic_Questions (test_id, group_id, question_number, part, question_text, options, correct_answer)
+SELECT t.id, g.id, 33, 3, 'Where does the man work?', '{"A":"At a bank","B":"At an advertising agency","C":"At a software company","D":"At a hotel"}', 'C'
+FROM Toeic_Tests t JOIN Toeic_Question_Groups g ON t.id = g.test_id
+WHERE t.title = 'Full Test 1' AND g.part = 3 LIMIT 1;
+
+-- Seed Single Question for Part 5
+INSERT INTO Toeic_Questions (test_id, group_id, question_number, part, question_text, options, correct_answer)
+SELECT id, NULL, 101, 5, 'Please submit your report ______ Friday.', '{"A":"in","B":"at","C":"by","D":"on"}', 'C'
+FROM Toeic_Tests WHERE title = 'Full Test 1';

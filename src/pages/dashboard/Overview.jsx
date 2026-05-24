@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { coursesData } from '../../data/coursesData';
+import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import { useAuth } from '../../contexts/useAuth';
@@ -8,10 +8,12 @@ import {
     completeDashboardTask,
     getDashboardUserKey,
     readDashboardProgress,
+    recordFlashcardSessionProgress,
     subscribeDashboardProgress,
+    syncDashboardProgressWithServer
 } from '../../utils/dashboardProgress';
-import { buildActivityChartData } from '../../utils/userStats';
-import { getLevelInfo, getXpData } from '../../utils/xpSystem';
+import { buildActivityChartData, getStatsSummary } from '../../utils/userStats';
+import { getLevelInfo, getXpData, syncXpWithServer } from '../../utils/xpSystem';
 import { getDueCount, getSrsForecast, checkSrsDecayWarning } from '../../utils/srsStorage';
 
 export default function Overview() {
@@ -20,7 +22,20 @@ export default function Overview() {
     const { remembered } = useCourseProgress();
     const { customCourses } = useCustomCourses();
     const canvasRef = useRef(null);
-    const allCourses = Object.values(coursesData);
+    const [allCourses, setAllCourses] = useState([]);
+
+    useEffect(() => {
+        axiosClient.get('/courses')
+            .then((res) => {
+                const data = res.data || res;
+                setAllCourses(Array.isArray(data) ? data : []);
+            })
+            .catch((err) => {
+                console.error("Fetch courses error:", err);
+                setAllCourses([]);
+            });
+    }, []);
+
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
 
     const [dashboardProgress, setDashboardProgress] = useState(() => readDashboardProgress(userKey));
@@ -30,6 +45,13 @@ export default function Overview() {
     const srsCount = getDueCount();
     const decayCount = checkSrsDecayWarning();
     const srsForecast = useMemo(() => getSrsForecast(), []);
+
+    useEffect(() => {
+        if (user) {
+            syncDashboardProgressWithServer(userKey);
+            syncXpWithServer();
+        }
+    }, [userKey, user]);
 
     useEffect(() => {
         setDashboardProgress(readDashboardProgress(userKey));
@@ -44,15 +66,8 @@ export default function Overview() {
         let total = 0;
         let done = 0;
 
-        allCourses.forEach((course) => {
-            course.topics.forEach((topic) => {
-                total += topic.words.length;
-                topic.words.forEach((word) => {
-                    if (remembered[word.id]) done += 1;
-                });
-            });
-        });
-
+        // Note: allCourses from API might not have nested topics/words
+        // Progress calculation now relies primarily on customCourses + remembered state
         customCourses.forEach((topic) => {
             total += topic.words.length;
             topic.words.forEach((word) => {
@@ -60,8 +75,12 @@ export default function Overview() {
             });
         });
 
-        return { grandTotal: total, grandDone: done };
-    }, [remembered, customCourses, allCourses]);
+        // Count from remembered keys for built-in courses
+        const rememberedCount = Object.keys(remembered).filter((k) => remembered[k]).length;
+        done = Math.max(done, rememberedCount);
+
+        return { grandTotal: Math.max(total, rememberedCount), grandDone: done };
+    }, [remembered, customCourses]);
 
     const tasks = dashboardProgress.tasks;
     const tasksView = tasks.map((task) => {
@@ -418,37 +437,24 @@ export default function Overview() {
 
                 <div className="courses-grid-dash">
                     {allCourses.map((course) => {
-                        let total = 0;
-                        let done = 0;
-
-                        course.topics.forEach((topic) => {
-                            total += topic.words.length;
-                            topic.words.forEach((word) => {
-                                if (remembered[word.id]) done += 1;
-                            });
-                        });
-
-                        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                        const langName = course.lang === 'en' ? 'Tiếng Anh' : 'Ngoại ngữ';
+                        const pct = 0; // Will calculate from server progress in future
+                        const langName = course.language === 'en' ? 'Topic' : 'Topic';
                         return (
-                            <div key={course.id} className="course-dash-card reveal" data-course-id={course.id}>
+                            <div key={course.id} className="course-dash-card reveal revealed" data-course-id={course.id}>
                                 <div className="course-dash-top course-dash-top-english">
                                     <span className="course-flag">{langName}</span>
                                 </div>
                                 <div className="course-dash-body">
                                     <h3 className="course-dash-name">{course.title}</h3>
-                                    <p className="course-dash-desc">
-
-                                    </p>
+                                    <p className="course-dash-desc">{course.description || ''}</p>
                                     <div className="course-dash-meta">
-                                        <span className="cd-meta-words">{total} từ</span>
-                                        <span className="cd-meta-topics">{course.topics.length} chủ đề</span>
+                                        <span className="cd-meta-topics">{course.topic_count || 0} chủ đề</span>
                                         <span>Level A1</span>
                                     </div>
                                     <div className="course-progress-section">
                                         <div className="course-progress-header">
                                             <span>Tiến độ</span>
-                                            <span><strong className="cd-done">{done}</strong> / <strong className="cd-total">{total}</strong> từ · <strong className="cd-pct">{pct}%</strong></span>
+                                            <span><strong className="cd-pct">{pct}%</strong></span>
                                         </div>
                                         <div className="progress-bar">
                                             <div
@@ -474,7 +480,7 @@ export default function Overview() {
                         );
                     })}
 
-                    <div className="course-dash-card reveal" style={{ transitionDelay: '160ms' }}>
+                    <div className="course-dash-card reveal revealed" style={{ transitionDelay: '160ms' }}>
                         <div className="course-dash-top course-dash-top-custom">
                             <span className="course-flag">Cá nhân</span>
                         </div>

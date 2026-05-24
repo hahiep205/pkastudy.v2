@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
-import { coursesData } from '../../data/coursesData';
+import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import WordModal from '../../components/detailTopic/WordModal';
@@ -22,7 +22,6 @@ import {
   mapReviewRatingToQualityScore,
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
-import { buildApiUrl } from '../../utils/apiClient';
 
 const SVG_ICONS = {
   VOICE: (
@@ -52,12 +51,12 @@ const SVG_ICONS = {
   ),
 };
 
-const MODES = [
-  { mode: 'flashcard', name: 'Flashcard', desc: 'Lật thẻ, nhớ từ nhanh' },
-  { mode: 'quiz', name: 'Quiz', desc: '4 đáp án, chọn đúng' },
-  { mode: 'listen', name: 'Listening', desc: 'Nghe và điền lại từ' },
-  { mode: 'typing', name: 'Typing', desc: 'Nhìn nghĩa và gõ lại từ' },
-  { mode: 'match', name: 'Match', desc: 'Nối từ với nghĩa đúng' },
+const VOCAB_GAMES = [
+  { id: 'flashcard', name: 'Flashcard', icon: '🃏', desc: 'Lật thẻ, ôn lại từ nhanh chóng', color: '#8b5cf6' },
+  { id: 'quiz', name: 'Trắc nghiệm', icon: '🎯', desc: '4 đáp án, chọn nghĩa đúng', color: '#6366f1' },
+  { id: 'typing', name: 'Gõ từ', icon: '⌨️', desc: 'Nhìn nghĩa, gõ lại từ vựng', color: '#f59e0b' },
+  { id: 'listen', name: 'Luyện nghe', icon: '🎧', desc: 'Nghe phát âm, điền lại từ', color: '#10b981' },
+  { id: 'match', name: 'Nối từ', icon: '🔗', desc: 'Ghép từ vựng với nghĩa đúng', color: '#ec4899' },
 ];
 
 const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match']);
@@ -88,12 +87,33 @@ export default function TopicWords() {
   const isCustom = courseId === 'custom';
   const useServerSrs = hasServerSrsAccess();
 
-  const course = isCustom ? null : coursesData[courseId];
+  // Fetch course info from API instead of static data
+  const [courseInfo, setCourseInfo] = useState(null);
+  const [courseLoading, setCourseLoading] = useState(!isCustom);
+  useEffect(() => {
+    if (isCustom) return;
+    setCourseLoading(true);
+    axiosClient.get(`/courses/${courseId}/topics`)
+      .then((res) => {
+        let data = res.data || res;
+        if (data && data.data && !data.topics) data = data.data;
+        setCourseInfo(data);
+      })
+      .catch((err) => {
+        console.error("Fetch course info error:", err);
+        setCourseInfo(null);
+      })
+      .finally(() => {
+        setCourseLoading(false);
+      });
+  }, [isCustom, courseId]);
+
+  const course = isCustom ? null : courseInfo;
   const topic = isCustom
     ? customCourses.find((item) => item.id === topicId)
-    : (course?.topics || []).find((item) => item.id === topicId);
+    : (course?.topics || []).find((item) => item.slug === topicId || String(item.id) === String(topicId));
 
-  const courseTitle = isCustom ? 'Tài liệu của bạn' : course?.title || '';
+  const courseTitle = isCustom ? 'Tài liệu của bạn' : course?.courseTitle || course?.title || '';
   const topicTitle = topic?.title || '';
   const topicLang = isCustom ? topic?.lang || 'en' : course?.lang || 'en';
   const builtInTopicWords = !isCustom && topic ? (Array.isArray(topic.words) ? topic.words : []) : [];
@@ -103,13 +123,17 @@ export default function TopicWords() {
 
   const topicError = isCustom
     ? (!topic ? 'Chủ đề không tồn tại.' : '')
-    : (!course ? 'Topic không tồn tại.' : (!topic ? 'Chủ đề không tồn tại.' : ''));
+    : (courseLoading ? '' : (!course ? 'Topic không tồn tại.' : (!topic ? 'Chủ đề không tồn tại.' : '')));
 
   useEffect(() => {
     if (isCustom) {
       setBuiltInWords([]);
       setBuiltInStatus('idle');
       setBuiltInError('');
+      return undefined;
+    }
+
+    if (!topic) {
       return undefined;
     }
 
@@ -120,17 +144,11 @@ export default function TopicWords() {
       setBuiltInError('');
 
       try {
-        const response = await fetch(
-          buildApiUrl(`api/topics/${encodeURIComponent(topicId)}/flashcards`),
-          { signal: controller.signal }
-        );
-        const payload = await response.json().catch(() => ({}));
+        const fetchId = topic?.slug || topicId;
+        const res = await axiosClient.get(`/topics/${encodeURIComponent(fetchId)}/flashcards`);
+        const data = res?.data || res;
 
-        if (!response.ok) {
-          throw new Error(payload.error || 'Không thể tải danh sách từ vựng.');
-        }
-
-        setBuiltInWords(Array.isArray(payload.data) ? payload.data : []);
+        setBuiltInWords(Array.isArray(data) ? data : []);
         setBuiltInStatus('success');
       } catch (error) {
         if (error.name === 'AbortError') return;
@@ -142,12 +160,24 @@ export default function TopicWords() {
 
     loadFlashcards();
     return () => controller.abort();
-  }, [isCustom, topicId]);
+  }, [isCustom, topicId, topic]);
 
   const backUrl = isCustom ? '/dashboard/courses?tab=custom' : `/dashboard/courses/${courseId}`;
 
+  if (courseLoading) {
+    return (
+      <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--gray-light, #64748b)' }}>
+        Đang tải thông tin...
+      </div>
+    );
+  }
+
   if (topicError) {
-    return <div>{topicError}</div>;
+    return (
+      <div style={{ padding: '40px 24px', textAlign: 'center', color: '#dc2626', fontWeight: 600 }}>
+        {topicError}
+      </div>
+    );
   }
 
   const speakWord = (text, language) => {
@@ -367,16 +397,19 @@ const activeWords = !studyWordIds
             <div className="cv-modes-header">
               <h3 className="cv-section-title">Chọn cách học</h3>
             </div>
-            <div className="cv-modes-grid" id="cv-modes-grid">
-              {MODES.map(({ mode, name, desc }) => (
+            <div className="games-vocab-grid" id="games-vocab-grid" style={{ marginTop: '16px', marginBottom: '24px' }}>
+              {VOCAB_GAMES.map((game) => (
                 <button
-                  key={mode}
-                  className={`cv-mode-card${activeMode === mode ? ' active' : ''}`}
-                  data-mode={mode}
-                  onClick={() => handleModeClick(mode)}
+                  key={game.id}
+                  className={`games-vocab-card${activeMode === game.id ? ' active' : ''}`}
+                  id={`game-card-${game.id}`}
+                  onClick={() => handleModeClick(game.id)}
+                  style={{ '--game-color': game.color }}
                 >
-                  <div className="cv-mode-card-name">{name}</div>
-                  <div className="cv-mode-card-desc">{desc}</div>
+                  <span className="games-vocab-icon">{game.icon}</span>
+                  <span className="games-vocab-name">{game.name}</span>
+                  <span className="games-vocab-desc">{game.desc}</span>
+                  <span className="games-vocab-play">Chơi ngay →</span>
                 </button>
               ))}
             </div>

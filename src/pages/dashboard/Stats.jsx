@@ -2,19 +2,36 @@ import { useMemo } from 'react';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import { useAuth } from '../../contexts/useAuth';
-import { coursesData } from '../../data/coursesData';
 import {
     getDashboardUserKey,
     readDashboardProgress,
+    syncDashboardProgressWithServer
 } from '../../utils/dashboardProgress';
+import { syncXpWithServer } from '../../utils/xpSystem';
+import { useEffect, useState } from 'react';
+import axiosClient from '../../utils/axiosClient';
 
 export default function Stats() {
     const { user } = useAuth();
     const { remembered } = useCourseProgress();
     const { customCourses } = useCustomCourses();
+    const [leaderboard, setLeaderboard] = useState([]);
 
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
     const dashboardProgress = useMemo(() => readDashboardProgress(userKey), [userKey]);
+
+    useEffect(() => {
+        syncDashboardProgressWithServer(userKey);
+        syncXpWithServer();
+        
+        axiosClient.get('/progress/leaderboard?limit=5')
+            .then(res => {
+                if (res) {
+                    setLeaderboard(res || []);
+                }
+            })
+            .catch(console.error);
+    }, [userKey]);
 
     // ── Compute real stats ──────────────────────────────────────────────────
     const { grandTotal, grandDone, courseStats } = useMemo(() => {
@@ -22,19 +39,10 @@ export default function Stats() {
         let done = 0;
         const stats = [];
 
-        Object.values(coursesData).forEach((course) => {
-            let cTotal = 0;
-            let cDone = 0;
-            course.topics.forEach((topic) => {
-                cTotal += topic.words.length;
-                topic.words.forEach((word) => {
-                    if (remembered[word.id]) cDone += 1;
-                });
-            });
-            total += cTotal;
-            done += cDone;
-            stats.push({ name: course.title, total: cTotal, done: cDone, lang: course.lang });
-        });
+        // Count from remembered keys for built-in courses
+        const rememberedCount = Object.keys(remembered).filter((k) => remembered[k]).length;
+        total += rememberedCount;
+        done += rememberedCount;
 
         let customTotal = 0;
         let customDone = 0;
@@ -45,12 +53,12 @@ export default function Stats() {
             });
         });
         if (customCourses.length > 0) {
-            total += customTotal;
-            done += customDone;
+            total = Math.max(total, customTotal + rememberedCount);
+            done = Math.max(done, customDone + rememberedCount - customTotal);
             stats.push({ name: 'Tài liệu cá nhân', total: customTotal, done: customDone, lang: 'custom' });
         }
 
-        return { grandTotal: total, grandDone: done, courseStats: stats };
+        return { grandTotal: Math.max(total, 1), grandDone: done, courseStats: stats };
     }, [remembered, customCourses]);
 
     const pct = grandTotal > 0 ? Math.round((grandDone / grandTotal) * 100) : 0;
@@ -191,6 +199,41 @@ export default function Stats() {
                                 <span>Mục tiêu: 10 từ/ngày</span>
                             </div>
                         </article>
+                    </div>
+                </section>
+
+                {/* ── Leaderboard ── */}
+                <section className="stats2-board stats2-board-streak reveal">
+                    <header className="stats2-board-header">
+                        <div className="stats2-board-copy">
+                            <h2>Bảng Xếp Hạng</h2>
+                            <p>Top người chơi có điểm XP cao nhất</p>
+                        </div>
+                    </header>
+                    <div className="stats2-history">
+                        {leaderboard.length === 0 ? (
+                            <div style={{ padding: '1rem', color: 'var(--text-light)' }}>Chưa có dữ liệu.</div>
+                        ) : leaderboard.map((entry, index) => (
+                            <article key={entry.id} className="stats2-history-item">
+                                <div className="stats2-leader-main">
+                                    <div className="stats2-leader-rank" style={{ 
+                                        width: '32px', height: '32px', borderRadius: '50%', 
+                                        background: index === 0 ? 'var(--orange-light)' : index === 1 ? 'var(--blue-light)' : index === 2 ? 'var(--green-light)' : 'var(--bg-card-hover)',
+                                        color: index === 0 ? 'var(--orange)' : index === 1 ? 'var(--blue)' : index === 2 ? 'var(--green)' : 'var(--text-light)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginRight: '1rem'
+                                    }}>
+                                        #{index + 1}
+                                    </div>
+                                    <div className="stats2-leader-copy">
+                                        <strong>{entry.name || 'Người dùng ẩn danh'}</strong>
+                                        <small>Level {entry.level}</small>
+                                    </div>
+                                </div>
+                                <div className="stats2-history-values">
+                                    <span style={{ fontWeight: 'bold', color: 'var(--blue)' }}>{entry.score} XP</span>
+                                </div>
+                            </article>
+                        ))}
                     </div>
                 </section>
             </div>

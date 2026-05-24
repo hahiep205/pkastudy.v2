@@ -71,65 +71,7 @@ function normalizeText(value = '') {
     return String(value).trim().toLocaleLowerCase();
 }
 
-function flattenTopics(customCourses) {
-    const builtInTopics = Object.values(coursesData).flatMap((course) => (
-        (course.topics || []).map((topic) => ({
-            id: `built:${course.id}:${topic.id}`,
-            title: topic.title,
-            description: topic.description || '',
-            lang: course.lang || topic.lang || topic.words?.[0]?.language || 'en',
-            sourceLabel: course.title,
-            sourceType: 'built-in',
-            words: Array.isArray(topic.words) ? topic.words : [],
-        }))
-    ));
 
-    const customTopics = (Array.isArray(customCourses) ? customCourses : []).map((topic) => ({
-        id: `custom:${topic.id}`,
-        title: topic.title,
-        description: topic.description || '',
-        lang: topic.lang || topic.words?.[0]?.language || 'en',
-        sourceLabel: 'Tài liệu của bạn',
-        sourceType: 'custom',
-        words: Array.isArray(topic.words) ? topic.words : [],
-    }));
-
-    return [...customTopics, ...builtInTopics]
-        .map((topic) => ({
-            ...topic,
-            words: topic.words.filter((word) => word?.word && word?.mean),
-        }))
-        .sort((first, second) => first.title.localeCompare(second.title, 'vi'));
-}
-
-function buildRememberedWordsByLang(topics, remembered) {
-    const rememberedMap = remembered && typeof remembered === 'object' ? remembered : {};
-    const langMap = new Map();
-
-    topics.forEach((topic) => {
-        topic.words.forEach((word) => {
-            if (!rememberedMap[word.id]) return;
-
-            const normalizedWord = {
-                ...word,
-                language: word.language || topic.lang,
-                sourceTopicTitle: topic.title,
-                sourceLabel: topic.sourceLabel,
-            };
-
-            if (!langMap.has(topic.lang)) {
-                langMap.set(topic.lang, []);
-            }
-
-            const currentWords = langMap.get(topic.lang);
-            if (!currentWords.some((item) => item.id === normalizedWord.id)) {
-                currentWords.push(normalizedWord);
-            }
-        });
-    });
-
-    return langMap;
-}
 
 function buildInitialWorld() {
     return {
@@ -474,63 +416,7 @@ function GameOverModal({ isOpen, score, hearts, answered, correct, wrong, reason
     );
 }
 
-function SetupPanel({ langOptions, selectedLang, onPickLang, selectedBird, onPickBird, onStart }) {
-    return (
-        <section className="flappy-setup-shell">
-            <div className="flappy-setup-panel">
-                <div className="flappy-setup-header">
-                    <div>
-                        <div className="flappy-setup-eyebrow">Bắt đầu luyện tập</div>
-                        <div className="flappy-setup-title-row">
-                            <h2>Flappy Bird</h2>
-                        </div>
-                        <p>Tất cả từ đã thuộc của bạn trong ngôn ngữ này sẽ được trộn lại để làm câu hỏi ôn tập ngẫu nhiên trong game.</p>
-                    </div>
-                </div>
 
-                <div className="flappy-lang-grid">
-                    {langOptions.map((option) => (
-                        <button
-                            key={option.code}
-                            type="button"
-                            className={`flappy-lang-card${selectedLang === option.code ? ' is-active' : ''}`}
-                            onClick={() => onPickLang(option.code)}
-                        >
-                            <strong>{languageLabels[option.code] || option.code.toUpperCase()}</strong>
-                            <small>{option.count} từ đã thuộc</small>
-                        </button>
-                    ))}
-                </div>
-
-                <div className="flappy-selected-topic-panel">
-                    <div className="flappy-selected-topic-copy">
-                        <span className="flappy-selected-topic-label">Chọn Bird</span>
-                        <strong>Chọn nhân vật bạn muốn dùng cho lượt chơi này.</strong>
-                    </div>
-                    <div className="flappy-bird-picker-grid">
-                        {BIRD_OPTIONS.map((bird) => (
-                            <button
-                                key={bird.id}
-                                type="button"
-                                className={`flappy-bird-option${selectedBird === bird.id ? ' is-active' : ''}`}
-                                onClick={() => onPickBird(bird.id)}
-                            >
-                                <img className="flappy-bird-option-image" src={bird.image} alt={`Bird ${bird.label}`} />
-                                <span>{bird.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="flappy-setup-footer" style={{ paddingBottom: "36px" }}>
-                    <button type="button" className="btn btn-primary" onClick={onStart} disabled={!selectedLang}>
-                        Play Flappy Bird
-                    </button>
-                </div>
-            </div>
-        </section>
-    );
-}
 
 export default function FlappyBirdExperience({ topic, selectedBird = 'yellow', onBackGallery, onBackToPicker }) {
     const { user } = useAuth();

@@ -10,7 +10,7 @@ import Match from '../../components/Match';
 import Flashcard from '../../components/Flashcard';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
-import { coursesData } from '../../data/coursesData';
+import axiosClient from '../../utils/axiosClient';
 import { addToSrs, getDueItems as getLocalDueItems, reviewItem as reviewLocalItem } from '../../utils/srsStorage';
 import {
   fetchDueReviews,
@@ -48,6 +48,37 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
   const [isMultiMode, setIsMultiMode] = useState(false);
   const [selectedTopicIds, setSelectedTopicIds] = useState(new Set());
 
+  const [apiTopics, setApiTopics] = useState([]);
+
+  useEffect(() => {
+    axiosClient.get('/courses')
+      .then(async (courses) => {
+        if (!Array.isArray(courses)) return;
+        const allTopics = [];
+        for (const course of courses) {
+          try {
+            const data = await axiosClient.get(`/courses/${course.slug || course.id}/topics`);
+            const topics = Array.isArray(data?.topics) ? data.topics : (Array.isArray(data) ? data : []);
+            topics.forEach((topic) => {
+              if ((topic.vocabularyCount || topic.words?.length || topic.wordCount || 0) >= 2) {
+                allTopics.push({
+                  id: topic.id,
+                  slug: topic.slug,
+                  title: topic.title,
+                  source: course.title,
+                  lang: course.lang || 'en',
+                  words: topic.words || null,
+                  vocabularyCount: topic.vocabularyCount,
+                });
+              }
+            });
+          } catch (e) { /* skip */ }
+        }
+        setApiTopics(allTopics);
+      })
+      .catch(() => {});
+  }, []);
+
   const allTopics = useMemo(() => {
     const list = [];
 
@@ -62,19 +93,7 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
       });
     }
 
-    Object.values(coursesData).forEach((course) => {
-      course.topics.forEach((topic) => {
-        if ((topic.words?.length || 0) >= 2) {
-          list.push({
-            id: topic.id,
-            title: topic.title,
-            source: course.title,
-            lang: course.lang || 'en',
-            words: topic.words,
-          });
-        }
-      });
-    });
+    list.push(...apiTopics);
 
     customCourses.forEach((topic) => {
       if ((topic.words?.length || 0) >= 2) {
@@ -89,7 +108,7 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
     });
 
     return list;
-  }, [customCourses, dueReviewWords]);
+  }, [customCourses, dueReviewWords, apiTopics]);
 
   const filteredTopics = allTopics.filter(
     (topic) =>
@@ -104,23 +123,35 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
     setSelectedTopicIds(next);
   };
 
-  const handleStartMixed = () => {
+  const handleStartMixed = async () => {
     if (selectedTopicIds.size === 0) return;
 
     const mixedWords = [];
     const seenIds = new Set();
 
-    selectedTopicIds.forEach((topicId) => {
+    for (const topicId of selectedTopicIds) {
       const topic = allTopics.find((item) => item.id === topicId);
-      if (!topic) return;
+      if (!topic) continue;
 
-      topic.words.forEach((word) => {
-        if (!seenIds.has(word.id)) {
-          seenIds.add(word.id);
+      let topicWords = topic.words;
+      if (!topicWords) {
+        try {
+          const data = await axiosClient.get(`/topics/${encodeURIComponent(topic.slug || topic.id)}/flashcards`);
+          topicWords = Array.isArray(data) ? data : [];
+        } catch (err) {
+          console.error(err);
+          topicWords = [];
+        }
+      }
+
+      topicWords.forEach((word) => {
+        const key = word.id ?? word.flashcardId;
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
           mixedWords.push(word);
         }
       });
-    });
+    }
 
     if (mixedWords.length < 2) {
       alert('Cần ít nhất 2 từ vựng để chơi.');
@@ -211,7 +242,7 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
                       </div>
                     ) : null}
                   </div>
-                  <span className="game-picker-card-count">{topic.words.length} từ</span>
+                  <span className="game-picker-card-count">{topic.words ? topic.words.length : topic.vocabularyCount} từ</span>
                 </button>
               );
             })}
@@ -226,7 +257,7 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
                 🔀 Bắt đầu với {selectedTopicIds.size} chủ đề (
                 {Array.from(selectedTopicIds).reduce((sum, topicId) => {
                   const topic = allTopics.find((item) => item.id === topicId);
-                  return sum + (topic ? topic.words.length : 0);
+                  return sum + (topic ? (topic.words ? topic.words.length : topic.vocabularyCount) : 0);
                 }, 0)}
                 {' '}từ)
               </button>
@@ -414,8 +445,17 @@ export default function Games() {
     }
   };
 
-  const handleTopicSelect = (topic) => {
-    setSelectedTopic(topic);
+  const handleTopicSelect = async (topic) => {
+    let fullTopic = topic;
+    if (!topic.words) {
+      try {
+        const data = await axiosClient.get(`/topics/${encodeURIComponent(topic.slug || topic.id)}/flashcards`);
+        fullTopic = { ...topic, words: Array.isArray(data) ? data : [] };
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    setSelectedTopic(fullTopic);
     setPhase('playing');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -522,8 +562,17 @@ export default function Games() {
         <TopicPicker
           dueReviewWords={dueReviewWords}
           gameInfo={flappyPickerInfo}
-          onSelect={(topic) => {
-            setSelectedFlappyTopic(topic);
+          onSelect={async (topic) => {
+            let fullTopic = topic;
+            if (!topic.words) {
+              try {
+                const data = await axiosClient.get(`/topics/${encodeURIComponent(topic.slug || topic.id)}/flashcards`);
+                fullTopic = { ...topic, words: Array.isArray(data) ? data : [] };
+              } catch (err) {
+                console.error(err);
+              }
+            }
+            setSelectedFlappyTopic(fullTopic);
             setActiveFunGamePhase('playing');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}

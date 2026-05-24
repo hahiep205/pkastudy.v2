@@ -15,8 +15,8 @@ export default function LandingPage() {
             {/* ── HERO (existing, kept intact) ── */}
             <header className="hero" id="hero-section">
                 <div className="hero-left">
-                    <div class="lp-eyebrow lp-eyebrow-blue"><span style={{ backgroundColor: 'var(--blue)', color: '#fff', borderRadius: '10px', padding: '2px 7px', fontSize: '12px', fontWeight: 'bold' }}>New</span> Học thử miễn phí ngay!</div>
-                    <h1 className="be-vietnam-pro-extrabold">Học và ghi nhớ từ vựng hiệu quả cùng <span class="name-logo">pkastudy</span> ngay hôm nay!</h1>
+                    <div className="lp-eyebrow lp-eyebrow-blue"><span style={{ backgroundColor: 'var(--blue)', color: '#fff', borderRadius: '10px', padding: '2px 7px', fontSize: '12px', fontWeight: 'bold' }}>New</span> Học thử miễn phí ngay!</div>
+                    <h1 className="be-vietnam-pro-extrabold">Học và ghi nhớ từ vựng hiệu quả cùng <span className="name-logo">pkastudy</span> ngay hôm nay!</h1>
                     <p>
                         Học từ vựng tiếng Anh và tiếng Hàn dễ hơn qua bộ từ theo chủ đề, phát âm chuẩn,
                         luyện nghe thực tế, flashcard trực quan và trợ lý AI luôn sẵn sàng hỗ trợ.
@@ -43,7 +43,7 @@ export default function LandingPage() {
                             {/* {SVGS[1].svg}  */}
                             Giới thiệu tính năng
                         </div>
-                        <h2 className="lp-heading be-vietnam-pro-extrabold">Các <span class="name-logo">tính năng</span> chính</h2>
+                        <h2 className="lp-heading be-vietnam-pro-extrabold">Các <span className="name-logo">tính năng</span> chính</h2>
                         <p className="lp-subheading">
                             Khám phá 4 trải nghiệm nổi bật: hỏi đáp cùng AI, học bằng nhiều chế độ khác nhau, ôn luyện với kho từ vựng theo chủ đề và vừa chơi vừa học qua các hoạt động tương tác sinh động.
                         </p>
@@ -82,7 +82,7 @@ export default function LandingPage() {
                                     {/* {SVGS[2].svg}  */}
                                     Danh sách tài liệu
                                 </div>
-                                <h2 className="lp-heading be-vietnam-pro-extrabold" >Xây dựng vốn từ, học đâu nhớ đó cùng <span class="name-logo">pkastudy.</span></h2>
+                                <h2 className="lp-heading be-vietnam-pro-extrabold" >Xây dựng vốn từ, học đâu nhớ đó cùng <span className="name-logo">pkastudy.</span></h2>
                                 <p className="lp-subheading">
                                     Hai bộ từ vựng chuẩn quốc tế được biên soạn bám sát đề thi thực tế,
                                     kèm phiên âm và ví dụ giúp bạn học đúng từ đầu.
@@ -140,7 +140,7 @@ export default function LandingPage() {
                                 Hệ thống Chatbot AI
                             </div>
                             <h2 className="lp-heading be-vietnam-pro-extrabold">
-                                <span class="name-logo">Trợ lý AI</span> giúp bạn tối ưu thời gian, học tập hiệu quả.
+                                <span className="name-logo">Trợ lý AI</span> giúp bạn tối ưu thời gian, học tập hiệu quả.
                             </h2>
                             <p className="lp-subheading">
                                 Từ hỏi đáp từ vựng, ngữ pháp và phát âm đến tạo bộ từ theo chủ đề, trợ lý AI trong

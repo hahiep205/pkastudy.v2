@@ -1,5 +1,6 @@
 import { recordUserStatsSnapshot } from './userStats';
 import { xpStreakDaily } from './xpSystem';
+import axiosClient from './axiosClient';
 
 const STORAGE_KEY = 'pka_dashboard_progress_v1';
 const UPDATE_EVENT = 'pka-dashboard-progress-updated';
@@ -185,6 +186,38 @@ export function readDashboardProgress(userKey = 'guest') {
     saveStorageMap(map);
     recordUserStatsSnapshot(userKey, progress);
     return progress;
+}
+
+export async function syncDashboardProgressWithServer(userKey = 'guest') {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || (!user.token && !user.id)) return;
+    try {
+        const res = await axiosClient.get('/progress');
+        if (res) {
+            const serverData = res;
+            const map = getStorageMap();
+            let progress = ensureTodayProgress(map[userKey] || createDefaultProgress());
+            
+            let updated = false;
+            if (serverData.current_xp > progress.totalXp) {
+                progress.totalXp = serverData.current_xp;
+                updated = true;
+            }
+            if (serverData.current_streak > progress.streak) {
+                progress.streak = serverData.current_streak;
+                updated = true;
+            }
+            
+            if (updated) {
+                map[userKey] = progress;
+                saveStorageMap(map);
+                recordUserStatsSnapshot(userKey, progress);
+                window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: { userKey, progress } }));
+            }
+        }
+    } catch (e) {
+        console.error("Failed to sync dashboard progress:", e);
+    }
 }
 
 export function writeDashboardProgress(userKey = 'guest', progress) {

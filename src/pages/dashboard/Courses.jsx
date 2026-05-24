@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import { Link, useLocation } from 'react-router-dom';
 import TopicFormModal from '../../components/customDocs/TopicFormModal';
-import { coursesData } from '../../data/coursesData';
+import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import { languageLabels } from '../../utils/language';
@@ -23,34 +23,40 @@ export default function Courses() {
     const { customCourses, createTopic, updateTopic, deleteTopic } = useCustomCourses();
     const { remembered } = useCourseProgress();
 
-    const coursesConfig = useMemo(() => {
-        const allCourses = Object.values(coursesData);
+    // Fetch courses from API
+    const [courses, setCourses] = useState([]);
+    const [loadingCourses, setLoadingCourses] = useState(true);
 
-        return {
-            en: allCourses.filter((course) => course.lang === 'en')
-        };
+    useEffect(() => {
+        let cancelled = false;
+        setLoadingCourses(true);
+        axiosClient.get('/courses')
+            .then((res) => {
+                if (!cancelled) {
+                    const data = res.data || res;
+                    setCourses(Array.isArray(data) ? data : []);
+                }
+            })
+            .catch((err) => {
+                console.error("Fetch courses error:", err);
+                if (!cancelled) setCourses([]);
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingCourses(false);
+            });
+        return () => { cancelled = true; };
     }, []);
 
     const englishDocCards = useMemo(() => {
-        const toeicBasic = coursesData['toeic-basic'];
-        const otherEnglishCourses = coursesConfig.en.filter((course) => course.id !== 'toeic-basic');
-
-        if (!toeicBasic) {
-            return coursesConfig.en;
-        }
-
-        return [
-            {
-                id: 'toeic-basic-lessons-1-50',
-                title: toeicBasic.title,
-                description: 'Tài liệu từ vựng trọng tâm cho kỳ thi TOEIC của Dr. Lin Lougheed, Barron’s. Nội dung giúp tăng điểm Reading và Listening, đồng thời xây nền từ vựng business và môi trường công việc quốc tế.',
-                tags: ['50 Topics', '600 Words'],
-                badge: 'TOEIC',
-                courseId: toeicBasic.id,
-            },
-            ...otherEnglishCourses,
-        ];
-    }, [coursesConfig.en]);
+        return courses.map((course) => ({
+            id: course.id,
+            title: course.title,
+            description: course.description || 'Bộ tài liệu học tập',
+            tags: course.tags ? course.tags : ['Vocabulary'],
+            badge: course.badge || 'TOEIC',
+            courseId: course.slug || course.id,
+        }));
+    }, [courses]);
 
     const getTopicProgress = (topic) => {
         if (!topic.words?.length) {
@@ -117,11 +123,11 @@ export default function Courses() {
                 </div>
                 <div className="courses-banner-badges">
                     <div className="courses-stat-pill">
-                        <span className="courses-stat-num">1</span>
+                        <span className="courses-stat-num">{courses.length || 1}</span>
                         <span className="courses-stat-label">Chủ đề chính</span>
                     </div>
                     <div className="courses-stat-pill">
-                        <span className="courses-stat-num">2</span>
+                        <span className="courses-stat-num">{customCourses.length + courses.length}</span>
                         <span className="courses-stat-label">Bộ tài liệu</span>
                     </div>
                 </div>
@@ -148,40 +154,46 @@ export default function Courses() {
                         </div>
                     </div>
 
-                    <div className="doc-list">
-                        {englishDocCards.map((course, index) => (
-                            <div className="doc-card reveal revealed" key={course.id}>
-                                <div className="doc-icon-wrap doc-icon-blue">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                        <path d="M5 4H15V8H19V20H5V4ZM3.9985 2C3.44749 2 3 2.44405 3 2.9918V21.0082C3 21.5447 3.44476 22 3.9934 22H20.0066C20.5551 22 21 21.5489 21 21.0082V7L15 2H3.9985ZM10.4999 7.5C10.4999 9.70914 8.70914 11.5 6.49999 11.5V13.5C9.81371 13.5 12.4999 10.8137 12.4999 7.5H10.4999ZM7.5 7.5H5.5C5.5 9.70914 7.29086 11.5 9.5 11.5V9.5C8.39543 9.5 7.5 8.60457 7.5 7.5Z" />
-                                    </svg>
-                                </div>
-                                <div className="doc-info">
-                                    <div className="doc-meta-row">
-                                        <span className="doc-type-badge type-pdf">{course.badge || 'TOEIC'}</span>
+                    {loadingCourses ? (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-text)' }}>
+                            Đang tải danh sách khóa học...
+                        </div>
+                    ) : (
+                        <div className="doc-list">
+                            {englishDocCards.map((course, index) => (
+                                <div className="doc-card reveal revealed" key={course.id}>
+                                    <div className="doc-icon-wrap doc-icon-blue">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                            <path d="M5 4H15V8H19V20H5V4ZM3.9985 2C3.44749 2 3 2.44405 3 2.9918V21.0082C3 21.5447 3.44476 22 3.9934 22H20.0066C20.5551 22 21 21.5489 21 21.0082V7L15 2H3.9985ZM10.4999 7.5C10.4999 9.70914 8.70914 11.5 6.49999 11.5V13.5C9.81371 13.5 12.4999 10.8137 12.4999 7.5H10.4999ZM7.5 7.5H5.5C5.5 9.70914 7.29086 11.5 9.5 11.5V9.5C8.39543 9.5 7.5 8.60457 7.5 7.5Z" />
+                                        </svg>
                                     </div>
-                                    <h3 className="doc-name">
-                                        {index + 1}. {course.title}
-                                    </h3>
-                                    <p className="doc-desc">
-                                        {course.description || 'Bộ 600 từ vựng cốt lõi được phân loại theo chủ đề: văn phòng, tài chính, du lịch, sức khỏe và hơn thế nữa.'}
-                                    </p>
-                                    <div className="doc-tags">
-                                        {(course.tags || ['Vocabulary', 'Words']).map((tag) => (
-                                            <span className="doc-tag" key={`${course.id}-${tag}`}>
-                                                {tag}
-                                            </span>
-                                        ))}
+                                    <div className="doc-info">
+                                        <div className="doc-meta-row">
+                                            <span className="doc-type-badge type-pdf">{course.badge || 'TOEIC'}</span>
+                                        </div>
+                                        <h3 className="doc-name">
+                                            {index + 1}. {course.title}
+                                        </h3>
+                                        <p className="doc-desc">
+                                            {course.description || 'Bộ 600 từ vựng cốt lõi được phân loại theo chủ đề: văn phòng, tài chính, du lịch, sức khỏe và hơn thế nữa.'}
+                                        </p>
+                                        <div className="doc-tags">
+                                            {(course.tags || ['Vocabulary', 'Words']).map((tag) => (
+                                                <span className="doc-tag" key={`${course.id}-${tag}`}>
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="doc-action">
+                                        <Link to={`/dashboard/courses/${course.courseId || course.id}`} className="btn btn-primary btn-small">
+                                            Học ngay
+                                        </Link>
                                     </div>
                                 </div>
-                                <div className="doc-action">
-                                    <Link to={`/dashboard/courses/${course.courseId || course.id}`} className="btn btn-primary btn-small">
-                                        Học ngay
-                                    </Link>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 

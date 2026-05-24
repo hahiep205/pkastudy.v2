@@ -18,7 +18,10 @@ async function fetchTopicsByCourseSlug(courseSlug) {
 
   const topics = await getTopicsByCourseId(course.id);
 
-  return topics;
+  return {
+    courseTitle: course.title,
+    topics,
+  };
 }
 
 module.exports = {
