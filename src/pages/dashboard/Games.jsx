@@ -329,6 +329,7 @@ export default function Games() {
   const [phase, setPhase] = useState('hub');
   const [studyWordIds, setStudyWordIds] = useState(null);
   const [dueReviewWords, setDueReviewWords] = useState([]);
+  const [catalogSummary, setCatalogSummary] = useState({ topics: 0, words: 0, tests: 0 });
   const { remembered, replaceRememberedInTopic } = useCourseProgress();
   const pageRef = useRef(null);
   const useServerSrs = hasServerSrsAccess();
@@ -404,6 +405,35 @@ export default function Games() {
       cancelled = true;
     };
   }, [useServerSrs]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCatalogSummary() {
+      try {
+        const courses = await axiosClient.get('/courses');
+        const courseList = Array.isArray(courses) ? courses : [];
+        const topics = courseList.reduce((sum, course) => sum + Number(course.topic_count || 0), 0);
+        const words = courseList.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0);
+        const tests = await axiosClient.get('/toeic/tests');
+        const testList = Array.isArray(tests) ? tests : [];
+
+        if (!cancelled) {
+          setCatalogSummary({ topics, words, tests: testList.length });
+        }
+      } catch (error) {
+        console.error('Failed to load game catalog summary.', error);
+        if (!cancelled) {
+          setCatalogSummary({ topics: 0, words: 0, tests: 0 });
+        }
+      }
+    }
+
+    loadCatalogSummary();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (location.hash === '#games-srs-label') {

@@ -1,25 +1,67 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './LandingPage.css';
 
 import { useLandingReveal, useCounterAnimation } from './hooks';
-import { FEATURES, AVATARS, SVGS, COURSE_CARDS } from '../../data/landingData';
+import { FEATURES, SVGS, COURSE_CARDS } from '../../data/landingData';
 import CourseCard from './CourseCard';
+import axiosClient from '../../utils/axiosClient';
 
-// ── Component ───────────────────────────────────────────────────────────────
 export default function LandingPage() {
     useLandingReveal();
     useCounterAnimation();
 
+    const [courses, setCourses] = useState([]);
+    const [tests, setTests] = useState([]);
+
+    useEffect(() => {
+        axiosClient.get('/courses')
+            .then((res) => {
+                const data = res.data || res;
+                setCourses(Array.isArray(data) ? data : []);
+            })
+            .catch(() => setCourses([]));
+
+        axiosClient.get('/toeic/tests')
+            .then((res) => {
+                const data = res.data || res;
+                setTests(Array.isArray(data) ? data : []);
+            })
+            .catch(() => setTests([]));
+    }, []);
+
+    const catalogSummary = useMemo(() => ({
+        topics: courses.reduce((sum, course) => sum + Number(course.topic_count || 0), 0),
+        words: courses.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0),
+        tests: tests.length,
+    }), [courses, tests]);
+
+    const courseCards = useMemo(() => (
+        COURSE_CARDS.map((card, index) => {
+            if (index !== 0) return card;
+            return {
+                ...card,
+                tags: [
+                    { label: 'TOEIC', color: 'blue' },
+                    { label: `${catalogSummary.words || 600} từ`, color: 'blue' },
+                    { label: `${catalogSummary.topics || 50} lessons`, color: 'blue' },
+                ],
+                desc: 'Bộ từ vựng TOEIC theo chủ đề, kết hợp bài học nền tảng và lộ trình luyện tập phù hợp cho người học tự ôn mỗi ngày.',
+            };
+        })
+    ), [catalogSummary]);
+
     return (
         <>
-            {/* ── HERO (existing, kept intact) ── */}
             <header className="hero" id="hero-section">
                 <div className="hero-left">
                     <div className="lp-eyebrow lp-eyebrow-blue"><span style={{ backgroundColor: 'var(--blue)', color: '#fff', borderRadius: '10px', padding: '2px 7px', fontSize: '12px', fontWeight: 'bold' }}>New</span> Học thử miễn phí ngay!</div>
                     <h1 className="be-vietnam-pro-extrabold">Học và ghi nhớ từ vựng hiệu quả cùng <span className="name-logo">pkastudy</span> ngay hôm nay!</h1>
                     <p>
-                        Học từ vựng tiếng Anh và tiếng Hàn dễ hơn qua bộ từ theo chủ đề, phát âm chuẩn,
-                        luyện nghe thực tế, flashcard trực quan và trợ lý AI luôn sẵn sàng hỗ trợ.
+                        Học từ vựng TOEIC qua bộ bài học theo chủ đề, phát âm chuẩn, flashcard trực quan, mini-game và trợ lý AI luôn sẵn sàng hỗ trợ.
+                    </p>
+                    <p>
+                        Học từ vựng TOEIC theo chủ đề, kết hợp luyện tập kỹ năng và làm đề để duy trì nhịp học ổn định mỗi ngày.
                     </p>
                     <div className="hero-buttons">
                         <Link to="/dashboard">
@@ -30,22 +72,17 @@ export default function LandingPage() {
                         </Link>
                     </div>
                 </div>
+            </header>
 
-            </header >
-
-            {/* ══════════════════════════════════════════
-                SECTION 1: GIỚI THIỆU - Features
-            ══════════════════════════════════════════ */}
-            < section className="lp-section lp-features" id="gioi-thieu" >
+            <section className="lp-section lp-features" id="gioi-thieu">
                 <div className="lp-container">
                     <div className="lp-features-header lp-reveal">
                         <div className="lp-eyebrow lp-eyebrow-blue">
-                            {/* {SVGS[1].svg}  */}
                             Giới thiệu tính năng
                         </div>
                         <h2 className="lp-heading be-vietnam-pro-extrabold">Các <span className="name-logo">tính năng</span> chính</h2>
                         <p className="lp-subheading">
-                            Khám phá 4 trải nghiệm nổi bật: hỏi đáp cùng AI, học bằng nhiều chế độ khác nhau, ôn luyện với kho từ vựng theo chủ đề và vừa chơi vừa học qua các hoạt động tương tác sinh động.
+                            Khám phá các trải nghiệm nổi bật: hỏi đáp cùng AI, học bằng nhiều chế độ, ôn luyện với kho TOEIC và vừa chơi vừa học qua các hoạt động tương tác.
                         </p>
                     </div>
 
@@ -64,28 +101,20 @@ export default function LandingPage() {
                             </div>
                         ))}
                     </div>
-
                 </div>
-            </section >
+            </section>
 
-            {/* ══════════════════════════════════════════
-                SECTION 2: KHÓA HỌC - Courses preview
-            ══════════════════════════════════════════ */}
-            < section className="lp-section lp-courses" id="tai-lieu" >
+            <section className="lp-section lp-courses" id="tai-lieu">
                 <div className="lp-container">
                     <div className="lp-courses-layout">
-
-                        {/* Left: text */}
                         <div className="lp-courses-text lp-reveal">
                             <div>
                                 <div className="lp-eyebrow lp-eyebrow-blue">
-                                    {/* {SVGS[2].svg}  */}
                                     Danh sách tài liệu
                                 </div>
-                                <h2 className="lp-heading be-vietnam-pro-extrabold" >Xây dựng vốn từ, học đâu nhớ đó cùng <span className="name-logo">pkastudy.</span></h2>
+                                <h2 className="lp-heading be-vietnam-pro-extrabold">Xây dựng vốn từ, học đâu nhớ đó cùng <span className="name-logo">pkastudy.</span></h2>
                                 <p className="lp-subheading">
-                                    Hai bộ từ vựng chuẩn quốc tế được biên soạn bám sát đề thi thực tế,
-                                    kèm phiên âm và ví dụ giúp bạn học đúng từ đầu.
+                                    Thư viện học tập được tổ chức theo chủ đề rõ ràng, giúp bạn ôn từ vựng và luyện đề trong cùng một lộ trình học liền mạch.
                                 </p>
                             </div>
 
@@ -105,46 +134,34 @@ export default function LandingPage() {
                                     fontWeight: 600,
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px'
+                                    gap: '6px',
                                 }}
                             >
                                 {SVGS[3].svg} Bạn có thể học thử ngay mà không cần đăng nhập!
                             </p>
                         </div>
 
-                        {/* Right: cards */}
                         <div className="lp-courses-cards">
-                            {COURSE_CARDS.map((card, i) => (
+                            {courseCards.map((card, i) => (
                                 <CourseCard key={i} {...card} />
                             ))}
                         </div>
-
                     </div>
                 </div>
-            </section >
+            </section>
 
-            {/* ══════════════════════════════════════════
-                SECTION 3: Chatbot AI
-            ══════════════════════════════════════════ */}
-            < section className="lp-section lp-ai" id="chatbot-ai" >
+            <section className="lp-section lp-ai" id="chatbot-ai">
                 <div className="lp-container">
                     <div className="lp-ai-shell">
                         <div className="lp-ai-copy lp-reveal">
                             <div className="lp-eyebrow lp-eyebrow-blue" style={{ width: 'fit-content' }}>
-                                {/* <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" color="currentColor" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                    <path d="M20.5 16.9286V10C20.5 6.22876 20.5 4.34315 19.3284 3.17157C18.1569 2 16.2712 2 12.5 2H11.5C7.72876 2 5.84315 2 4.67157 3.17157C3.5 4.34315 3.5 6.22876 3.5 10V19.5" />
-                                    <path d="M20.5 17H6C4.61929 17 3.5 18.1193 3.5 19.5C3.5 20.8807 4.61929 22 6 22H20.5" />
-                                    <path d="M20.5 22C19.1193 22 18 20.8807 18 19.5C18 18.1193 19.1193 17 20.5 17" />
-                                    <path d="M12.3077 12L10.847 7.47891C10.7552 7.19466 10.4734 7 10.1538 7C9.83425 7 9.55249 7.19466 9.46066 7.47891L8 12M15 7V12M8.53846 10.5H11.7692" />
-                                </svg>  */}
                                 Hệ thống Chatbot AI
                             </div>
                             <h2 className="lp-heading be-vietnam-pro-extrabold">
                                 <span className="name-logo">Trợ lý AI</span> giúp bạn tối ưu thời gian, học tập hiệu quả.
                             </h2>
                             <p className="lp-subheading">
-                                Từ hỏi đáp từ vựng, ngữ pháp và phát âm đến tạo bộ từ theo chủ đề, trợ lý AI trong
-                                pkastudy được xây để rút ngắn thời gian hiểu bài và biến việc ôn tập thành một luồng học liền mạch.
+                                Từ hỏi đáp từ vựng, ngữ pháp và phát âm đến tạo bộ từ theo chủ đề, trợ lý AI trong pkastudy được xây dựng để rút ngắn thời gian hiểu bài và biến việc ôn tập thành một luồng học liền mạch.
                             </p>
 
                             <div className="lp-ai-feature-list">
@@ -196,7 +213,7 @@ export default function LandingPage() {
                                         </div>
                                         <div className="lp-ai-line lp-ai-line-bot">
                                             <strong>allocate</strong> có nghĩa là phân bổ hoặc dành ra cho một mục đích cụ thể.
-                                            Ví dụ: “We allocated more time to speaking practice.”
+                                            Ví dụ: "We allocated more time to speaking practice."
                                         </div>
                                     </div>
                                 </div>
@@ -210,7 +227,7 @@ export default function LandingPage() {
                                     <article className="lp-ai-card lp-ai-card-mini">
                                         <span className="lp-ai-mini-label">Tạo nhanh hàng loạt</span>
                                         <strong>Tạo bộ từ theo chủ đề chỉ trong vài giây</strong>
-                                        <p>Tạo danh sách từ cho 5 ngôn ngữ với nghĩa, phiên âm và ví dụ đi kèm.</p>
+                                        <p>Tạo danh sách từ với nghĩa, phiên âm và ví dụ đi kèm.</p>
                                     </article>
                                     <article className="lp-ai-card lp-ai-card-wide">
                                         <span className="lp-ai-mini-label">Luồng học liền mạch</span>
@@ -227,8 +244,7 @@ export default function LandingPage() {
                         </div>
                     </div>
                 </div>
-            </section >
-
+            </section>
         </>
     );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import { Link, useLocation } from 'react-router-dom';
+import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import TopicFormModal from '../../components/customDocs/TopicFormModal';
 import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
@@ -11,9 +11,7 @@ export default function Courses() {
     const location = useLocation();
     const [activeLang, setActiveLang] = useState(() => {
         const params = new URLSearchParams(location.search);
-        const tab = params.get('tab');
-
-        return tab === 'custom' ? 'custom' : 'english';
+        return params.get('tab') === 'custom' ? 'custom' : 'english';
     });
     const [modalType, setModalType] = useState(null);
     const [editingTopic, setEditingTopic] = useState(null);
@@ -23,40 +21,58 @@ export default function Courses() {
     const { customCourses, createTopic, updateTopic, deleteTopic } = useCustomCourses();
     const { remembered } = useCourseProgress();
 
-    // Fetch courses from API
     const [courses, setCourses] = useState([]);
     const [loadingCourses, setLoadingCourses] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
         setLoadingCourses(true);
+
         axiosClient.get('/courses')
             .then((res) => {
-                if (!cancelled) {
-                    const data = res.data || res;
-                    setCourses(Array.isArray(data) ? data : []);
-                }
+                if (cancelled) return;
+                const data = res.data || res;
+                setCourses(Array.isArray(data) ? data : []);
             })
             .catch((err) => {
-                console.error("Fetch courses error:", err);
+                console.error('Fetch courses error:', err);
                 if (!cancelled) setCourses([]);
             })
             .finally(() => {
                 if (!cancelled) setLoadingCourses(false);
             });
-        return () => { cancelled = true; };
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    const englishDocCards = useMemo(() => {
-        return courses.map((course) => ({
+    const builtInTopicCount = useMemo(
+        () => courses.reduce((sum, course) => sum + Number(course.topic_count || 0), 0),
+        [courses],
+    );
+
+    const builtInWordCount = useMemo(
+        () => courses.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0),
+        [courses],
+    );
+
+    const englishDocCards = useMemo(() => (
+        courses.map((course) => ({
             id: course.id,
             title: course.title,
             description: course.description || 'Bộ tài liệu học tập',
-            tags: course.tags ? course.tags : ['Vocabulary'],
-            badge: course.badge || 'TOEIC',
+            tags: [
+                `${course.topic_count || 0} lessons`,
+                `${course.vocabulary_count || 0} words`,
+                'TOEIC',
+            ],
+            badge: 'TOEIC',
             courseId: course.slug || course.id,
-        }));
-    }, [courses]);
+            topicCount: Number(course.topic_count || 0),
+            vocabularyCount: Number(course.vocabulary_count || 0),
+        }))
+    ), [courses]);
 
     const getTopicProgress = (topic) => {
         if (!topic.words?.length) {
@@ -118,17 +134,17 @@ export default function Courses() {
                     <div className="welcome-eyebrow">Thư viện tài liệu</div>
                     <h1 className="welcome-title">Học từ vựng cùng pkastudy!</h1>
                     <p className="welcome-sub">
-                        Chọn ngôn ngữ bạn muốn học và khám phá các tài liệu được tuyển chọn kỹ lưỡng.
+                        Thư viện học tập được sắp xếp theo chủ đề rõ ràng, giúp bạn học từ vựng và luyện tập đều đặn mỗi ngày.
                     </p>
                 </div>
                 <div className="courses-banner-badges">
                     <div className="courses-stat-pill">
-                        <span className="courses-stat-num">{courses.length || 1}</span>
-                        <span className="courses-stat-label">Chủ đề chính</span>
+                        <span className="courses-stat-num">{builtInTopicCount}</span>
+                        <span className="courses-stat-label">Chủ đề TOEIC</span>
                     </div>
                     <div className="courses-stat-pill">
-                        <span className="courses-stat-num">{customCourses.length + courses.length}</span>
-                        <span className="courses-stat-label">Bộ tài liệu</span>
+                        <span className="courses-stat-num">{builtInWordCount}</span>
+                        <span className="courses-stat-label">Từ vựng</span>
                     </div>
                 </div>
             </section>
@@ -169,16 +185,18 @@ export default function Courses() {
                                     </div>
                                     <div className="doc-info">
                                         <div className="doc-meta-row">
-                                            <span className="doc-type-badge type-pdf">{course.badge || 'TOEIC'}</span>
+                                            <span className="doc-type-badge type-pdf">{course.badge}</span>
+                                            <span className="doc-level">{course.topicCount} lessons</span>
+                                            <span className="doc-level">{course.vocabularyCount} words</span>
                                         </div>
                                         <h3 className="doc-name">
                                             {index + 1}. {course.title}
                                         </h3>
                                         <p className="doc-desc">
-                                            {course.description || 'Bộ 600 từ vựng cốt lõi được phân loại theo chủ đề: văn phòng, tài chính, du lịch, sức khỏe và hơn thế nữa.'}
+                                            {course.description}
                                         </p>
                                         <div className="doc-tags">
-                                            {(course.tags || ['Vocabulary', 'Words']).map((tag) => (
+                                            {course.tags.map((tag) => (
                                                 <span className="doc-tag" key={`${course.id}-${tag}`}>
                                                     {tag}
                                                 </span>
@@ -186,7 +204,7 @@ export default function Courses() {
                                         </div>
                                     </div>
                                     <div className="doc-action">
-                                        <Link to={`/dashboard/courses/${course.courseId || course.id}`} className="btn btn-primary btn-small">
+                                        <Link to={`/dashboard/courses/${course.courseId}`} className="btn btn-primary btn-small">
                                             Học ngay
                                         </Link>
                                     </div>
@@ -196,8 +214,6 @@ export default function Courses() {
                     )}
                 </div>
             )}
-
-
 
             {activeLang === 'custom' && (
                 <div className="lang-content" id="lang-custom">
@@ -214,16 +230,16 @@ export default function Courses() {
                     <div className="doc-list" id="cv-custom-list">
                         {customCourses.length === 0 ? (
                             <div className="cv-empty-state reveal revealed" style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "center",
-                                alignItems: "center"
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                alignItems: 'center',
                             }}>
                                 <div className="cv-empty-icon"></div>
-                                <h3 className="cv-empty-title" style={{ marginTop: "8px" }}>
+                                <h3 className="cv-empty-title" style={{ marginTop: '8px' }}>
                                     Chưa có chủ đề nào
                                 </h3>
-                                <button className="btn btn-primary btn-small" style={{ marginTop: "8px" }} onClick={() => handleOpenTopicForm()}>
+                                <button className="btn btn-primary btn-small" style={{ marginTop: '8px' }} onClick={() => handleOpenTopicForm()}>
                                     + Tạo chủ đề đầu tiên
                                 </button>
                             </div>

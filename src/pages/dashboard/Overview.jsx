@@ -12,7 +12,7 @@ import {
     subscribeDashboardProgress,
     syncDashboardProgressWithServer
 } from '../../utils/dashboardProgress';
-import { buildActivityChartData, getStatsSummary } from '../../utils/userStats';
+import { buildActivityChartData } from '../../utils/userStats';
 import { getLevelInfo, getXpData, syncXpWithServer } from '../../utils/xpSystem';
 import { getDueCount, getSrsForecast, checkSrsDecayWarning } from '../../utils/srsStorage';
 
@@ -23,6 +23,7 @@ export default function Overview() {
     const { customCourses } = useCustomCourses();
     const canvasRef = useRef(null);
     const [allCourses, setAllCourses] = useState([]);
+    const [toeicTests, setToeicTests] = useState([]);
 
     useEffect(() => {
         axiosClient.get('/courses')
@@ -33,6 +34,16 @@ export default function Overview() {
             .catch((err) => {
                 console.error("Fetch courses error:", err);
                 setAllCourses([]);
+            });
+
+        axiosClient.get('/toeic/tests')
+            .then((res) => {
+                const data = res.data || res;
+                setToeicTests(Array.isArray(data) ? data : []);
+            })
+            .catch((err) => {
+                console.error('Fetch TOEIC tests error:', err);
+                setToeicTests([]);
             });
     }, []);
 
@@ -62,25 +73,37 @@ export default function Overview() {
         });
     }, [userKey]);
 
-    const { grandTotal, grandDone } = useMemo(() => {
-        let total = 0;
-        let done = 0;
+    const builtInWordTotal = useMemo(
+        () => allCourses.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0),
+        [allCourses],
+    );
 
-        // Note: allCourses from API might not have nested topics/words
-        // Progress calculation now relies primarily on customCourses + remembered state
-        customCourses.forEach((topic) => {
-            total += topic.words.length;
-            topic.words.forEach((word) => {
-                if (remembered[word.id]) done += 1;
-            });
-        });
+    const builtInTopicTotal = useMemo(
+        () => allCourses.reduce((sum, course) => sum + Number(course.topic_count || 0), 0),
+        [allCourses],
+    );
 
-        // Count from remembered keys for built-in courses
-        const rememberedCount = Object.keys(remembered).filter((k) => remembered[k]).length;
-        done = Math.max(done, rememberedCount);
+    const customTotal = useMemo(
+        () => customCourses.reduce((sum, topic) => sum + topic.words.length, 0),
+        [customCourses],
+    );
 
-        return { grandTotal: Math.max(total, rememberedCount), grandDone: done };
-    }, [remembered, customCourses]);
+    const customDone = useMemo(
+        () => customCourses.reduce(
+            (sum, topic) => sum + topic.words.filter((word) => remembered[word.id]).length,
+            0,
+        ),
+        [customCourses, remembered],
+    );
+
+    const totalRememberedCount = useMemo(
+        () => Object.keys(remembered).filter((key) => remembered[key]).length,
+        [remembered],
+    );
+
+    const builtInDone = Math.max(totalRememberedCount - customDone, 0);
+    const grandTotal = Math.max(builtInWordTotal + customTotal, totalRememberedCount);
+    const grandDone = builtInDone + customDone;
 
     const tasks = dashboardProgress.tasks;
     const tasksView = tasks.map((task) => {
@@ -267,11 +290,6 @@ export default function Overview() {
     const totalLearn = activeChartData.totalWords;
     const totalReview = activeChartData.totalXp;
 
-    const customTotal = customCourses.reduce((sum, topic) => sum + topic.words.length, 0);
-    const customDone = customCourses.reduce(
-        (sum, topic) => sum + topic.words.filter((word) => remembered[word.id]).length,
-        0,
-    );
     const customPct = customTotal > 0 ? Math.round((customDone / customTotal) * 100) : 0;
 
     return (
@@ -437,7 +455,9 @@ export default function Overview() {
 
                 <div className="courses-grid-dash">
                     {allCourses.map((course) => {
-                        const pct = 0; // Will calculate from server progress in future
+                        const totalWords = Number(course.vocabulary_count || 0);
+                        const totalTopics = Number(course.topic_count || 0);
+                        const pct = totalWords > 0 ? Math.round((builtInDone / totalWords) * 100) : 0;
                         const langName = course.language === 'en' ? 'Topic' : 'Topic';
                         return (
                             <div key={course.id} className="course-dash-card reveal revealed" data-course-id={course.id}>

@@ -696,9 +696,7 @@ function ListeningTestSession({ test, section, onBack }) {
             <div className="toeic-audio-row toeic-audio-row-spaced">
               <span className="toeic-audio-meta">
                 {isMixedAudioSection
-                  ? q?.toeicPart === "PART 1"
-                    ? "Đang dùng audio Part 1 cho nhóm câu 1-6."
-                    : "Đang dùng audio Part 2 cho nhóm câu 7-31."
+                  ? "Đang dùng audio cho nhóm câu hiện tại."
                   : "Audio của part này được dùng chung cho toàn bộ câu hỏi trong phần."}
               </span>
             </div>
@@ -3221,35 +3219,38 @@ export default function TOEIC() {
     return title.replace(/^(đề|de)\s+/i, "").trim();
   };
 
+  const getDisplayTestIndex = (title, fallbackId) => {
+    const source = `${title || ""} ${fallbackId || ""}`;
+    const match = source.match(/\d+/);
+    return match ? match[0] : "";
+  };
+
   const LISTENING_TEST_SETS = apiTests.map((t) => {
-    const titleVal = cleanTitle(t.title);
     return {
       id: `listening-test-${t.id}`,
       apiId: t.id,
-      name: `Đề Listening ${titleVal}`,
-      desc: t.description || `Đề Listening TOEIC ${titleVal}.`,
+      name: `Listening Test ${getDisplayTestIndex(cleanTitle(t.title), t.id)}`,
+      desc: "Luyện nghe theo cấu trúc TOEIC với các part bám sát định dạng bài thi.",
       sections: [], // Will be populated on select
     };
   });
 
   const READING_TEST_SETS = apiTests.map((t) => {
-    const titleVal = cleanTitle(t.title);
     return {
       id: `reading-test-${t.id}`,
       apiId: t.id,
-      name: `Đề Reading ${titleVal}`,
-      desc: t.description || `Đề Reading TOEIC ${titleVal}.`,
+      name: `Reading Test ${getDisplayTestIndex(cleanTitle(t.title), t.id)}`,
+      desc: "Luyện đọc theo cấu trúc TOEIC để rèn tốc độ xử lý câu hỏi và quản lý thời gian.",
       sections: [], // Will be populated on select
     };
   });
 
   const FULL_TEST_VARIANTS = apiTests.map((t) => {
-    const titleVal = cleanTitle(t.title);
     return {
       id: `fulltest-${t.id}`,
       apiId: t.id,
-      name: `Đề ${titleVal}`,
-      desc: t.description || `Full Test ${titleVal} hoàn chỉnh.`,
+      name: `TOEIC Test ${getDisplayTestIndex(cleanTitle(t.title), t.id)}`,
+      desc: "Mô phỏng bài thi TOEIC đầy đủ phần Listening và Reading để luyện chiến lược làm bài toàn diện.",
       questions: [], // Will be populated on select
     };
   });

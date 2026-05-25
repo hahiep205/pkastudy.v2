@@ -1,14 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import { useAuth } from '../../contexts/useAuth';
 import {
     getDashboardUserKey,
     readDashboardProgress,
-    syncDashboardProgressWithServer
+    syncDashboardProgressWithServer,
 } from '../../utils/dashboardProgress';
 import { syncXpWithServer } from '../../utils/xpSystem';
-import { useEffect, useState } from 'react';
 import axiosClient from '../../utils/axiosClient';
 
 export default function Stats() {
@@ -16,6 +15,7 @@ export default function Stats() {
     const { remembered } = useCourseProgress();
     const { customCourses } = useCustomCourses();
     const [leaderboard, setLeaderboard] = useState([]);
+    const [courses, setCourses] = useState([]);
 
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
     const dashboardProgress = useMemo(() => readDashboardProgress(userKey), [userKey]);
@@ -23,47 +23,83 @@ export default function Stats() {
     useEffect(() => {
         syncDashboardProgressWithServer(userKey);
         syncXpWithServer();
-        
+
         axiosClient.get('/progress/leaderboard?limit=5')
-            .then(res => {
-                if (res) {
-                    setLeaderboard(res || []);
-                }
+            .then((res) => {
+                setLeaderboard(Array.isArray(res) ? res : []);
             })
             .catch(console.error);
+
+        axiosClient.get('/courses')
+            .then((res) => {
+                const data = res.data || res;
+                setCourses(Array.isArray(data) ? data : []);
+            })
+            .catch((err) => {
+                console.error('Failed to load courses', err);
+                setCourses([]);
+            });
     }, [userKey]);
 
-    // ── Compute real stats ──────────────────────────────────────────────────
-    const { grandTotal, grandDone, courseStats } = useMemo(() => {
-        let total = 0;
-        let done = 0;
+    const customTotal = useMemo(
+        () => customCourses.reduce((sum, topic) => sum + topic.words.length, 0),
+        [customCourses],
+    );
+
+    const customDone = useMemo(
+        () => customCourses.reduce(
+            (sum, topic) => sum + topic.words.filter((word) => remembered[word.id]).length,
+            0,
+        ),
+        [customCourses, remembered],
+    );
+
+    const builtInTotal = useMemo(
+        () => courses.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0),
+        [courses],
+    );
+
+    const builtInTopicTotal = useMemo(
+        () => courses.reduce((sum, course) => sum + Number(course.topic_count || 0), 0),
+        [courses],
+    );
+
+    const totalRemembered = useMemo(
+        () => Object.keys(remembered).filter((key) => remembered[key]).length,
+        [remembered],
+    );
+
+    const builtInDone = Math.max(totalRemembered - customDone, 0);
+    const grandTotal = Math.max(builtInTotal + customTotal, totalRemembered, 1);
+    const grandDone = builtInDone + customDone;
+    const pct = Math.round((grandDone / grandTotal) * 100);
+
+    const courseStats = useMemo(() => {
         const stats = [];
 
-        // Count from remembered keys for built-in courses
-        const rememberedCount = Object.keys(remembered).filter((k) => remembered[k]).length;
-        total += rememberedCount;
-        done += rememberedCount;
-
-        let customTotal = 0;
-        let customDone = 0;
-        customCourses.forEach((topic) => {
-            customTotal += topic.words.length;
-            topic.words.forEach((word) => {
-                if (remembered[word.id]) customDone += 1;
+        if (builtInTotal > 0) {
+            stats.push({
+                name: 'Kho học TOEIC',
+                total: builtInTotal,
+                done: builtInDone,
+                subtitle: `${builtInTopicTotal} chủ đề · ${courses.length} khóa học`,
+                tone: 'blue',
             });
-        });
-        if (customCourses.length > 0) {
-            total = Math.max(total, customTotal + rememberedCount);
-            done = Math.max(done, customDone + rememberedCount - customTotal);
-            stats.push({ name: 'Tài liệu cá nhân', total: customTotal, done: customDone, lang: 'custom' });
         }
 
-        return { grandTotal: Math.max(total, 1), grandDone: done, courseStats: stats };
-    }, [remembered, customCourses]);
+        if (customCourses.length > 0) {
+            stats.push({
+                name: 'Tài liệu cá nhân',
+                total: customTotal,
+                done: customDone,
+                subtitle: `${customCourses.length} chủ đề`,
+                tone: 'orange',
+            });
+        }
 
-    const pct = grandTotal > 0 ? Math.round((grandDone / grandTotal) * 100) : 0;
+        return stats;
+    }, [builtInDone, builtInTotal, builtInTopicTotal, courses.length, customCourses.length, customDone, customTotal]);
 
-    // ── Personal stats pills ────────────────────────────────────────────────
     const personalStats = [
         {
             label: 'Streak',
@@ -91,8 +127,7 @@ export default function Stats() {
         },
     ];
 
-    // ── Course progress cards ───────────────────────────────────────────────
-    const toneMap = { en: 'blue', ko: 'green', custom: 'orange' };
+    const toneMap = { blue: 'blue', orange: 'orange' };
 
     return (
         <main className="dash-main stats-page stats2-page" id="page-stats">
@@ -100,11 +135,10 @@ export default function Stats() {
                 <div className="stats2-hero-copy">
                     <div className="stats2-kicker">Thống kê</div>
                     <h1>Tổng quan tiến trình học tập</h1>
-                    <p>Theo dõi chi tiết số từ đã thuộc, EXP tích lũy và tiến trình từng khóa học.</p>
+                    <p>Theo dõi tiến độ học tập trên kho TOEIC, tài liệu cá nhân và những mốc EXP bạn đang tích lũy.</p>
                 </div>
             </section>
 
-            {/* ── Personal stats pills ── */}
             <div className="stats2-pills reveal" data-reveal-order="1">
                 {personalStats.map((stat) => (
                     <div key={stat.label} className={`stats2-pill stats2-pill-${stat.tone}`}>
@@ -117,12 +151,11 @@ export default function Stats() {
                 ))}
             </div>
 
-            {/* ── Overall progress bar ── */}
             <section className="stats2-board stats2-board-overview reveal" data-reveal-order="2">
                 <header className="stats2-board-header">
                     <div className="stats2-board-copy">
                         <h2>Tiến độ tổng thể</h2>
-                        <p>{grandDone} / {grandTotal} từ vựng đã thuộc</p>
+                        <p>{grandDone} / {grandTotal} từ vựng đã được đánh dấu nhớ</p>
                     </div>
                     <span className="stats2-pct-badge">{pct}%</span>
                 </header>
@@ -131,17 +164,17 @@ export default function Stats() {
                 </div>
             </section>
 
-            {/* ── Per-course progress ── */}
             <div className="stats2-grid">
                 {courseStats.map((course) => {
                     const coursePct = course.total > 0 ? Math.round((course.done / course.total) * 100) : 0;
-                    const tone = toneMap[course.lang] || 'blue';
+                    const tone = toneMap[course.tone] || 'blue';
+
                     return (
                         <section key={course.name} className={`stats2-board stats2-board-${tone} reveal`}>
                             <header className="stats2-board-header">
                                 <div className="stats2-board-copy">
                                     <h2>{course.name}</h2>
-                                    <p>{course.done} / {course.total} từ · {coursePct}%</p>
+                                    <p>{course.subtitle}</p>
                                 </div>
                             </header>
 
@@ -155,7 +188,7 @@ export default function Stats() {
                                 <article className="stats2-history-item">
                                     <div className="stats2-leader-main">
                                         <div className="stats2-leader-copy">
-                                            <strong>Từ đã thuộc</strong>
+                                            <strong>Đã hoàn thành</strong>
                                             <small>{course.done} từ</small>
                                         </div>
                                     </div>
@@ -168,12 +201,11 @@ export default function Stats() {
                     );
                 })}
 
-                {/* ── Daily tasks summary ── */}
                 <section className="stats2-board stats2-board-streak reveal">
                     <header className="stats2-board-header">
                         <div className="stats2-board-copy">
                             <h2>Hoạt động hôm nay</h2>
-                            <p>EXP đã nhận hôm nay và trạng thái task</p>
+                            <p>EXP đã nhận và tiến độ daily task</p>
                         </div>
                     </header>
                     <div className="stats2-history">
@@ -185,7 +217,7 @@ export default function Stats() {
                                 </div>
                             </div>
                             <div className="stats2-history-values">
-                                <span>{dashboardProgress.tasks.filter(t => t.isDone).length}/{dashboardProgress.tasks.length} task</span>
+                                <span>{dashboardProgress.tasks.filter((task) => task.isDone).length}/{dashboardProgress.tasks.length} task</span>
                             </div>
                         </article>
                         <article className="stats2-history-item">
@@ -202,12 +234,11 @@ export default function Stats() {
                     </div>
                 </section>
 
-                {/* ── Leaderboard ── */}
                 <section className="stats2-board stats2-board-streak reveal">
                     <header className="stats2-board-header">
                         <div className="stats2-board-copy">
-                            <h2>Bảng Xếp Hạng</h2>
-                            <p>Top người chơi có điểm XP cao nhất</p>
+                            <h2>Bảng xếp hạng</h2>
+                            <p>Top người học có tổng EXP cao nhất</p>
                         </div>
                     </header>
                     <div className="stats2-history">
@@ -216,12 +247,21 @@ export default function Stats() {
                         ) : leaderboard.map((entry, index) => (
                             <article key={entry.id} className="stats2-history-item">
                                 <div className="stats2-leader-main">
-                                    <div className="stats2-leader-rank" style={{ 
-                                        width: '32px', height: '32px', borderRadius: '50%', 
-                                        background: index === 0 ? 'var(--orange-light)' : index === 1 ? 'var(--blue-light)' : index === 2 ? 'var(--green-light)' : 'var(--bg-card-hover)',
-                                        color: index === 0 ? 'var(--orange)' : index === 1 ? 'var(--blue)' : index === 2 ? 'var(--green)' : 'var(--text-light)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginRight: '1rem'
-                                    }}>
+                                    <div
+                                        className="stats2-leader-rank"
+                                        style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            borderRadius: '50%',
+                                            background: index === 0 ? 'var(--orange-light)' : index === 1 ? 'var(--blue-light)' : index === 2 ? 'var(--green-light)' : 'var(--bg-card-hover)',
+                                            color: index === 0 ? 'var(--orange)' : index === 1 ? 'var(--blue)' : index === 2 ? 'var(--green)' : 'var(--text-light)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 'bold',
+                                            marginRight: '1rem',
+                                        }}
+                                    >
                                         #{index + 1}
                                     </div>
                                     <div className="stats2-leader-copy">
