@@ -1,7 +1,8 @@
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
+const { getUserAuthById } = require('../models/userModel');
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -15,7 +16,19 @@ function authMiddleware(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_jwt_secret');
-    req.userId = decoded.id;
+    const user = await getUserAuthById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (user.status === 'banned') {
+      return res.status(403).json({ error: 'Your account has been banned.' });
+    }
+
+    req.userId = user.id;
+    req.userRole = user.role;
+    req.userStatus = user.status;
+    req.user = user;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Unauthorized' });

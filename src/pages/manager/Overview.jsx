@@ -1,0 +1,464 @@
+import { useEffect, useMemo, useState } from 'react';
+import axiosClient from '../../utils/axiosClient';
+
+function formatNumber(value) {
+    return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
+}
+
+function SummaryCard({ label, value, hint, loading }) {
+    return (
+        <article className="manager-stat-card">
+            <span className="manager-stat-label">{label}</span>
+            <strong className="manager-stat-value">{loading ? '...' : formatNumber(value)}</strong>
+            <p className="manager-stat-hint">{hint}</p>
+        </article>
+    );
+}
+
+function OverviewBarChart({ points, maxCount }) {
+    if (!points.length) {
+        return <div className="manager-chart-empty">Chưa có dữ liệu đăng ký trong khoảng thời gian này.</div>;
+    }
+
+    const width = 760;
+    const height = 280;
+    const padding = { top: 30, right: 20, bottom: 42, left: 20 };
+    const max = Math.max(maxCount || 0, 1);
+    const innerWidth = width - padding.left - padding.right;
+    const innerHeight = height - padding.top - padding.bottom;
+    const slotWidth = innerWidth / points.length;
+    const barWidth = Math.min(Math.max(slotWidth * 0.52, 18), 34);
+
+    return (
+        <div className="manager-chart-wrap">
+            <svg viewBox={`0 0 ${width} ${height}`} className="manager-bar-chart-svg" role="img" aria-label="Biểu đồ cột người dùng đăng ký mới">
+                {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+                    const y = padding.top + innerHeight * tick;
+                    const label = Math.round(max - (max * tick));
+
+                    return (
+                        <g key={tick}>
+                            <line
+                                x1={padding.left}
+                                y1={y}
+                                x2={width - padding.right}
+                                y2={y}
+                                className="manager-bar-chart-grid"
+                            />
+                            <text
+                                x={width - padding.right}
+                                y={y - 6}
+                                textAnchor="end"
+                                className="manager-bar-chart-axis-text"
+                            >
+                                {label}
+                            </text>
+                        </g>
+                    );
+                })}
+
+                {points.map((point, index) => {
+                    const x = padding.left + slotWidth * index + (slotWidth - barWidth) / 2;
+                    const barHeight = point.count ? Math.max((point.count / max) * innerHeight, 10) : 0;
+                    const y = padding.top + innerHeight - barHeight;
+                    const centerX = x + barWidth / 2;
+
+                    return (
+                        <g key={point.date}>
+                            {barHeight > 0 ? (
+                                <>
+                                    <rect
+                                        x={x}
+                                        y={y}
+                                        width={barWidth}
+                                        height={barHeight}
+                                        rx="12"
+                                        className="manager-bar-chart-bar"
+                                    />
+                                    <text
+                                        x={centerX}
+                                        y={Math.max(y - 10, padding.top - 2)}
+                                        textAnchor="middle"
+                                        className="manager-bar-chart-top-label"
+                                    >
+                                        {formatNumber(point.count)}
+                                    </text>
+                                </>
+                            ) : (
+                                <text
+                                    x={centerX}
+                                    y={padding.top + innerHeight - 8}
+                                    textAnchor="middle"
+                                    className="manager-bar-chart-zero"
+                                >
+                                    0
+                                </text>
+                            )}
+
+                            <text
+                                x={centerX}
+                                y={height - 12}
+                                textAnchor="middle"
+                                className="manager-bar-chart-label"
+                            >
+                                {point.label}
+                            </text>
+                        </g>
+                    );
+                })}
+            </svg>
+        </div>
+    );
+}
+
+function OverviewDonutChart({ items, total, emptyMessage }) {
+    const safeTotal = Math.max(total || 0, items.reduce((sum, item) => sum + Number(item.value || 0), 0));
+    const radius = 72;
+    const stroke = 18;
+    const circumference = 2 * Math.PI * radius;
+    let offsetCursor = 0;
+    const colors = ['#1cb0f6', '#58cc02', '#d98f3f', '#7f8aa3'];
+
+    if (!items.length || !safeTotal) {
+        return <div className="manager-chart-empty manager-chart-empty-compact">{emptyMessage}</div>;
+    }
+
+    return (
+        <div className="manager-donut-shell">
+            <div className="manager-donut-visual" role="img" aria-label="Biểu đồ tròn cơ cấu hoạt động học">
+                <svg viewBox="0 0 220 220" className="manager-donut-svg">
+                    <circle cx="110" cy="110" r={radius} className="manager-donut-track" />
+                    {items.map((item, index) => {
+                        const value = Number(item.value || 0);
+                        const ratio = value / safeTotal;
+                        const dash = circumference * ratio;
+                        const gap = circumference - dash;
+                        const currentOffset = offsetCursor;
+                        offsetCursor += dash;
+
+                        return (
+                            <circle
+                                key={item.label}
+                                cx="110"
+                                cy="110"
+                                r={radius}
+                                className="manager-donut-ring"
+                                stroke={colors[index % colors.length]}
+                                strokeWidth={stroke}
+                                strokeDasharray={`${dash} ${gap}`}
+                                strokeDashoffset={-currentOffset}
+                            />
+                        );
+                    })}
+                </svg>
+                <div className="manager-donut-center">
+                    <span>Tổng</span>
+                    <strong>{formatNumber(safeTotal)}</strong>
+                </div>
+            </div>
+
+            <div className="manager-donut-legend">
+                {items.map((item, index) => (
+                    <div key={item.label} className="manager-donut-legend-item">
+                        <span className="manager-donut-swatch" style={{ backgroundColor: colors[index % colors.length] }} />
+                        <div>
+                            <strong>{item.label}</strong>
+                            <span>{formatNumber(item.value)}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export default function ManagerOverview() {
+    const [rangeDays, setRangeDays] = useState(7);
+    const [summary, setSummary] = useState(null);
+    const [chart, setChart] = useState(null);
+    const [summaryLoading, setSummaryLoading] = useState(true);
+    const [chartLoading, setChartLoading] = useState(true);
+    const [summaryError, setSummaryError] = useState('');
+    const [chartError, setChartError] = useState('');
+
+    useEffect(() => {
+        let active = true;
+        setSummaryLoading(true);
+        setSummaryError('');
+
+        axiosClient.get('/admin/overview/summary')
+            .then((data) => {
+                if (!active) return;
+                setSummary(data);
+            })
+            .catch((err) => {
+                if (!active) return;
+                setSummaryError(err.response?.data?.error || err.message || 'Không tải được tổng quan hệ thống.');
+            })
+            .finally(() => {
+                if (active) setSummaryLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        setChartLoading(true);
+        setChartError('');
+
+        axiosClient.get(`/admin/overview/registrations?days=${rangeDays}`)
+            .then((data) => {
+                if (!active) return;
+                setChart(data);
+            })
+            .catch((err) => {
+                if (!active) return;
+                setChartError(err.response?.data?.error || err.message || 'Không tải được dữ liệu đăng ký mới.');
+            })
+            .finally(() => {
+                if (active) setChartLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [rangeDays]);
+
+    const summaryCards = useMemo(() => ([
+        {
+            label: 'Tổng người dùng',
+            value: summary?.totalUsers,
+            hint: 'Tổng số tài khoản đã đăng ký trên hệ thống.',
+        },
+        {
+            label: 'Khóa học',
+            value: summary?.totalCourses,
+            hint: `Flashcards: ${formatNumber(summary?.totalFlashcards)}`,
+        },
+        {
+            label: 'Lượt thi TOEIC',
+            value: summary?.totalToeicAttempts,
+            hint: 'Tổng số lượt làm bài TOEIC đã được ghi nhận.',
+        },
+        {
+            label: 'Lượt ôn SRS',
+            value: summary?.totalSrsReviews,
+            hint: 'Tổng số lần ôn tập từ vựng đang có trong hệ thống.',
+        },
+        {
+            label: 'Tổng hoạt động học',
+            value: summary?.totalActivities,
+            hint: `TOEIC ${formatNumber(summary?.activityBreakdown?.toeicAttempts)} / SRS ${formatNumber(summary?.activityBreakdown?.srsReviews)}`,
+        },
+    ]), [summary]);
+
+    const activityChartItems = useMemo(() => ([
+        { label: 'Thi TOEIC', value: Number(summary?.activityBreakdown?.toeicAttempts || 0) },
+        { label: 'Ôn SRS', value: Number(summary?.activityBreakdown?.srsReviews || 0) },
+    ]), [summary]);
+
+    const displayedChart = useMemo(() => {
+        if (!chart?.points?.length) {
+            return {
+                points: [],
+                maxCount: 0,
+                totalRegistrations: chart?.totalRegistrations || 0,
+                range: chart?.range || null,
+            };
+        }
+
+        if (rangeDays !== 30) {
+            return {
+                points: chart.points,
+                maxCount: chart.maxCount || 0,
+                totalRegistrations: chart.totalRegistrations || 0,
+                range: chart.range || null,
+            };
+        }
+
+        const bucketSize = Math.ceil(chart.points.length / 4);
+        const weeklyPoints = Array.from({ length: 4 }, (_, index) => {
+            const start = index * bucketSize;
+            const end = start + bucketSize;
+            const group = chart.points.slice(start, end);
+
+            return {
+                date: `week-${index + 1}`,
+                label: `Tuần ${index + 1}`,
+                count: group.reduce((sum, point) => sum + Number(point.count || 0), 0),
+            };
+        }).filter((item, index) => index < 4 && (item.count > 0 || index * bucketSize < chart.points.length));
+
+        return {
+            points: weeklyPoints,
+            maxCount: Math.max(...weeklyPoints.map((item) => item.count), 0),
+            totalRegistrations: chart.totalRegistrations || 0,
+            range: chart.range || null,
+        };
+    }, [chart, rangeDays]);
+
+    const insightItems = useMemo(() => ([
+        {
+            label: 'Kho nội dung',
+            value: `${formatNumber(summary?.totalCourses)} khóa học / ${formatNumber(summary?.totalFlashcards)} thẻ từ`,
+        },
+        {
+            label: 'Lưu lượng thi',
+            value: `${formatNumber(summary?.totalToeicAttempts)} lượt thi TOEIC`,
+        },
+        {
+            label: 'Lưu lượng ôn tập',
+            value: `${formatNumber(summary?.totalSrsReviews)} lượt ôn SRS`,
+        },
+        {
+            label: 'Theo dõi chính',
+            value: 'Người dùng mới, hoạt động học và tăng trưởng nội dung.',
+        },
+    ]), [summary]);
+
+    return (
+        <main className="manager-page">
+            <section className="manager-panel manager-overview-banner">
+                <div>
+                    <span className="manager-panel-eyebrow">Tổng quan hệ thống</span>
+                    <h2>Bức tranh vận hành hiện tại</h2>
+                    <p>
+                        Theo dõi nhanh người dùng, nội dung học và nhịp hoạt động gần đây bằng giao diện gọn,
+                        đồng nhất với hệ thống hiện tại.
+                    </p>
+                </div>
+                <div className="manager-overview-badge">
+                    <span>Tổng người dùng</span>
+                    <strong>{summaryLoading ? '...' : formatNumber(summary?.totalUsers)}</strong>
+                </div>
+            </section>
+
+            {summaryError ? (
+                <section className="manager-panel">
+                    <div className="manager-panel-head">
+                        <h3>Lỗi tải tổng quan</h3>
+                        <span className="manager-chip">Cần kiểm tra</span>
+                    </div>
+                    <p className="manager-error-text">{summaryError}</p>
+                </section>
+            ) : null}
+
+            <section className="manager-overview-stats">
+                {summaryCards.map((card) => (
+                    <SummaryCard
+                        key={card.label}
+                        label={card.label}
+                        value={card.value}
+                        hint={card.hint}
+                        loading={summaryLoading}
+                    />
+                ))}
+            </section>
+
+            <section className="manager-grid manager-grid-overview manager-overview-chart-grid">
+                <article className="manager-panel">
+                    <div className="manager-panel-head manager-panel-head-wrap">
+                        <div>
+                            <h3>Người dùng đăng ký mới</h3>
+                            <p className="manager-muted-text">
+                                Biểu đồ cột theo dõi số người dùng đăng ký mới trong {rangeDays} ngày gần đây.
+                            </p>
+                        </div>
+                        <div className="manager-segmented">
+                            {[7, 30].map((days) => (
+                                <button
+                                    key={days}
+                                    type="button"
+                                    className={`manager-segmented-btn ${rangeDays === days ? 'active' : ''}`}
+                                    onClick={() => setRangeDays(days)}
+                                >
+                                    {days} ngày
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {chartError ? <p className="manager-error-text">{chartError}</p> : null}
+                    {chartLoading ? <div className="manager-chart-loading">Đang tải biểu đồ đăng ký mới...</div> : null}
+                    {!chartLoading && !chartError ? (
+                        <OverviewBarChart points={displayedChart.points} maxCount={displayedChart.maxCount} />
+                    ) : null}
+
+                    {!chartLoading && !chartError && displayedChart ? (
+                        <div className="manager-chart-meta">
+                            <div>
+                                <span>Tổng trong kỳ</span>
+                                <strong>{formatNumber(displayedChart.totalRegistrations)}</strong>
+                            </div>
+                            <div>
+                                <span>Khoảng thời gian</span>
+                                <strong>{displayedChart.range?.startDate} {'->'} {displayedChart.range?.endDate}</strong>
+                            </div>
+                            <div>
+                                <span>Mức cao nhất</span>
+                                <strong>{formatNumber(displayedChart.maxCount)}</strong>
+                            </div>
+                        </div>
+                    ) : null}
+                </article>
+
+                <article className="manager-panel">
+                    <div className="manager-panel-head manager-panel-head-wrap">
+                        <div>
+                            <h3>Cơ cấu hoạt động học</h3>
+                            <p className="manager-muted-text">
+                                Biểu đồ tròn tổng hợp tỷ trọng giữa các nhóm hoạt động học đang diễn ra trên hệ thống.
+                            </p>
+                        </div>
+                    </div>
+                    {summaryLoading ? <div className="manager-chart-loading">Đang tải biểu đồ cơ cấu...</div> : null}
+                    {!summaryLoading ? (
+                        <OverviewDonutChart
+                            items={activityChartItems}
+                            total={summary?.totalActivities}
+                            emptyMessage="Chưa có dữ liệu để hiển thị."
+                        />
+                    ) : null}
+
+                    {!summaryLoading ? (
+                        <div className="manager-chart-meta">
+                            <div>
+                                <span>Thi TOEIC</span>
+                                <strong>{formatNumber(summary?.activityBreakdown?.toeicAttempts)}</strong>
+                            </div>
+                            <div>
+                                <span>Ôn SRS</span>
+                                <strong>{formatNumber(summary?.activityBreakdown?.srsReviews)}</strong>
+                            </div>
+                            <div>
+                                <span>Tổng hoạt động</span>
+                                <strong>{formatNumber(summary?.totalActivities)}</strong>
+                            </div>
+                        </div>
+                    ) : null}
+                </article>
+            </section>
+
+            <section className="manager-panel">
+                <div className="manager-panel-head manager-panel-head-wrap">
+                    <div>
+                        <h3>Điểm cần theo dõi</h3>
+                        <p className="manager-muted-text">Một vài chỉ số tổng hợp để nắm nhanh tình hình hiện tại.</p>
+                    </div>
+                </div>
+
+                <div className="manager-kv-list manager-kv-list-single manager-overview-notes">
+                    {insightItems.map((item) => (
+                        <div key={item.label}>
+                            <span>{item.label}</span>
+                            <strong>{summaryLoading ? '...' : item.value}</strong>
+                        </div>
+                    ))}
+                </div>
+            </section>
+        </main>
+    );
+}

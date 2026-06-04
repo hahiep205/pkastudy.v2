@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import FloatChat from './components/FloatChat';
+import RequireAdmin from './components/manager/RequireAdmin';
 import DashboardLayout from './layouts/DashboardLayout';
+import ManagerLayout from './layouts/ManagerLayout';
 import MainLayout from './layouts/MainLayout';
 import Games from './pages/dashboard/Games';
 import CourseTopics from './pages/dashboard/CourseTopics';
@@ -13,6 +15,12 @@ import TopicWords from './pages/dashboard/TopicWords';
 import TOEIC from './pages/dashboard/TOEIC';
 import LandingPage from './pages/landingPage/LandingPage';
 import Login from './pages/Login';
+import ManagerCourses from './pages/manager/Courses';
+import ManagerOverview from './pages/manager/Overview';
+import ManagerToeic from './pages/manager/Toeic';
+import ManagerToeicBuilder from './pages/manager/ToeicBuilder';
+import ManagerTopics from './pages/manager/Topics';
+import ManagerUsers from './pages/manager/Users';
 import Register from './pages/Register';
 import { initializeTheme } from './utils/theme';
 
@@ -42,6 +50,17 @@ function App() {
                     <Route path="toeic" element={<TOEIC />} />
                     <Route path="stats" element={<Stats />} />
                     <Route path="settings" element={<Settings />} />
+                </Route>
+
+                <Route element={<RequireAdmin />}>
+                    <Route path="/manager" element={<ManagerLayout />}>
+                        <Route index element={<ManagerOverview />} />
+                        <Route path="users" element={<ManagerUsers />} />
+                        <Route path="courses" element={<ManagerCourses />} />
+                        <Route path="courses/:courseId/topics" element={<ManagerTopics />} />
+                        <Route path="toeic" element={<ManagerToeic />} />
+                        <Route path="toeic/:testId" element={<ManagerToeicBuilder />} />
+                    </Route>
                 </Route>
             </Routes>
             <FloatChat />

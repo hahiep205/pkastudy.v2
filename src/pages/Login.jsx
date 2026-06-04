@@ -14,6 +14,10 @@ export default function Login() {
     const [errorMessage, setErrorMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const navigateAfterLogin = (nextUser) => {
+        navigate(nextUser?.role === 'admin' ? '/manager' : '/dashboard');
+    };
+
     const handleEmailLogin = async () => {
         setErrorMessage('');
 
@@ -30,11 +34,14 @@ export default function Login() {
                 throw new Error('Phản hồi đăng nhập không hợp lệ.');
             }
             login({
+                id: result.user.id,
                 name: result.user.name,
                 email: result.user.email,
+                role: result.user.role,
+                status: result.user.status,
                 token: result.token,
             });
-            navigate('/dashboard');
+            navigateAfterLogin(result.user);
         } catch (error) {
             setErrorMessage(error.response?.data?.error || error.message || 'Đăng nhập thất bại');
         } finally {
@@ -55,11 +62,14 @@ export default function Login() {
                 throw new Error('Phản hồi đăng nhập Google không hợp lệ.');
             }
             login({
+                id: data.user.id,
                 name: data.user.name,
                 email: data.user.email,
+                role: data.user.role,
+                status: data.user.status,
                 token: data.token,
             });
-            navigate('/dashboard');
+            navigateAfterLogin(data.user);
         } catch (error) {
             setErrorMessage(error.response?.data?.error || error.message || 'Đăng nhập Google thất bại');
         } finally {

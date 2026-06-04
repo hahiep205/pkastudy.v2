@@ -32,6 +32,21 @@ const googleLoginSchema = Joi.object({
 
 const pendingVerificationCodes = new Map();
 
+function buildAuthPayload(user, token) {
+  return {
+    data: {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role || 'user',
+        status: user.status || 'active',
+      },
+    },
+  };
+}
+
 function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -133,21 +148,12 @@ async function register(req, res, next) {
     await createProgressRecordForUser(user.id);
 
     const token = jwt.sign(
-      { id: user.id },
+      { id: user.id, role: user.role || 'user' },
       process.env.JWT_SECRET || 'default_jwt_secret',
       { expiresIn: '1h' }
     );
 
-    res.status(201).json({
-      data: {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-      },
-    });
+    res.status(201).json(buildAuthPayload(user, token));
   } catch (err) {
     next(err);
   }
@@ -172,27 +178,22 @@ async function login(req, res, next) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
+    if (user.status === 'banned') {
+      return res.status(403).json({ error: 'Your account has been banned.' });
+    }
+
     const passwordMatches = await bcrypt.compare(value.password, user.passwordHash);
     if (!passwordMatches) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
     const token = jwt.sign(
-      { id: user.id },
+      { id: user.id, role: user.role || 'user' },
       process.env.JWT_SECRET || 'default_jwt_secret',
       { expiresIn: '1h' }
     );
 
-    res.json({
-      data: {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-      },
-    });
+    res.json(buildAuthPayload(user, token));
   } catch (err) {
     next(err);
   }
@@ -231,22 +232,17 @@ async function googleLogin(req, res, next) {
       await createProgressRecordForUser(user.id);
     }
 
+    if (user.status === 'banned') {
+      return res.status(403).json({ error: 'Your account has been banned.' });
+    }
+
     const token = jwt.sign(
-      { id: user.id },
+      { id: user.id, role: user.role || 'user' },
       process.env.JWT_SECRET || 'default_jwt_secret',
       { expiresIn: '1h' }
     );
 
-    res.json({
-      data: {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-      },
-    });
+    res.json(buildAuthPayload(user, token));
   } catch (err) {
     next(err);
   }

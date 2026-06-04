@@ -8,48 +8,54 @@ const axiosClient = axios.create({
   withCredentials: true,
 });
 
-// Interceptor for Request
 axiosClient.interceptors.request.use(
   (config) => {
-    // Lấy token từ localStorage (phù hợp với login API hiện tại)
     let token = localStorage.getItem('token');
+
     if (!token) {
       const userStr = localStorage.getItem('user');
       if (userStr) {
         try {
           const userObj = JSON.parse(userStr);
           token = userObj?.token || userObj?.stsTokenManager?.accessToken;
-        } catch (e) {
-          console.error('Error parsing user object from localStorage:', e);
+        } catch (error) {
+          console.error('Error parsing user object from localStorage:', error);
         }
       }
     }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Interceptor for Response
 axiosClient.interceptors.response.use(
   (response) => {
     if (response && response.data) {
-      // API của bạn thường trả về { data: ... }
       return response.data.data !== undefined ? response.data.data : response.data;
     }
+
     return response;
   },
   (error) => {
     if (error.response && error.response.status === 401) {
-      console.warn('Unauthorized! Xóa token và điều hướng về trang đăng nhập.');
+      console.warn('Unauthorized request. Clearing local session and redirecting to login.');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Có thể thêm code auto redirect: window.location.href = '/login';
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:unauthorized'));
+
+        if (window.location.pathname !== '/login') {
+          window.location.assign('/login');
+        }
+      }
     }
+
     return Promise.reject(error);
   }
 );

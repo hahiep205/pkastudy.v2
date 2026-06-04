@@ -56,10 +56,7 @@ export default function LandingPage() {
             <header className="hero" id="hero-section">
                 <div className="hero-left">
                     <div className="lp-eyebrow lp-eyebrow-blue"><span style={{ backgroundColor: 'var(--blue)', color: '#fff', borderRadius: '10px', padding: '2px 7px', fontSize: '12px', fontWeight: 'bold' }}>New</span> Học thử miễn phí ngay!</div>
-                    <h1 className="be-vietnam-pro-extrabold">Học và ghi nhớ từ vựng hiệu quả cùng <span className="name-logo">pkastudy</span> ngay hôm nay!</h1>
-                    <p>
-                        Học từ vựng TOEIC qua bộ bài học theo chủ đề, phát âm chuẩn, flashcard trực quan, mini-game và trợ lý AI luôn sẵn sàng hỗ trợ.
-                    </p>
+                    <h1 className="be-vietnam-pro-extrabold">Học từ vựng và ôn luyện TOEIC hiệu quả cùng <span className="name-logo">pkastudy</span> ngay hôm nay!</h1>
                     <p>
                         Học từ vựng TOEIC theo chủ đề, kết hợp luyện tập kỹ năng và làm đề để duy trì nhịp học ổn định mỗi ngày.
                     </p>

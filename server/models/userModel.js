@@ -4,7 +4,17 @@ const pool = require('../db');
 
 async function getUserByEmail(email) {
   const [rows] = await pool.query(
-    'SELECT id, email, password_hash AS passwordHash, name FROM Users WHERE email = ?',
+    `SELECT
+      id,
+      email,
+      password_hash AS passwordHash,
+      name,
+      role,
+      status,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM Users
+    WHERE email = ?`,
     [email]
   );
   return rows[0] || null;
@@ -13,13 +23,15 @@ async function getUserByEmail(email) {
 async function createUser({ email, password, name }) {
   const passwordHash = await bcrypt.hash(password, 10);
   const [result] = await pool.query(
-    'INSERT INTO Users (email, password_hash, name) VALUES (?, ?, ?)',
-    [email, passwordHash, name]
+    'INSERT INTO Users (email, password_hash, name, role, status) VALUES (?, ?, ?, ?, ?)',
+    [email, passwordHash, name, 'user', 'active']
   );
   return {
     id: result.insertId,
     email,
     name,
+    role: 'user',
+    status: 'active',
   };
 }
 
@@ -27,14 +39,35 @@ async function createUserFromGoogle({ email, name }) {
   const randomPassword = crypto.randomBytes(16).toString('hex');
   const passwordHash = await bcrypt.hash(randomPassword, 10);
   const [result] = await pool.query(
-    'INSERT INTO Users (email, password_hash, name) VALUES (?, ?, ?)',
-    [email, passwordHash, name]
+    'INSERT INTO Users (email, password_hash, name, role, status) VALUES (?, ?, ?, ?, ?)',
+    [email, passwordHash, name, 'user', 'active']
   );
   return {
     id: result.insertId,
     email,
     name,
+    role: 'user',
+    status: 'active',
   };
+}
+
+async function getUserAuthById(userId) {
+  const [rows] = await pool.query(
+    `SELECT
+      id,
+      email,
+      name,
+      role,
+      status,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM Users
+    WHERE id = ?
+    LIMIT 1`,
+    [userId]
+  );
+
+  return rows[0] || null;
 }
 
 async function createProgressRecordForUser(userId) {
@@ -48,5 +81,6 @@ module.exports = {
   getUserByEmail,
   createUser,
   createUserFromGoogle,
+  getUserAuthById,
   createProgressRecordForUser,
 };

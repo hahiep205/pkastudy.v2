@@ -1,12 +1,35 @@
 import { createContext } from 'react';
 
-export const guestUser = { name: 'Guest User', role: 'Tài khoản khách' };
+export const guestUser = {
+    id: null,
+    name: 'Guest User',
+    email: null,
+    role: 'guest',
+    status: 'active',
+    token: null,
+};
+
 export const AuthContext = createContext();
+
+export function normalizeUser(user) {
+    if (!user || typeof user !== 'object') {
+        return guestUser;
+    }
+
+    return {
+        id: user.id ?? null,
+        name: user.name || guestUser.name,
+        email: user.email || null,
+        role: user.role || 'user',
+        status: user.status || 'active',
+        token: user.token || null,
+    };
+}
 
 export function getInitialUser() {
     try {
         const storedUser = localStorage.getItem('user');
-        return storedUser ? JSON.parse(storedUser) : guestUser;
+        return storedUser ? normalizeUser(JSON.parse(storedUser)) : guestUser;
     } catch {
         return guestUser;
     }

@@ -48,6 +48,25 @@ DB_NAME=pkastudy
 
 Nếu MySQL có mật khẩu thì sửa `DB_PASS` cho đúng.
 
+## 2.1. Migration cho manager/admin phase 1
+
+Nếu database đã được tạo từ trước, chạy thêm migration:
+
+- [server/sql/migration-admin-phase1.sql](C:/Users/hahie/OneDrive/Desktop/pkastudy/pkastudy/server/sql/migration-admin-phase1.sql)
+
+Migration này thêm:
+
+- `Users.role`
+- `Users.status`
+- `Courses.thumbnail_url`
+
+Sau đó có thể nâng quyền một tài khoản có sẵn thành admin:
+
+```powershell
+cd C:\path\to\pkastudy\server
+npm run make-admin -- admin@example.com
+```
+
 ## 3. Tạo database và import schema
 
 Tạo database `pkastudy`, sau đó import file:
