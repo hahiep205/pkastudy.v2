@@ -1,4 +1,5 @@
 const { getProgressByUserId, updateStreak, updateXPAndLevel, getLeaderboard } = require('../models/progressModel');
+const { createVocabActivityLog, normalizeVocabActivityMode } = require('../models/vocabActivityModel');
 
 async function fetchUserProgress(userId) {
   return getProgressByUserId(userId);
@@ -49,9 +50,20 @@ async function fetchLeaderboard(limit = 10) {
   return getLeaderboard(limit);
 }
 
+async function recordVocabActivityService(userId, mode) {
+  const normalizedMode = normalizeVocabActivityMode(mode);
+  if (!normalizedMode) {
+    throw Object.assign(new Error('Invalid vocabulary activity mode'), { status: 400 });
+  }
+
+  await checkAndUpdateStreak(userId);
+  return createVocabActivityLog(userId, normalizedMode);
+}
+
 module.exports = {
   fetchUserProgress,
   checkAndUpdateStreak,
   addXpService,
   fetchLeaderboard,
+  recordVocabActivityService,
 };

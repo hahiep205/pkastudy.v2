@@ -23,6 +23,7 @@ import {
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
+import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
 
 const VOCAB_GAMES = [
   { id: 'quiz', name: 'Trắc nghiệm', icon: '🎯', desc: '4 đáp án, chọn nghĩa đúng', color: '#6366f1' },
@@ -45,6 +46,7 @@ function trackStudySessionComplete(modeName) {
   recordGamePlay(getCurrentStudyUserKey());
   if (modeName) {
     xpStudyModeComplete(modeName);
+    recordVocabularyActivity(modeName);
     recordStudyModeCompletion(modeName);
   }
 }

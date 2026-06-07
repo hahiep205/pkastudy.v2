@@ -6,7 +6,6 @@ import axiosClient from '../../utils/axiosClient';
 import { clearUserStudyLocalState } from '../../utils/userStorage';
 
 const PAGE_SIZE = 10;
-const ROOT_ADMIN_ID = 1;
 
 function formatNumber(value) {
     return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
@@ -315,7 +314,7 @@ export default function ManagerUsers() {
 
                             {!loading && items.map((item) => {
                                 const isCurrentUser = Number(currentUser?.id) === Number(item.id);
-                                const isRootAdmin = Number(item.id) === ROOT_ADMIN_ID;
+                                const isRootAdmin = Boolean(item.isRootAdmin);
                                 const roleActionKey = `role:${item.id}`;
                                 const statusActionKey = `status:${item.id}`;
                                 const resetStudyActionKey = `study-reset:${item.id}`;

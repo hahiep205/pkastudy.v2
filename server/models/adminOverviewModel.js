@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { ensureVocabActivityTable } = require('./vocabActivityModel');
 
 function formatDateKey(value) {
   if (typeof value === 'string') {
@@ -19,6 +20,8 @@ function formatShortLabel(value) {
 }
 
 async function getAdminOverviewSummary() {
+  await ensureVocabActivityTable();
+
   const [rows] = await pool.query(
     `SELECT
       (SELECT COUNT(*) FROM Users) AS totalUsers,
@@ -28,7 +31,8 @@ async function getAdminOverviewSummary() {
       (SELECT COUNT(*) FROM Toeic_Tests) AS totalToeicTests,
       (SELECT COUNT(*) FROM Toeic_Questions) AS totalToeicQuestions,
       (SELECT COUNT(*) FROM Toeic_Test_Records) AS totalToeicAttempts,
-      (SELECT COUNT(*) FROM SRS_Reviews) AS totalSrsReviews`
+      (SELECT COUNT(*) FROM SRS_Reviews) AS totalSrsReviews,
+      (SELECT COUNT(*) FROM Vocab_Activity_Logs) AS totalVocabModeCompletions`
   );
 
   const row = rows[0] || {};
@@ -42,6 +46,7 @@ async function getAdminOverviewSummary() {
     totalToeicQuestions: Number(row.totalToeicQuestions || 0),
     totalToeicAttempts: Number(row.totalToeicAttempts || 0),
     totalSrsReviews: Number(row.totalSrsReviews || 0),
+    totalVocabModeCompletions: Number(row.totalVocabModeCompletions || 0),
   };
 }
 

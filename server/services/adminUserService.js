@@ -1,5 +1,6 @@
 const {
   ROOT_ADMIN_ID,
+  isRootAdminUser,
   listAdminUsers,
   getAdminUserById,
   updateAdminUserRole,
@@ -83,7 +84,7 @@ async function changeAdminUserRole(actorUserId, userId, nextRole) {
     return user;
   }
 
-  if (parsedUserId === ROOT_ADMIN_ID) {
+  if (isRootAdminUser(user)) {
     throw Object.assign(new Error('Root admin account cannot change role.'), { status: 400 });
   }
 
@@ -126,7 +127,7 @@ async function changeAdminUserStatus(actorUserId, userId, nextStatus) {
     return user;
   }
 
-  if (parsedUserId === ROOT_ADMIN_ID) {
+  if (isRootAdminUser(user)) {
     throw Object.assign(new Error('Root admin account cannot be banned.'), { status: 400 });
   }
 
@@ -161,7 +162,9 @@ async function resetAdminUserStudy(actorUserId, userId) {
     throw Object.assign(new Error('User not found'), { status: 404 });
   }
 
-  if (parsedUserId === ROOT_ADMIN_ID && actorId !== ROOT_ADMIN_ID) {
+  const actorUser = await getAdminUserById(actorId);
+
+  if (isRootAdminUser(user) && !isRootAdminUser(actorUser)) {
     throw Object.assign(new Error('Only root admin can reset root admin study data.'), { status: 403 });
   }
 
@@ -181,7 +184,7 @@ async function removeAdminUser(actorUserId, userId) {
     throw Object.assign(new Error('User not found'), { status: 404 });
   }
 
-  if (parsedUserId === ROOT_ADMIN_ID) {
+  if (isRootAdminUser(user)) {
     throw Object.assign(new Error('Root admin account cannot be deleted.'), { status: 400 });
   }
 

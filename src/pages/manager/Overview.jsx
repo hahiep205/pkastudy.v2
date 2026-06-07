@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import axiosClient from '../../utils/axiosClient';
-import { getDashboardUserKey } from '../../utils/dashboardProgress';
-import { getStatsSummary } from '../../utils/userStats';
 
 function formatNumber(value) {
     return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
@@ -196,15 +194,7 @@ export default function ManagerOverview() {
     const [chartLoading, setChartLoading] = useState(true);
     const [summaryError, setSummaryError] = useState('');
     const [chartError, setChartError] = useState('');
-    const vocabStudySummary = useMemo(() => {
-        try {
-            const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
-            return getStatsSummary(getDashboardUserKey(storedUser));
-        } catch {
-            return getStatsSummary('guest');
-        }
-    }, []);
-    const totalVocabularyActivities = Number(summary?.totalSrsReviews || 0) + Number(vocabStudySummary?.totalGamesPlayed || 0);
+    const totalVocabularyActivities = Number(summary?.totalSrsReviews || 0) + Number(summary?.totalVocabModeCompletions || 0);
     const totalLearningActivities = Number(summary?.totalToeicAttempts || 0) + totalVocabularyActivities;
 
     useEffect(() => {

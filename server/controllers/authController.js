@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const admin = require('../firebase-admin');
 const {
   getUserByEmail,
+  getUserByLoginIdentifier,
   createUser,
   createUserFromGoogle,
   createProgressRecordForUser,
@@ -22,7 +23,7 @@ const sendCodeSchema = Joi.object({
 });
 
 const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string().trim().required(),
   password: Joi.string().required(),
 });
 
@@ -173,7 +174,7 @@ async function login(req, res, next) {
       });
     }
 
-    const user = await getUserByEmail(value.email);
+    const user = await getUserByLoginIdentifier(value.email);
     if (!user) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }

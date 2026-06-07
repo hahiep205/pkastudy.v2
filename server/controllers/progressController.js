@@ -1,4 +1,9 @@
-const { fetchUserProgress, addXpService, fetchLeaderboard } = require('../services/progressService');
+const {
+  fetchUserProgress,
+  addXpService,
+  fetchLeaderboard,
+  recordVocabActivityService,
+} = require('../services/progressService');
 
 async function getProgress(req, res, next) {
   try {
@@ -33,8 +38,19 @@ async function getLeaderboard(req, res, next) {
   }
 }
 
+async function recordVocabActivity(req, res, next) {
+  try {
+    const mode = req.body?.mode;
+    const result = await recordVocabActivityService(req.userId, mode);
+    res.status(201).json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getProgress,
   addXP,
   getLeaderboard,
+  recordVocabActivity,
 };

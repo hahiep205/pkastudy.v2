@@ -1,13 +1,13 @@
 const pool = require('../db');
 const ROOT_ADMIN_ID = 1;
+const { DEFAULT_ADMIN_EMAIL, ensureDefaultAdminUser } = require('./userModel');
 
 async function ensureRootAdminUser() {
-  await pool.query(
-    `UPDATE Users
-     SET role = 'admin', status = 'active'
-     WHERE id = ?`,
-    [ROOT_ADMIN_ID]
-  );
+  await ensureDefaultAdminUser();
+}
+
+function isRootAdminUser(user) {
+  return user?.email === DEFAULT_ADMIN_EMAIL;
 }
 
 async function listAdminUsers({ limit, offset, search, role, status }) {
@@ -69,6 +69,7 @@ async function listAdminUsers({ limit, offset, search, role, status }) {
       name: row.name,
       role: row.role,
       status: row.status,
+      isRootAdmin: isRootAdminUser(row),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       currentXp: Number(row.currentXp || 0),
@@ -112,6 +113,7 @@ async function getAdminUserById(userId) {
     name: row.name,
     role: row.role,
     status: row.status,
+    isRootAdmin: isRootAdminUser(row),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     currentXp: Number(row.currentXp || 0),
@@ -200,7 +202,9 @@ async function deleteAdminUser(userId) {
 
 module.exports = {
   ROOT_ADMIN_ID,
+  DEFAULT_ADMIN_EMAIL,
   ensureRootAdminUser,
+  isRootAdminUser,
   listAdminUsers,
   getAdminUserById,
   updateAdminUserRole,

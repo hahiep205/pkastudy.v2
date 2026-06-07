@@ -24,6 +24,7 @@ import {
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
+import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
 
 const SVG_ICONS = {
   VOICE: (
@@ -80,6 +81,7 @@ function trackStudySessionComplete(modeName) {
   if (!IMMERSIVE_MODES.has(modeName)) return;
   recordGamePlay(getCurrentStudyUserKey());
   xpStudyModeComplete(modeName);
+  recordVocabularyActivity(modeName);
   const normalizedMode = modeName === 'listen' ? 'listen' : modeName;
   recordStudyModeCompletion(normalizedMode);
 }

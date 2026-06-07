@@ -2,6 +2,11 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const pool = require('../db');
 
+const DEFAULT_ADMIN_EMAIL = 'admin@pkastudy.local';
+const DEFAULT_ADMIN_PASSWORD = 'admin';
+const DEFAULT_ADMIN_NAME = 'Admin';
+const DEFAULT_ADMIN_LOGIN_ALIAS = 'admin';
+
 async function getUserByEmail(email) {
   const [rows] = await pool.query(
     `SELECT
@@ -18,6 +23,17 @@ async function getUserByEmail(email) {
     [email]
   );
   return rows[0] || null;
+}
+
+async function getUserByLoginIdentifier(identifier) {
+  const normalized = typeof identifier === 'string' ? identifier.trim() : '';
+  if (!normalized) return null;
+
+  if (normalized.toLowerCase() === DEFAULT_ADMIN_LOGIN_ALIAS) {
+    return getUserByEmail(DEFAULT_ADMIN_EMAIL);
+  }
+
+  return getUserByEmail(normalized);
 }
 
 async function createUser({ email, password, name }) {
@@ -77,10 +93,41 @@ async function createProgressRecordForUser(userId) {
   );
 }
 
+async function ensureDefaultAdminUser() {
+  const existingUser = await getUserByEmail(DEFAULT_ADMIN_EMAIL);
+
+  if (existingUser) {
+    await createProgressRecordForUser(existingUser.id);
+    return existingUser;
+  }
+
+  const passwordHash = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
+  const [result] = await pool.query(
+    `INSERT INTO Users (email, password_hash, name, role, status)
+     VALUES (?, ?, ?, 'admin', 'active')`,
+    [DEFAULT_ADMIN_EMAIL, passwordHash, DEFAULT_ADMIN_NAME]
+  );
+
+  await createProgressRecordForUser(result.insertId);
+
+  return {
+    id: result.insertId,
+    email: DEFAULT_ADMIN_EMAIL,
+    name: DEFAULT_ADMIN_NAME,
+    role: 'admin',
+    status: 'active',
+  };
+}
+
 module.exports = {
   getUserByEmail,
+  getUserByLoginIdentifier,
   createUser,
   createUserFromGoogle,
   getUserAuthById,
   createProgressRecordForUser,
+  ensureDefaultAdminUser,
+  DEFAULT_ADMIN_EMAIL,
+  DEFAULT_ADMIN_PASSWORD,
+  DEFAULT_ADMIN_LOGIN_ALIAS,
 };
