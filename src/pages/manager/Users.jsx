@@ -3,6 +3,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import { useAuth } from '../../contexts/useAuth';
 import axiosClient from '../../utils/axiosClient';
+import { clearUserStudyLocalState } from '../../utils/userStorage';
 
 const PAGE_SIZE = 10;
 const ROOT_ADMIN_ID = 1;
@@ -129,6 +130,26 @@ export default function ManagerUsers() {
         });
     };
 
+    const openResetStudyAction = (targetUser) => {
+        setPendingAction({
+            type: 'study-reset',
+            user: targetUser,
+            title: 'Xóa toàn bộ dữ liệu học?',
+            message: `Tất cả tiến trình học, XP, streak, từ đã nhớ, lượt thi TOEIC, SRS và tài liệu cá nhân của ${targetUser.email} sẽ bị xóa để trở về trạng thái như mới đăng ký.`,
+            confirmLabel: 'Xóa dữ liệu học',
+        });
+    };
+
+    const openDeleteAccountAction = (targetUser) => {
+        setPendingAction({
+            type: 'account-delete',
+            user: targetUser,
+            title: 'Xóa tài khoản này?',
+            message: `Tài khoản ${targetUser.email} và toàn bộ dữ liệu liên quan sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác.`,
+            confirmLabel: 'Xóa tài khoản',
+        });
+    };
+
     const closePendingAction = () => setPendingAction(null);
 
     const refetchCurrentPage = async () => {
@@ -170,6 +191,25 @@ export default function ManagerUsers() {
                 });
             }
 
+            if (pendingAction.type === 'study-reset') {
+                await axiosClient.post(`/admin/users/${pendingAction.user.id}/reset-study`);
+                if (Number(currentUser?.id) === Number(pendingAction.user.id)) {
+                    clearUserStudyLocalState(currentUser);
+                }
+                setToast({
+                    message: `Đã xóa toàn bộ dữ liệu học của ${pendingAction.user.email}.`,
+                    type: 'success',
+                });
+            }
+
+            if (pendingAction.type === 'account-delete') {
+                await axiosClient.delete(`/admin/users/${pendingAction.user.id}`);
+                setToast({
+                    message: `Đã xóa tài khoản ${pendingAction.user.email}.`,
+                    type: 'success',
+                });
+            }
+
             closePendingAction();
             await refetchCurrentPage();
         } catch (err) {
@@ -197,7 +237,7 @@ export default function ManagerUsers() {
                     <div>
                         <h2>Người dùng</h2>
                         <p className="manager-muted-text">
-                            Theo dõi tài khoản học viên, tìm kiếm nhanh theo email hoặc tên và cập nhật quyền hay trạng thái truy cập.
+                            Theo dõi tài khoản học viên, tìm kiếm nhanh theo email hoặc tên và cập nhật quyền, trạng thái hay dữ liệu học tập.
                         </p>
                     </div>
                     <span className="manager-chip">{loading ? 'Đang tải' : paginationSummary}</span>
@@ -246,7 +286,6 @@ export default function ManagerUsers() {
                                 <th>ID</th>
                                 <th>Email</th>
                                 <th>Họ tên</th>
-                                <th>Level</th>
                                 <th>Ngày tạo</th>
                                 <th>Quyền</th>
                                 <th>Trạng thái</th>
@@ -279,6 +318,8 @@ export default function ManagerUsers() {
                                 const isRootAdmin = Number(item.id) === ROOT_ADMIN_ID;
                                 const roleActionKey = `role:${item.id}`;
                                 const statusActionKey = `status:${item.id}`;
+                                const resetStudyActionKey = `study-reset:${item.id}`;
+                                const deleteAccountActionKey = `account-delete:${item.id}`;
 
                                 return (
                                     <tr key={item.id}>
@@ -293,12 +334,11 @@ export default function ManagerUsers() {
                                                 {item.currentStreak ? `${item.currentStreak} ngày streak` : 'Chưa có streak'}
                                             </div>
                                         </td>
-                                        <td>Lv.{item.level}</td>
                                         <td>{formatDate(item.createdAt)}</td>
                                         <td><UserRolePill role={item.role} isRootAdmin={isRootAdmin} /></td>
                                         <td><UserStatusPill status={item.status} /></td>
                                         <td>
-                                            <div className="manager-table-actions">
+                                            <div className="manager-table-actions manager-user-actions">
                                                 <button
                                                     type="button"
                                                     className="manager-table-action"
@@ -309,9 +349,9 @@ export default function ManagerUsers() {
                                                         ? 'Đang lưu...'
                                                         : isRootAdmin
                                                             ? 'Admin root'
-                                                        : item.role === 'admin'
-                                                            ? 'Đổi thành người dùng'
-                                                            : 'Cấp quyền admin'}
+                                                            : item.role === 'admin'
+                                                                ? 'Đổi thành người dùng'
+                                                                : 'Cấp quyền admin'}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -323,9 +363,31 @@ export default function ManagerUsers() {
                                                         ? 'Đang lưu...'
                                                         : isRootAdmin
                                                             ? 'Không thể khóa'
-                                                        : item.status === 'banned'
-                                                            ? 'Mở khóa'
-                                                            : 'Khóa'}
+                                                            : item.status === 'banned'
+                                                                ? 'Mở khóa'
+                                                                : 'Khóa'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="manager-table-action is-danger"
+                                                    disabled={submittingKey === resetStudyActionKey}
+                                                    onClick={() => openResetStudyAction(item)}
+                                                >
+                                                    {submittingKey === resetStudyActionKey ? 'Đang xóa...' : 'Xóa dữ liệu học'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="manager-table-action is-danger"
+                                                    disabled={submittingKey === deleteAccountActionKey || isCurrentUser || isRootAdmin}
+                                                    onClick={() => openDeleteAccountAction(item)}
+                                                >
+                                                    {submittingKey === deleteAccountActionKey
+                                                        ? 'Đang xóa...'
+                                                        : isRootAdmin
+                                                            ? 'Không thể xóa root'
+                                                            : isCurrentUser
+                                                                ? 'Không thể tự xóa'
+                                                                : 'Xóa tài khoản'}
                                                 </button>
                                             </div>
                                         </td>

@@ -20,7 +20,9 @@ const {
   updateAdminToeicQuestion,
   deleteAdminToeicQuestion,
   getMaxToeicQuestionNumber,
+  getQuestionInsertConfig,
 } = require('../models/adminToeicModel');
+const pool = require('../db');
 
 function normalizeRequiredText(value, fieldName) {
   if (typeof value !== 'string' || !value.trim()) {
@@ -82,9 +84,13 @@ function normalizeQuestionNumber(value, fallback = null) {
   return parsed;
 }
 
-function normalizeOptions(value) {
+function getToeicOptionKeys(part) {
+  return Number(part) === 2 ? ['A', 'B', 'C'] : ['A', 'B', 'C', 'D'];
+}
+
+function normalizeOptions(value, part) {
   const raw = value || {};
-  const optionKeys = ['A', 'B', 'C', 'D'];
+  const optionKeys = getToeicOptionKeys(part);
   const next = {};
 
   optionKeys.forEach((key) => {
@@ -98,17 +104,110 @@ function normalizeOptions(value) {
   return next;
 }
 
-function normalizeCorrectAnswer(value) {
+function normalizeCorrectAnswer(value, part) {
   if (typeof value !== 'string') {
     throw Object.assign(new Error('Correct answer is required'), { status: 400 });
   }
 
   const answer = value.trim().toUpperCase();
-  if (!['A', 'B', 'C', 'D'].includes(answer)) {
-    throw Object.assign(new Error('Correct answer must be one of A, B, C, D'), { status: 400 });
+  const allowedAnswers = getToeicOptionKeys(part);
+  if (!allowedAnswers.includes(answer)) {
+    throw Object.assign(new Error(`Correct answer must be one of ${allowedAnswers.join(', ')}`), { status: 400 });
   }
 
   return answer;
+}
+
+function normalizeToeicImportRoot(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw Object.assign(new Error('Import payload must be an object'), { status: 400 });
+  }
+
+  if (payload.format !== 'pkastudy-toeic-test-export') {
+    throw Object.assign(new Error('Unsupported import format'), { status: 400 });
+  }
+
+  if (Number(payload.version) !== 1) {
+    throw Object.assign(new Error('Unsupported import version'), { status: 400 });
+  }
+
+  return payload;
+}
+
+function normalizeImportedToeicGroup(payload, index) {
+  const groupRef = normalizeRequiredText(payload?.groupRef, `Group ref #${index + 1}`);
+
+  return {
+    groupRef,
+    part: normalizePart(payload?.part),
+    audioUrl: normalizeOptionalMediaUrl(payload?.audioUrl, 'Audio URL'),
+    imageUrl: normalizeOptionalMediaUrl(payload?.imageUrl, 'Image URL'),
+    passageText: normalizeOptionalText(payload?.passageText),
+  };
+}
+
+function normalizeImportedToeicQuestion(payload, index, allowedGroupRefs) {
+  const part = normalizePart(payload?.part);
+  const groupRef = payload?.groupRef === undefined || payload?.groupRef === null || payload?.groupRef === ''
+    ? null
+    : normalizeRequiredText(payload?.groupRef, `Question #${index + 1} group ref`);
+
+  if (groupRef && !allowedGroupRefs.has(groupRef)) {
+    throw Object.assign(new Error(`Question #${index + 1} references unknown groupRef "${groupRef}"`), { status: 400 });
+  }
+
+  return {
+    groupRef,
+    questionNumber: normalizeQuestionNumber(payload?.questionNumber, index + 1),
+    part,
+    questionText: normalizeOptionalText(payload?.questionText),
+    options: normalizeOptions(payload?.options, part),
+    correctAnswer: normalizeCorrectAnswer(payload?.correctAnswer, part),
+    explanation: normalizeOptionalText(payload?.explanation),
+    audioUrl: normalizeOptionalMediaUrl(payload?.audioUrl, 'Audio URL'),
+    imageUrl: normalizeOptionalMediaUrl(payload?.imageUrl, 'Image URL'),
+  };
+}
+
+function normalizeImportedToeicPayload(payload) {
+  const root = normalizeToeicImportRoot(payload);
+  const testPayload = root.test;
+  if (!testPayload || typeof testPayload !== 'object' || Array.isArray(testPayload)) {
+    throw Object.assign(new Error('Import file is missing test data'), { status: 400 });
+  }
+
+  const title = normalizeRequiredText(testPayload?.title, 'Test title');
+  const description = normalizeOptionalText(testPayload?.description);
+
+  if (!Array.isArray(root.groups)) {
+    throw Object.assign(new Error('Import file is missing groups array'), { status: 400 });
+  }
+
+  if (!Array.isArray(root.questions)) {
+    throw Object.assign(new Error('Import file is missing questions array'), { status: 400 });
+  }
+
+  const groups = root.groups.map((group, index) => normalizeImportedToeicGroup(group, index));
+  const seenGroupRefs = new Set();
+  groups.forEach((group) => {
+    if (seenGroupRefs.has(group.groupRef)) {
+      throw Object.assign(new Error(`Duplicate groupRef "${group.groupRef}" in import file`), { status: 400 });
+    }
+    seenGroupRefs.add(group.groupRef);
+  });
+
+  const questions = root.questions.map((question, index) =>
+    normalizeImportedToeicQuestion(question, index, seenGroupRefs)
+  );
+
+  return {
+    test: {
+      title,
+      description,
+    },
+    groups,
+    questions,
+  };
 }
 
 async function ensureToeicTestExists(testId) {
@@ -173,6 +272,117 @@ async function deleteAdminToeicTestEntry(testId) {
   const existing = await ensureToeicTestExists(parsedTestId);
   await deleteAdminToeicTest(parsedTestId);
   return { success: true, deleted: existing };
+}
+
+async function exportAdminToeicTestEntry(testId) {
+  const parsedTestId = normalizePositiveId(testId, 'test id');
+  const test = await ensureToeicTestExists(parsedTestId);
+  const groups = await listAdminToeicGroupsByTestId(parsedTestId);
+  const questionsResult = await listAdminToeicQuestionsByTestId({
+    testId: parsedTestId,
+    limit: 10000,
+    offset: 0,
+    search: '',
+    part: null,
+    groupId: null,
+  });
+
+  const groupRefMap = new Map();
+  groups.forEach((group, index) => {
+    groupRefMap.set(Number(group.id), `group-${index + 1}`);
+  });
+
+  return {
+    format: 'pkastudy-toeic-test-export',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    source: {
+      app: 'pkastudy',
+      entity: 'toeic-test',
+    },
+    test: {
+      title: test.title,
+      description: test.description,
+    },
+    groups: groups.map((group) => ({
+      groupRef: groupRefMap.get(Number(group.id)),
+      part: group.part,
+      audioUrl: group.audioUrl,
+      imageUrl: group.imageUrl,
+      passageText: group.passageText,
+    })),
+    questions: (questionsResult.items || []).map((question) => ({
+      groupRef: question.groupId ? groupRefMap.get(Number(question.groupId)) || null : null,
+      questionNumber: question.questionNumber,
+      part: question.part,
+      questionText: question.questionText,
+      options: question.options,
+      correctAnswer: question.correctAnswer,
+      explanation: question.explanation,
+      audioUrl: question.audioUrl,
+      imageUrl: question.imageUrl,
+    })),
+  };
+}
+
+async function importAdminToeicTestEntry(payload) {
+  const normalized = normalizeImportedToeicPayload(payload);
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [testResult] = await connection.query(
+      'INSERT INTO Toeic_Tests (title, description) VALUES (?, ?)',
+      [normalized.test.title, normalized.test.description],
+    );
+
+    const groupIdByRef = new Map();
+    for (const group of normalized.groups) {
+      const [groupResult] = await connection.query(
+        `INSERT INTO Toeic_Question_Groups (test_id, part, audio_url, image_url, passage_text)
+         VALUES (?, ?, ?, ?, ?)`,
+        [testResult.insertId, group.part, group.audioUrl, group.imageUrl, group.passageText],
+      );
+      groupIdByRef.set(group.groupRef, groupResult.insertId);
+    }
+
+    const insertConfig = await getQuestionInsertConfig();
+    for (const question of normalized.questions) {
+      await connection.query(
+        `INSERT INTO Toeic_Questions (${insertConfig.columns})
+         VALUES (${insertConfig.placeholders})`,
+        insertConfig.buildParams({
+          testId: testResult.insertId,
+          groupId: question.groupRef ? groupIdByRef.get(question.groupRef) || null : null,
+          questionNumber: question.questionNumber,
+          part: question.part,
+          questionText: question.questionText,
+          options: question.options,
+          correctAnswer: question.correctAnswer,
+          explanation: question.explanation,
+          audioUrl: question.audioUrl,
+          imageUrl: question.imageUrl,
+        }),
+      );
+    }
+
+    await connection.commit();
+
+    const importedTest = await fetchAdminToeicTest(testResult.insertId);
+    return {
+      test: importedTest,
+      importedCounts: {
+        groups: normalized.groups.length,
+        questions: normalized.questions.length,
+      },
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function fetchAdminToeicGroups(testId) {
@@ -284,8 +494,8 @@ async function createAdminToeicQuestionEntry(testId, payload) {
     questionNumber,
     part,
     questionText: normalizeOptionalText(payload?.questionText),
-    options: normalizeOptions(payload?.options),
-    correctAnswer: normalizeCorrectAnswer(payload?.correctAnswer),
+    options: normalizeOptions(payload?.options, part),
+    correctAnswer: normalizeCorrectAnswer(payload?.correctAnswer, part),
     explanation: normalizeOptionalText(payload?.explanation),
     audioUrl: normalizeOptionalMediaUrl(payload?.audioUrl, 'Audio URL'),
     imageUrl: normalizeOptionalMediaUrl(payload?.imageUrl, 'Image URL'),
@@ -312,8 +522,8 @@ async function updateAdminToeicQuestionEntry(questionId, payload) {
     questionNumber,
     part,
     questionText: normalizeOptionalText(payload?.questionText),
-    options: normalizeOptions(payload?.options),
-    correctAnswer: normalizeCorrectAnswer(payload?.correctAnswer),
+    options: normalizeOptions(payload?.options, part),
+    correctAnswer: normalizeCorrectAnswer(payload?.correctAnswer, part),
     explanation: normalizeOptionalText(payload?.explanation),
     audioUrl: normalizeOptionalMediaUrl(payload?.audioUrl, 'Audio URL'),
     imageUrl: normalizeOptionalMediaUrl(payload?.imageUrl, 'Image URL'),
@@ -336,6 +546,8 @@ async function deleteAdminToeicQuestionEntry(questionId) {
 module.exports = {
   fetchAdminToeicTests,
   fetchAdminToeicTest,
+  exportAdminToeicTestEntry,
+  importAdminToeicTestEntry,
   createAdminToeicTestEntry,
   updateAdminToeicTestEntry,
   deleteAdminToeicTestEntry,

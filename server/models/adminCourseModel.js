@@ -108,6 +108,84 @@ async function getAdminCourseById(courseId) {
   return rows[0] ? mapAdminCourseRow(rows[0]) : null;
 }
 
+function mapAdminCourseExportTopicRow(row) {
+  return {
+    id: row.id,
+    courseId: row.courseId,
+    slug: row.slug,
+    title: row.title,
+    description: row.description,
+    sortOrder: Number(row.sortOrder || 0),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function mapAdminCourseExportFlashcardRow(row) {
+  return {
+    id: row.id,
+    topicId: row.topicId,
+    word: row.word,
+    transcription: row.transcription,
+    meaning: row.meaning,
+    wordType: row.wordType,
+    example: row.example,
+    exampleVi: row.exampleVi,
+    language: row.language || 'en',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+async function getAdminCourseExportById(courseId) {
+  const course = await getAdminCourseById(courseId);
+  if (!course) return null;
+
+  const [topicRows] = await pool.query(
+    `SELECT
+      t.id,
+      t.course_id AS courseId,
+      t.slug,
+      t.title,
+      t.description,
+      t.sort_order AS sortOrder,
+      t.created_at AS createdAt,
+      t.updated_at AS updatedAt
+    FROM Topics t
+    WHERE t.course_id = ?
+      AND COALESCE(t.is_custom, 0) = 0
+    ORDER BY t.sort_order ASC, t.id ASC`,
+    [courseId]
+  );
+
+  const [flashcardRows] = await pool.query(
+    `SELECT
+      f.id,
+      f.topic_id AS topicId,
+      f.word,
+      f.transcription,
+      f.meaning,
+      f.word_type AS wordType,
+      f.example,
+      f.example_vi AS exampleVi,
+      f.language,
+      f.created_at AS createdAt,
+      f.updated_at AS updatedAt
+    FROM Flashcards f
+    INNER JOIN Topics t ON t.id = f.topic_id
+    WHERE t.course_id = ?
+      AND COALESCE(t.is_custom, 0) = 0
+    ORDER BY t.sort_order ASC, t.id ASC, f.word ASC, f.id ASC`,
+    [courseId]
+  );
+
+  return {
+    ...course,
+    topics: topicRows.map(mapAdminCourseExportTopicRow),
+    flashcards: flashcardRows.map(mapAdminCourseExportFlashcardRow),
+  };
+}
+
 async function getAdminCourseBySlug(slug) {
   const [rows] = await pool.query(
     `SELECT id, slug
@@ -153,6 +231,7 @@ async function deleteAdminCourse(courseId) {
 module.exports = {
   listAdminCourses,
   getAdminCourseById,
+  getAdminCourseExportById,
   getAdminCourseBySlug,
   createAdminCourse,
   updateAdminCourse,

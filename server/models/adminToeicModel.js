@@ -415,6 +415,7 @@ async function getMaxToeicQuestionNumber(testId) {
 }
 
 module.exports = {
+  getQuestionInsertConfig,
   listAdminToeicTests,
   getAdminToeicTestById,
   createAdminToeicTest,

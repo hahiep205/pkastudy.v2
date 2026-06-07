@@ -4,7 +4,6 @@ import {
     getSpeechLang,
 } from '../utils/studyModes';
 import { playCorrectSound, playIncorrectSound } from '../utils/feedbackAudio';
-import { xpQuizCorrect, xpQuizComplete } from '../utils/xpSystem';
 
 const EXIT_CLICK_SELECTOR = '.topbar, .sidebar, .mobile-nav, .sidebar-overlay';
 
@@ -33,6 +32,7 @@ export default function Quiz({
     words,
     allTopicWords,
     onSaveLearnedWords,
+    onSessionComplete,
     onExit,
     onBackToTopic,
     onStudyWrongWords,
@@ -112,8 +112,8 @@ export default function Quiz({
             
         setIsCompleted(true);
         sessionLockedRef.current = true;
-        xpQuizComplete(); // +30 XP hoàn thành quiz
         onSaveLearnedWords?.(correctWordIds);
+        onSessionComplete?.();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -122,7 +122,6 @@ export default function Quiz({
 
         if (choice.isCorrect) {
             playCorrectSound();
-            xpQuizCorrect(); // +10 XP quiz đúng
         } else {
             playIncorrectSound();
         }

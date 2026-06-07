@@ -5,6 +5,8 @@ const {
   updateAdminUserRole,
   updateAdminUserStatus,
   countAdmins,
+  resetAdminUserStudyData,
+  deleteAdminUser,
 } = require('../models/adminUserModel');
 const {
   parsePaginationQuery,
@@ -147,9 +149,69 @@ async function changeAdminUserStatus(actorUserId, userId, nextStatus) {
   return getAdminUserById(parsedUserId);
 }
 
+async function resetAdminUserStudy(actorUserId, userId) {
+  const parsedUserId = Number.parseInt(userId, 10);
+  if (!Number.isFinite(parsedUserId) || parsedUserId <= 0) {
+    throw Object.assign(new Error('Invalid user id'), { status: 400 });
+  }
+
+  const actorId = Number.parseInt(actorUserId, 10);
+  const user = await getAdminUserById(parsedUserId);
+  if (!user) {
+    throw Object.assign(new Error('User not found'), { status: 404 });
+  }
+
+  if (parsedUserId === ROOT_ADMIN_ID && actorId !== ROOT_ADMIN_ID) {
+    throw Object.assign(new Error('Only root admin can reset root admin study data.'), { status: 403 });
+  }
+
+  await resetAdminUserStudyData(parsedUserId);
+  return getAdminUserById(parsedUserId);
+}
+
+async function removeAdminUser(actorUserId, userId) {
+  const parsedUserId = Number.parseInt(userId, 10);
+  if (!Number.isFinite(parsedUserId) || parsedUserId <= 0) {
+    throw Object.assign(new Error('Invalid user id'), { status: 400 });
+  }
+
+  const actorId = Number.parseInt(actorUserId, 10);
+  const user = await getAdminUserById(parsedUserId);
+  if (!user) {
+    throw Object.assign(new Error('User not found'), { status: 404 });
+  }
+
+  if (parsedUserId === ROOT_ADMIN_ID) {
+    throw Object.assign(new Error('Root admin account cannot be deleted.'), { status: 400 });
+  }
+
+  if (actorId === parsedUserId) {
+    throw Object.assign(new Error('You cannot delete your own account.'), { status: 400 });
+  }
+
+  if (user.role === 'admin' && user.status === 'active') {
+    const activeAdminCount = await countAdmins({ status: 'active' });
+    if (activeAdminCount <= 1) {
+      throw Object.assign(new Error('At least one active admin account is required.'), { status: 400 });
+    }
+  }
+
+  const deleted = await deleteAdminUser(parsedUserId);
+  if (!deleted) {
+    throw Object.assign(new Error('User not found'), { status: 404 });
+  }
+
+  return {
+    id: parsedUserId,
+    email: user.email,
+  };
+}
+
 module.exports = {
   fetchAdminUsers,
   fetchAdminUser,
   changeAdminUserRole,
   changeAdminUserStatus,
+  resetAdminUserStudy,
+  removeAdminUser,
 };

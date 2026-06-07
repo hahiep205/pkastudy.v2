@@ -418,7 +418,7 @@ function GameOverModal({ isOpen, score, hearts, answered, correct, wrong, reason
 
 
 
-export default function FlappyBirdExperience({ topic, selectedBird = 'yellow', onBackGallery, onBackToPicker }) {
+export default function FlappyBirdExperience({ topic, selectedBird = 'yellow', onBackGallery, onBackToPicker, onSessionComplete }) {
     const { user } = useAuth();
     const [phase, setPhase] = useState('playing');
     const [activeTopic, setActiveTopic] = useState(topic || null);
@@ -429,6 +429,7 @@ export default function FlappyBirdExperience({ topic, selectedBird = 'yellow', o
     const [hasRunStarted, setHasRunStarted] = useState(false);
     const [timeLeft, setTimeLeft] = useState(QUESTION_TIME);
     const [challengeValue, setChallengeValue] = useState('');
+    const completionRecordedRef = useRef(false);
     const worldRef = useRef(buildInitialWorld());
     const animationRef = useRef(null);
     const lastFrameRef = useRef(0);
@@ -460,6 +461,7 @@ export default function FlappyBirdExperience({ topic, selectedBird = 'yellow', o
         setChallengeValue('');
         setHasRunStarted(false);
         setTimeLeft(QUESTION_TIME);
+        completionRecordedRef.current = false;
     };
 
     useEffect(() => {
@@ -489,7 +491,6 @@ export default function FlappyBirdExperience({ topic, selectedBird = 'yellow', o
 
         setActiveTopic(topic);
         resetRun();
-        recordGamePlay(getDashboardUserKey(user));
         setPhase('playing');
     };
 
@@ -499,6 +500,11 @@ export default function FlappyBirdExperience({ topic, selectedBird = 'yellow', o
         setWorldSnapshot(snapshotWorld(world));
         setActiveChallenge(null);
         setPhase('gameover');
+        if (!completionRecordedRef.current) {
+            completionRecordedRef.current = true;
+            recordGamePlay(getDashboardUserKey(user));
+            onSessionComplete?.();
+        }
         window.speechSynthesis?.cancel();
     };
 

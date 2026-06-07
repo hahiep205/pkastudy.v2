@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { buildFlashcardDeck, getSpeechLang } from '../utils/studyModes';
-import { xpFlashcardView, xpTopicComplete } from '../utils/xpSystem';
 
 const LANGUAGE_LABELS = {
     en: 'Tiếng Anh',
@@ -57,6 +56,7 @@ export default function Flashcard({
     topicLang = 'en',
     words,
     onSaveLearnedWords,
+    onSessionComplete,
     onExit,
     onBackToTopic,
     onStartQuiz,
@@ -124,8 +124,8 @@ export default function Flashcard({
         setIsFlipped(false);
         sessionLockedRef.current = true;
         
-        xpTopicComplete(); // +50 XP hoàn thành chủ đề
         onSaveLearnedWords?.(words.map((w) => w.id)); // Add all words to SRS
+        onSessionComplete?.();
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -153,7 +153,6 @@ export default function Flashcard({
         setIsFlipped((prev) => {
             if (!prev) {
                 setHasFlippedOnce(true);
-                xpFlashcardView(); // +5 XP mỗi lần lật thẻ
             }
             return !prev;
         });

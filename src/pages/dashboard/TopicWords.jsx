@@ -13,7 +13,8 @@ import Quiz from '../../components/Quiz';
 import Listening from '../../components/Listening';
 import Typing from '../../components/Typing';
 import Match from '../../components/Match';
-import { recordFlashcardSessionProgress } from '../../utils/dashboardProgress';
+import { getDashboardUserKey, recordFlashcardSessionProgress, recordStudyModeCompletion } from '../../utils/dashboardProgress';
+import { recordGamePlay } from '../../utils/userStats';
 import { getSpeechLang } from '../../utils/studyModes';
 import { addToSrs, removeFromSrs, reviewItem } from '../../utils/srsStorage';
 import {
@@ -22,6 +23,7 @@ import {
   mapReviewRatingToQualityScore,
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
+import { xpStudyModeComplete } from '../../utils/xpSystem';
 
 const SVG_ICONS = {
   VOICE: (
@@ -63,6 +65,23 @@ const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match
 
 function getWordKey(word) {
   return word.id ?? word.flashcardId;
+}
+
+function getCurrentStudyUserKey() {
+  try {
+    const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    return getDashboardUserKey(storedUser);
+  } catch {
+    return 'guest';
+  }
+}
+
+function trackStudySessionComplete(modeName) {
+  if (!IMMERSIVE_MODES.has(modeName)) return;
+  recordGamePlay(getCurrentStudyUserKey());
+  xpStudyModeComplete(modeName);
+  const normalizedMode = modeName === 'listen' ? 'listen' : modeName;
+  recordStudyModeCompletion(normalizedMode);
 }
 
 export default function TopicWords() {
@@ -329,6 +348,7 @@ const activeWords = !studyWordIds
     words: activeWords,
     allTopicWords: words,
     initialLearnedWordIds,
+    onSessionComplete: () => trackStudySessionComplete(activeMode),
     onExit: () => {
       setActiveMode(null);
       setStudyWordIds(null);

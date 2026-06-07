@@ -1,10 +1,11 @@
 import { recordUserStatsSnapshot } from './userStats';
 import { xpStreakDaily } from './xpSystem';
 import axiosClient from './axiosClient';
+import { getStoredUser, getUserStorageOwner } from './userStorage';
 
 const STORAGE_KEY = 'pka_dashboard_progress_v1';
 const UPDATE_EVENT = 'pka-dashboard-progress-updated';
-const USER_STORAGE_KEY = 'user';
+const VOCAB_DAILY_MODES = ['flashcard', 'quiz', 'listen', 'typing', 'match', 'flappy-bird'];
 
 const TASK_TEMPLATES = [
     {
@@ -16,23 +17,21 @@ const TASK_TEMPLATES = [
         exp: 10,
     },
     {
-        id: 'learn-ten-words',
-        title: 'Học thuộc 10 từ mới',
-        desc: 'Đánh dấu đã thuộc đủ 10 từ trong ngày · +20 EXP',
+        id: 'vocab-modes',
+        title: 'Học từ vựng',
+        desc: 'Hoàn thành Flashcard, Quiz, Listening, Typing, Match và Flappy Bird · +24 EXP',
         btnText: 'Làm ngay',
-        page: 'courses',
-        exp: 20,
+        page: 'games',
+        exp: 24,
         autoComplete: true,
     },
     {
-        id: 'game-session',
-        title: 'Hoàn thành 5 lần chơi Flashcard',
-        desc: '0/5 lần chơi Flashcard hôm nay · +25 EXP',
+        id: 'toeic-fulltest',
+        title: 'Hoàn thành 1 bài TOEIC Full Test',
+        desc: 'Đạt tối thiểu 200 điểm trong 1 bài TOEIC Full Test hôm nay · +50 EXP',
         btnText: 'Làm ngay',
-        page: 'courses',
-        exp: 25,
-        targetCount: 5,
-        currentCount: 0,
+        page: 'toeic',
+        exp: 50,
         autoComplete: true,
     },
 ];
@@ -46,8 +45,7 @@ export function getTodayKey(date = new Date()) {
 }
 
 export function getDashboardUserKey(user) {
-    if (!user || user.name === 'Guest User') return 'guest';
-    return `user:${String(user.name).trim().toLowerCase()}`;
+    return getUserStorageOwner(user);
 }
 
 function createDailyTasks() {
@@ -81,6 +79,7 @@ function createDefaultProgress() {
         lastStreakDate: null,
         learnedWordIdsToday: [],
         learnedWordEventIdsToday: [],
+        completedStudyModesToday: [],
         tasks: createDailyTasks(),
     };
 }
@@ -96,6 +95,9 @@ function normalizeProgress(progress) {
         lastStreakDate: typeof safe.lastStreakDate === 'string' ? safe.lastStreakDate : null,
         learnedWordIdsToday: Array.isArray(safe.learnedWordIdsToday) ? safe.learnedWordIdsToday : [],
         learnedWordEventIdsToday: Array.isArray(safe.learnedWordEventIdsToday) ? safe.learnedWordEventIdsToday : [],
+        completedStudyModesToday: Array.isArray(safe.completedStudyModesToday)
+            ? safe.completedStudyModesToday.filter((mode) => VOCAB_DAILY_MODES.includes(mode))
+            : [],
         tasks: Array.isArray(safe.tasks) && safe.tasks.length
             ? TASK_TEMPLATES.map((template) => {
                 const existing = safe.tasks.find((task) => task.id === template.id);
@@ -127,6 +129,7 @@ export function ensureTodayProgress(progress) {
         dailyXp: 0,
         learnedWordIdsToday: [],
         learnedWordEventIdsToday: [],
+        completedStudyModesToday: [],
         tasks: createDailyTasks(),
     };
 }
@@ -161,7 +164,7 @@ function applyDashboardTaskCompletion(current, taskId) {
         streak += 1;
         lastStreakDate = today;
         streakGained = true;
-        xpStreakDaily(); // +20 XP streak bonus
+        xpStreakDaily();
     }
 
     return {
@@ -193,30 +196,30 @@ export async function syncDashboardProgressWithServer(userKey = 'guest') {
     if (!user || (!user.token && !user.id)) return;
     try {
         const res = await axiosClient.get('/progress');
-        if (res) {
-            const serverData = res;
-            const map = getStorageMap();
-            let progress = ensureTodayProgress(map[userKey] || createDefaultProgress());
-            
-            let updated = false;
-            if (serverData.current_xp > progress.totalXp) {
-                progress.totalXp = serverData.current_xp;
-                updated = true;
-            }
-            if (serverData.current_streak > progress.streak) {
-                progress.streak = serverData.current_streak;
-                updated = true;
-            }
-            
-            if (updated) {
-                map[userKey] = progress;
-                saveStorageMap(map);
-                recordUserStatsSnapshot(userKey, progress);
-                window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: { userKey, progress } }));
-            }
+        if (!res) return;
+
+        const serverData = res;
+        const map = getStorageMap();
+        const progress = ensureTodayProgress(map[userKey] || createDefaultProgress());
+
+        let updated = false;
+        if (serverData.current_xp > progress.totalXp) {
+            progress.totalXp = serverData.current_xp;
+            updated = true;
+        }
+        if (serverData.current_streak > progress.streak) {
+            progress.streak = serverData.current_streak;
+            updated = true;
+        }
+
+        if (updated) {
+            map[userKey] = progress;
+            saveStorageMap(map);
+            recordUserStatsSnapshot(userKey, progress);
+            window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: { userKey, progress } }));
         }
     } catch (e) {
-        console.error("Failed to sync dashboard progress:", e);
+        console.error('Failed to sync dashboard progress:', e);
     }
 }
 
@@ -252,12 +255,7 @@ export function completeDashboardTask(userKey = 'guest', taskId) {
 }
 
 function getCurrentStoredUser() {
-    try {
-        const storedUser = localStorage.getItem(USER_STORAGE_KEY);
-        return storedUser ? JSON.parse(storedUser) : { name: 'Guest User' };
-    } catch {
-        return { name: 'Guest User' };
-    }
+    return getStoredUser() || { name: 'Guest User' };
 }
 
 function getCurrentDashboardUserKey() {
@@ -270,6 +268,42 @@ function finalizeTaskProgress(userKey, nextProgress) {
     return {
         progress: savedProgress,
         learnedWordsCount: savedProgress.learnedWordIdsToday.length,
+    };
+}
+
+export function recordStudyModeCompletion(modeName) {
+    if (!VOCAB_DAILY_MODES.includes(modeName)) {
+        return {
+            progress: readDashboardProgress(getCurrentDashboardUserKey()),
+            expGained: 0,
+            streakGained: false,
+        };
+    }
+
+    const userKey = getCurrentDashboardUserKey();
+    const current = readDashboardProgress(userKey);
+    const completedModes = new Set(current.completedStudyModesToday || []);
+    completedModes.add(modeName);
+
+    let nextProgress = {
+        ...current,
+        completedStudyModesToday: Array.from(completedModes),
+    };
+    let expGained = 0;
+    let streakGained = false;
+
+    const vocabTask = nextProgress.tasks.find((task) => task.id === 'vocab-modes');
+    if (vocabTask && !vocabTask.isDone && VOCAB_DAILY_MODES.every((mode) => completedModes.has(mode))) {
+        const completed = applyDashboardTaskCompletion(nextProgress, 'vocab-modes');
+        nextProgress = completed.nextProgress;
+        expGained = completed.expGained;
+        streakGained = completed.streakGained;
+    }
+
+    return {
+        ...finalizeTaskProgress(userKey, nextProgress),
+        expGained,
+        streakGained,
     };
 }
 
@@ -321,6 +355,28 @@ export function recordFlashcardSessionProgress() {
     };
 }
 
+export function recordToeicFullTestProgress(totalScore) {
+    const safeScore = Number(totalScore || 0);
+    const userKey = getCurrentDashboardUserKey();
+    const current = readDashboardProgress(userKey);
+    const toeicTask = current.tasks.find((task) => task.id === 'toeic-fulltest');
+
+    if (!toeicTask || toeicTask.isDone || safeScore < 200) {
+        return {
+            ...finalizeTaskProgress(userKey, current),
+            expGained: 0,
+            streakGained: false,
+        };
+    }
+
+    const completed = applyDashboardTaskCompletion(current, 'toeic-fulltest');
+    return {
+        ...finalizeTaskProgress(userKey, completed.nextProgress),
+        expGained: completed.expGained,
+        streakGained: completed.streakGained,
+    };
+}
+
 export function syncRememberedWordProgress(previousRemembered = {}, nextRemembered = {}) {
     const userKey = getCurrentDashboardUserKey();
     const current = readDashboardProgress(userKey);
@@ -341,27 +397,16 @@ export function syncRememberedWordProgress(previousRemembered = {}, nextRemember
         if (!nextIds.has(id)) learnedToday.delete(id);
     });
 
-    let nextProgress = {
+    const nextProgress = {
         ...current,
         learnedWordIdsToday: Array.from(learnedToday),
         learnedWordEventIdsToday: Array.from(learnedEventsToday),
     };
 
-    const learnTask = nextProgress.tasks.find((task) => task.id === 'learn-ten-words');
-    let expGained = 0;
-    let streakGained = false;
-
-    if (learnTask && !learnTask.isDone && learnedToday.size >= 10) {
-        const completed = applyDashboardTaskCompletion(nextProgress, 'learn-ten-words');
-        nextProgress = completed.nextProgress;
-        expGained = completed.expGained;
-        streakGained = completed.streakGained;
-    }
-
     return {
         ...finalizeTaskProgress(userKey, nextProgress),
-        expGained,
-        streakGained,
+        expGained: 0,
+        streakGained: false,
     };
 }
 

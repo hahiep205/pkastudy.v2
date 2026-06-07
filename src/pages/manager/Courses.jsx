@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
@@ -6,6 +6,30 @@ import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
 
 const PAGE_SIZE = 8;
+
+function slugifyFilePart(value) {
+    return String(value || 'course')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .replace(/-{2,}/g, '-');
+}
+
+function downloadJsonFile(data, fileName) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json;charset=utf-8',
+    });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+}
 
 function createEmptyCourseForm() {
     return {
@@ -17,7 +41,15 @@ function createEmptyCourseForm() {
     };
 }
 
-function CourseFormModal({ isOpen, mode, form, onChange, onClose, onSubmit, submitting }) {
+function CourseFormModal({
+    isOpen,
+    mode,
+    form,
+    onChange,
+    onClose,
+    onSubmit,
+    submitting,
+}) {
     const isEdit = mode === 'edit';
 
     return (
@@ -32,7 +64,7 @@ function CourseFormModal({ isOpen, mode, form, onChange, onClose, onSubmit, subm
                     />
                 </label>
 
-                <label className="manager-field">
+                <label className={isEdit ? 'manager-field' : 'manager-field manager-field-full'}>
                     <span>Slug</span>
                     <input
                         value={form.slug}
@@ -95,6 +127,9 @@ export default function ManagerCourses() {
     const [editingCourse, setEditingCourse] = useState(null);
     const [pendingDelete, setPendingDelete] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [exportingCourseId, setExportingCourseId] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const importInputRef = useRef(null);
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
@@ -229,6 +264,62 @@ export default function ManagerCourses() {
         }
     };
 
+    const handleExportCourse = async (course) => {
+        if (!course?.id) return;
+
+        setExportingCourseId(course.id);
+        try {
+            const data = await axiosClient.get(`/admin/courses/${course.id}/export`);
+            const fileName = `${slugifyFilePart(course.slug || course.title)}.course-export.v1.json`;
+            downloadJsonFile(data, fileName);
+            setToast({ message: `Đã export khóa học ${course.title}.`, type: 'success' });
+        } catch (err) {
+            setToast({
+                message: err.response?.data?.error || err.message || 'Export khóa học thất bại.',
+                type: 'error',
+            });
+        } finally {
+            setExportingCourseId(null);
+        }
+    };
+
+    const handleImportButtonClick = () => {
+        importInputRef.current?.click();
+    };
+
+    const handleImportCourse = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        setImporting(true);
+        try {
+            const rawText = await file.text();
+            let payload;
+
+            try {
+                payload = JSON.parse(rawText);
+            } catch {
+                throw new Error('File JSON không hợp lệ.');
+            }
+
+            const data = await axiosClient.post('/admin/courses/import', payload);
+            setPage(1);
+            await refetchCourses(1);
+            setToast({
+                message: `Đã import khóa học ${data.course?.title || payload?.course?.title || file.name}.`,
+                type: 'success',
+            });
+        } catch (err) {
+            setToast({
+                message: err.response?.data?.error || err.message || 'Import khóa học thất bại.',
+                type: 'error',
+            });
+        } finally {
+            setImporting(false);
+        }
+    };
+
     return (
         <main className="manager-page">
             <section className="manager-panel">
@@ -239,9 +330,26 @@ export default function ManagerCourses() {
                             Quản lý khóa học, ảnh thumbnail, slug và cấu trúc nội dung cấp khóa học trong hệ thống.
                         </p>
                     </div>
-                    <button type="button" className="manager-primary-btn" onClick={openCreateModal}>
-                        Tạo khóa học
-                    </button>
+                    <div className="manager-head-actions">
+                        <input
+                            ref={importInputRef}
+                            type="file"
+                            accept=".json,application/json"
+                            className="manager-course-import-input"
+                            onChange={handleImportCourse}
+                        />
+                        <button
+                            type="button"
+                            className="manager-secondary-btn manager-course-import-btn"
+                            onClick={handleImportButtonClick}
+                            disabled={importing}
+                        >
+                            {importing ? 'Đang import...' : 'Import'}
+                        </button>
+                        <button type="button" className="manager-primary-btn" onClick={openCreateModal}>
+                            Tạo khóa học
+                        </button>
+                    </div>
                 </div>
 
                 <div className="manager-toolbar manager-toolbar-courses">
@@ -288,10 +396,8 @@ export default function ManagerCourses() {
                         <article key={course.id} className="manager-content-card">
                             <div className="manager-content-card-top">
                                 <div className="manager-content-main">
-                                    <span className="manager-content-label">Khóa học #{course.id}</span>
                                     <h3>{course.title}</h3>
                                 </div>
-                                <span className="manager-table-pill">{course.language}</span>
                             </div>
 
                             <div className="manager-course-thumbnail">
@@ -322,10 +428,18 @@ export default function ManagerCourses() {
 
                             <div className="manager-table-actions">
                                 <Link to={`/manager/courses/${course.id}/topics`} className="manager-inline-action">
-                                    Chủ đề và từ
+                                    Xem chi ti?t
                                 </Link>
                                 <button type="button" className="manager-table-action" onClick={() => openEditModal(course)}>
                                     Sửa
+                                </button>
+                                <button
+                                    type="button"
+                                    className="manager-table-action"
+                                    onClick={() => handleExportCourse(course)}
+                                    disabled={Number(exportingCourseId) === Number(course.id)}
+                                >
+                                    {Number(exportingCourseId) === Number(course.id) ? 'Đang export...' : 'Export'}
                                 </button>
                                 <button
                                     type="button"

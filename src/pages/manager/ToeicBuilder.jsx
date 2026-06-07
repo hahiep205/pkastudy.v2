@@ -30,6 +30,8 @@ function createEmptyQuestionForm() {
         explanation: '',
         audioUrl: '',
         imageUrl: '',
+        audioSource: '',
+        imageSource: '',
     };
 }
 
@@ -93,22 +95,26 @@ function QuestionFormModal({ isOpen, mode, form, groups, onChange, onClose, onSu
                     </select>
                 </label>
 
-                <label className="manager-field">
-                    <span>Nhóm câu hỏi</span>
-                    <select value={form.groupId} onChange={(event) => onChange('groupId', event.target.value)}>
-                        <option value="">Không thuộc nhóm</option>
-                        {groups.map((group) => (
-                            <option key={group.id} value={group.id}>
-                                Group #{group.id} - Part {group.part}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                {!isEdit ? (
+                    <label className="manager-field">
+                        <span>Nhóm câu hỏi</span>
+                        <select value={form.groupId} onChange={(event) => onChange('groupId', event.target.value)}>
+                            <option value="">Không thuộc nhóm</option>
+                            {groups.map((group) => (
+                                <option key={group.id} value={group.id}>
+                                    Group #{group.id} - Part {group.part}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                ) : null}
 
-                <label className="manager-field">
-                    <span>Số câu</span>
-                    <input type="number" min="1" value={form.questionNumber} onChange={(event) => onChange('questionNumber', event.target.value)} placeholder="1" />
-                </label>
+                {!isEdit ? (
+                    <label className="manager-field">
+                        <span>Số câu</span>
+                        <input type="number" min="1" value={form.questionNumber} onChange={(event) => onChange('questionNumber', event.target.value)} placeholder="1" />
+                    </label>
+                ) : null}
 
                 <label className="manager-field">
                     <span>Đáp án đúng</span>
@@ -197,8 +203,8 @@ function getQuestionMediaPreview(question, groups) {
     return {
         audioUrl: question.audioUrl || relatedGroup?.audioUrl || '',
         imageUrl: question.imageUrl || relatedGroup?.imageUrl || '',
-        audioSource: question.audioUrl ? 'Câu hỏi' : relatedGroup?.audioUrl ? `Group #${relatedGroup.id}` : '',
-        imageSource: question.imageUrl ? 'Câu hỏi' : relatedGroup?.imageUrl ? `Group #${relatedGroup.id}` : '',
+        audioSource: question.audioUrl ? 'câu hỏi' : relatedGroup?.audioUrl ? `Group #${relatedGroup.id}` : '',
+        imageSource: question.imageUrl ? 'câu hỏi' : relatedGroup?.imageUrl ? `Group #${relatedGroup.id}` : '',
         group: relatedGroup || null,
     };
 }
@@ -213,7 +219,6 @@ export default function ManagerToeicBuilder() {
     const deferredSearch = useDeferredValue(searchInput);
     const [search, setSearch] = useState('');
     const [partFilter, setPartFilter] = useState(searchParams.get('part') || '');
-    const [groupFilter, setGroupFilter] = useState('');
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -255,8 +260,6 @@ export default function ManagerToeicBuilder() {
         params.set('limit', String(PAGE_SIZE));
         if (search) params.set('search', search);
         if (partFilter) params.set('part', partFilter);
-        if (groupFilter) params.set('groupId', groupFilter);
-
         const [testData, groupsData, questions] = await Promise.all([
             axiosClient.get(`/admin/toeic/tests/${testId}`),
             axiosClient.get(`/admin/toeic/tests/${testId}/groups`),
@@ -285,7 +288,7 @@ export default function ManagerToeicBuilder() {
         return () => {
             active = false;
         };
-    }, [testId, page, search, partFilter, groupFilter]);
+    }, [testId, page, search, partFilter]);
 
     const questionItems = questionsData?.items || [];
     const meta = questionsData?.meta;
@@ -377,6 +380,7 @@ export default function ManagerToeicBuilder() {
     };
 
     const openEditQuestionModal = (question) => {
+        const mediaPreview = getQuestionMediaPreview(question, groups);
         setEditingQuestion(question);
         setQuestionForm({
             part: question.part,
@@ -389,8 +393,10 @@ export default function ManagerToeicBuilder() {
             optionD: question.options?.D || '',
             correctAnswer: question.correctAnswer || 'A',
             explanation: question.explanation || '',
-            audioUrl: question.audioUrl || '',
-            imageUrl: question.imageUrl || '',
+            audioUrl: mediaPreview.audioUrl || '',
+            imageUrl: mediaPreview.imageUrl || '',
+            audioSource: mediaPreview.audioSource || '',
+            imageSource: mediaPreview.imageSource || '',
         });
         setQuestionModalMode('edit');
     };
@@ -510,8 +516,8 @@ export default function ManagerToeicBuilder() {
     };
 
     const groupSummary = useMemo(() => {
-        if (!groups.length) return 'Chưa có nhóm câu hỏi';
-        return `${groups.length} nhóm câu hỏi`;
+        if (!groups.length) return 'Chua co nhom cau hoi';
+        return `${groups.length} nhom cau hoi`;
     }, [groups]);
 
     const questionsByPart = useMemo(() => {
@@ -533,12 +539,11 @@ export default function ManagerToeicBuilder() {
             <section className="manager-panel">
                 <div className="manager-panel-head manager-panel-head-wrap">
                     <div>
-                        <h2>{test?.title || `TOEIC Test #${testId}`}</h2>
-                        <p className="manager-muted-text">
-                            Builder để quản lý media, nhóm câu hỏi và từng câu hỏi TOEIC theo Part 1-7.
-                        </p>
+                        <h3>Câu hỏi TOEIC</h3>
+                        <p className="manager-muted-text">Xem toàn bộ danh sách câu hỏi trong từng part, mở chi tiết từng câu và chỉnh sửa trực tiếp nếu cần.</p>
                     </div>
                     <div className="manager-topbar-actions">
+                        <span className="manager-chip">{loading ? 'Đang tải' : `${questionsData?.meta?.total || 0} câu hỏi`}</span>
                         <Link to="/manager/toeic" className="manager-secondary-btn manager-inline-button">Quay lại danh sách đề</Link>
                         <button type="button" className="manager-primary-btn" onClick={openCreateQuestionModal}>Tạo câu hỏi</button>
                     </div>
@@ -546,45 +551,6 @@ export default function ManagerToeicBuilder() {
 
                 {error ? <p className="manager-error-text">{error}</p> : null}
 
-                <div className="manager-grid manager-grid-overview">
-                    <article className="manager-panel">
-                        <div className="manager-panel-head manager-panel-head-wrap">
-                            <div>
-                                <h3>Nhóm câu hỏi</h3>
-                                <p className="manager-muted-text">{groupSummary}</p>
-                            </div>
-                            <button type="button" className="manager-secondary-btn" onClick={openCreateGroupModal}>Tạo nhóm</button>
-                        </div>
-
-                        <div className="manager-toeic-groups">
-                            {!groups.length ? (
-                                <div className="manager-chart-empty manager-chart-empty-compact">Chưa có nhóm câu hỏi nào.</div>
-                            ) : groups.map((group) => (
-                                <article key={group.id} className="manager-mini-card">
-                                    <span>Group #{group.id} - Part {group.part}</span>
-                                    <strong>{group.questionCount} câu hỏi</strong>
-                                    <p className="manager-muted-text manager-card-description">
-                                        {group.passageText || group.audioUrl || group.imageUrl || 'Nhóm này chưa có passage/audio/image.'}
-                                    </p>
-                                    <div className="manager-table-actions">
-                                        <button type="button" className="manager-table-action" onClick={() => openEditGroupModal(group)}>Sửa</button>
-                                        <button type="button" className="manager-table-action is-danger" onClick={() => setPendingDelete({ type: 'group', item: group })}>Xóa</button>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    </article>
-                </div>
-            </section>
-
-            <section className="manager-panel">
-                <div className="manager-panel-head manager-panel-head-wrap">
-                    <div>
-                        <h3>Câu hỏi TOEIC</h3>
-                        <p className="manager-muted-text">Xem toàn bộ danh sách câu hỏi trong từng part, mở chi tiết từng câu và chỉnh sửa trực tiếp nếu cần.</p>
-                    </div>
-                    <span className="manager-chip">{loading ? 'Đang tải' : `${questionsData?.meta?.total || 0} câu hỏi`}</span>
-                </div>
 
                 <div className="manager-segmented manager-toeic-part-tabs">
                     <button
@@ -630,17 +596,6 @@ export default function ManagerToeicBuilder() {
                         </select>
                     </label>
 
-                    <label className="manager-field">
-                        <span>Nhóm</span>
-                        <select value={groupFilter} onChange={(event) => { setGroupFilter(event.target.value); setPage(1); }}>
-                            <option value="">Tất cả nhóm</option>
-                            <option value="ungrouped">Không thuộc nhóm</option>
-                            {groups.map((group) => (
-                                <option key={group.id} value={group.id}>Group #{group.id}</option>
-                            ))}
-                        </select>
-                    </label>
-
                     <button
                         type="button"
                         className="manager-secondary-btn"
@@ -648,7 +603,6 @@ export default function ManagerToeicBuilder() {
                             setSearchInput('');
                             setSearch('');
                             setPartFilter('');
-                            setGroupFilter('');
                             setPage(1);
                             updateQueryState({ nextPart: '', nextQuestion: '' });
                         }}
@@ -657,12 +611,6 @@ export default function ManagerToeicBuilder() {
                     </button>
                 </div>
 
-                {partFilter && !loading ? (
-                    <div className="manager-toeic-part-summary">
-                        <span>Đang xem riêng Part {partFilter}</span>
-                        <strong>{questionsByPart[partFilter]?.length || 0} câu hỏi trên trang hiện tại</strong>
-                    </div>
-                ) : null}
 
                 <div className="manager-table-shell">
                     <table className="manager-table manager-toeic-question-table">
@@ -671,8 +619,6 @@ export default function ManagerToeicBuilder() {
                             <col className="manager-toeic-col-part" />
                             <col className="manager-toeic-col-content" />
                             <col className="manager-toeic-col-answer" />
-                            <col className="manager-toeic-col-group" />
-                            <col className="manager-toeic-col-media" />
                             <col className="manager-toeic-col-actions" />
                         </colgroup>
                         <thead>
@@ -681,8 +627,6 @@ export default function ManagerToeicBuilder() {
                                 <th>Part</th>
                                 <th>Nội dung</th>
                                 <th>Đáp án đúng</th>
-                                <th>Nhóm</th>
-                                <th>Media</th>
                                 <th>Thao tác</th>
                             </tr>
                         </thead>
@@ -690,14 +634,14 @@ export default function ManagerToeicBuilder() {
                             {loading ? (
                                 Array.from({ length: 6 }).map((_, index) => (
                                     <tr key={`toeic-question-skeleton-${index}`}>
-                                        <td colSpan="7"><div className="manager-table-loading-row">Đang tải dữ liệu câu hỏi...</div></td>
+                                        <td colSpan="5"><div className="manager-table-loading-row">Đang tải dữ liệu câu hỏi...</div></td>
                                     </tr>
                                 ))
                             ) : null}
 
                             {!loading && !questionItems.length ? (
                                 <tr>
-                                    <td colSpan="7"><div className="manager-table-empty">Chưa có câu hỏi nào khớp bộ lọc hiện tại.</div></td>
+                                    <td colSpan="5"><div className="manager-table-empty">Chưa có câu hỏi nào khớp bộ lọc hiện tại.</div></td>
                                 </tr>
                             ) : null}
 
@@ -716,11 +660,6 @@ export default function ManagerToeicBuilder() {
                                         </div>
                                     </td>
                                     <td><span className="manager-table-pill is-accent">{question.correctAnswer}</span></td>
-                                    <td>{question.groupId ? `Group #${question.groupId}` : 'Không nhóm'}</td>
-                                    <td>
-                                        <div className="manager-table-secondary">{question.audioUrl ? 'Có audio' : 'Không audio'}</div>
-                                        <div className="manager-table-secondary">{question.imageUrl ? 'Có hình' : 'Không hình'}</div>
-                                    </td>
                                     <td>
                                         <div className="manager-table-actions manager-toeic-question-actions">
                                             <button
@@ -783,6 +722,7 @@ export default function ManagerToeicBuilder() {
 
             </section>
 
+
             <GroupFormModal
                 isOpen={groupModalMode === 'create' || groupModalMode === 'edit'}
                 mode={groupModalMode}
@@ -843,7 +783,7 @@ export default function ManagerToeicBuilder() {
                                         ) : null}
                                         {selectedQuestionMedia.group?.passageText ? (
                                             <div>
-                                                <span>Passage / Transcript từ group</span>
+                                                <span>Passage / Transcript tu group</span>
                                                 <strong>{selectedQuestionMedia.group.passageText}</strong>
                                             </div>
                                         ) : null}
@@ -855,7 +795,7 @@ export default function ManagerToeicBuilder() {
                                         <span>Preview hình ảnh</span>
                                         {selectedQuestionMedia.imageUrl ? (
                                             <>
-                                                <img src={selectedQuestionMedia.imageUrl} alt={`Preview câu ${selectedQuestion.questionNumber}`} />
+                                                <img src={selectedQuestionMedia.imageUrl} alt={`Preview cau ${selectedQuestion.questionNumber}`} />
                                             </>
                                         ) : (
                                             <p className="manager-muted-text">Câu hỏi này chưa có hình riêng hoặc hình dùng chung từ group.</p>
@@ -947,7 +887,7 @@ export default function ManagerToeicBuilder() {
                                 </div>
                                 <div>
                                     <span>Giải thích đáp án</span>
-                                    <strong>{selectedQuestion.explanation || 'Chưa có giải thích đáp án.'}</strong>
+                                    <strong>{selectedQuestion.explanation || 'Chua co giai thich dap an.'}</strong>
                                 </div>
                                 {selectedQuestionMedia.group?.passageText ? (
                                     <div>

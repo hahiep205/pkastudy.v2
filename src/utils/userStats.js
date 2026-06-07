@@ -1,7 +1,12 @@
+import {
+    getStoredUser,
+    getUserScopedJson,
+    getUserStorageOwner,
+} from './userStorage';
+
 const STATS_STORAGE_KEY = 'pka_user_stats_v1';
 const REMEMBERED_STORAGE_KEY = 'pka_remembered';
 const MAX_HISTORY_DAYS = 90;
-const USER_STORAGE_KEY = 'user';
 const XP_STORAGE_KEY = 'pka_xp_system_v1';
 
 function pad(value) {
@@ -29,19 +34,11 @@ function saveStorageMap(data) {
 }
 
 function getXpStorage() {
-    try {
-        return JSON.parse(localStorage.getItem(XP_STORAGE_KEY)) || {};
-    } catch {
-        return {};
-    }
+    return getUserScopedJson(XP_STORAGE_KEY, {});
 }
 
 function getCurrentStoredUser() {
-    try {
-        return JSON.parse(localStorage.getItem(USER_STORAGE_KEY)) || { name: 'Guest User' };
-    } catch {
-        return { name: 'Guest User' };
-    }
+    return getStoredUser() || { name: 'Guest User' };
 }
 
 function getDisplayNameFromUserKey(userKey = 'guest') {
@@ -66,12 +63,8 @@ function resolveProfileName(userKey = 'guest', profileName) {
 }
 
 function getRememberedCount() {
-    try {
-        const remembered = JSON.parse(localStorage.getItem(REMEMBERED_STORAGE_KEY)) || {};
-        return Object.keys(remembered).filter((key) => remembered[key]).length;
-    } catch {
-        return 0;
-    }
+    const remembered = getUserScopedJson(REMEMBERED_STORAGE_KEY, {}) || {};
+    return Object.keys(remembered).filter((key) => remembered[key]).length;
 }
 
 function createEmptyStats() {
@@ -127,7 +120,9 @@ export function recordUserStatsSnapshot(userKey = 'guest', progress, options = {
     const currentStats = normalizeStats(map[userKey] || createEmptyStats());
     const dateKey = typeof progress.currentDate === 'string' ? progress.currentDate : getTodayKey();
     const existingDay = getDayStats(currentStats, dateKey);
-    const rememberedTotal = Number.isFinite(options.rememberedTotal) ? options.rememberedTotal : getRememberedCount();
+    const rememberedTotal = Number.isFinite(options.rememberedTotal)
+        ? options.rememberedTotal
+        : getRememberedCount();
     const tasksCompleted = Array.isArray(progress.tasks) ? progress.tasks.filter((task) => task.isDone).length : 0;
     const taskTarget = Array.isArray(progress.tasks) ? progress.tasks.length : 0;
 
@@ -240,6 +235,10 @@ export function recordGamePlay(userKey = 'guest', count = 1) {
     map[userKey] = nextStats;
     saveStorageMap(map);
     return nextStats;
+}
+
+export function getCurrentStudyUserKey() {
+    return getUserStorageOwner(getCurrentStoredUser());
 }
 
 function getLeaderboardAccent(index) {

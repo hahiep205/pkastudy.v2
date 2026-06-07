@@ -69,6 +69,7 @@ export default function Listening({
     words,
     initialLearnedWordIds = [],
     onSaveLearnedWords,
+    onSessionComplete,
     onExit,
     onBackToTopic,
     learnUntilMastered = false,
@@ -282,6 +283,7 @@ export default function Listening({
 
         if (result.isCompleted) {
             setIsCompleted(true);
+            onSessionComplete?.();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
@@ -299,6 +301,7 @@ export default function Listening({
         const nextSelection = createDraftRememberedSelection(questions, attemptsByWordId, initialLearnedWordIds);
         setSelectedWordIds(getInitialRememberedSelection(words, nextSelection));
         setIsCompleted(true);
+        onSessionComplete?.();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 

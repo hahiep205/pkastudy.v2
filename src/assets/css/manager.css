@@ -389,43 +389,112 @@
     padding: 24px 32px 32px;
 }
 
-.manager-overview-banner {
-    display: flex;
-    justify-content: space-between;
-    gap: 18px;
-    align-items: flex-start;
-}
-
-.manager-overview-badge {
-    min-width: 220px;
-    padding: 18px;
-    border-radius: var(--radius-md);
+.manager-overview-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(300px, .95fr);
+    gap: 20px;
+    align-items: stretch;
     background: #fff;
-    border: 2px solid var(--border-color);
-    max-width: 100%;
-    box-shadow: var(--shadow-card);
 }
 
-.manager-overview-badge span,
-.manager-overview-badge strong {
-    display: block;
+.manager-overview-hero-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
 }
 
-.manager-overview-badge span {
+.manager-overview-hero-copy h2 {
+    margin: 0;
+    font-size: clamp(26px, 3vw, 34px);
+    line-height: 1.12;
+    color: var(--dark-blue);
+    letter-spacing: -0.02em;
+}
+
+.manager-overview-hero-copy p {
+    margin: 0;
+    max-width: 560px;
+    color: var(--gray-light);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.manager-overview-hero-notes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.manager-overview-hero-notes span {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--bg-page);
+    border: 1px solid var(--border-color);
     color: var(--gray-light);
     font-size: 12px;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
 }
 
-.manager-overview-badge strong {
-    margin-top: 8px;
-    font-size: 28px;
+.manager-overview-hero-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.manager-overview-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.manager-overview-metric-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    border-radius: var(--radius-md);
+    background: #fff;
+    border: 1px solid var(--border-color);
+    box-shadow: none;
+    min-width: 0;
+}
+
+.manager-overview-metric-card.is-primary {
+    background: var(--bg-page);
+    border-color: var(--border-color);
+}
+
+.manager-overview-metric-card span,
+.manager-overview-metric-card strong,
+.manager-overview-metric-card small {
+    display: block;
+}
+
+.manager-overview-metric-card span {
+    color: var(--gray-light);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.manager-overview-metric-card strong {
     color: var(--dark-blue);
+    font-size: clamp(22px, 2.6vw, 30px);
     font-weight: 900;
-    line-height: 1;
+    line-height: 1.05;
     overflow-wrap: anywhere;
+}
+
+.manager-overview-metric-card small {
+    color: var(--gray-light);
+    font-size: 12px;
+    line-height: 1.45;
 }
 
 .manager-overview-stats {
@@ -487,6 +556,14 @@
     align-items: flex-start;
 }
 
+.manager-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .manager-segmented {
     display: inline-flex;
     gap: 8px;
@@ -516,7 +593,7 @@
 
 .manager-chart-wrap {
     width: 100%;
-    overflow-x: auto;
+    overflow-x: hidden;
 }
 
 .manager-chart-svg {
@@ -586,7 +663,7 @@
 
 .manager-bar-chart-svg {
     width: 100%;
-    min-width: 640px;
+    min-width: 0;
     height: auto;
     display: block;
 }
@@ -1017,6 +1094,20 @@
     box-shadow: 0 0 0 4px rgba(28, 176, 246, .10);
 }
 
+.manager-course-import-slot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+}
+
+.manager-course-import-input {
+    display: none;
+}
+
+.manager-course-import-btn {
+    min-width: 160px;
+}
+
 .manager-table-shell {
     overflow-x: auto;
     border-radius: var(--radius-md);
@@ -1106,6 +1197,91 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.manager-user-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    min-width: 240px;
+}
+
+.manager-user-actions .manager-table-action {
+    width: 100%;
+    min-height: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 10px;
+}
+
+.manager-support-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    min-width: 252px;
+}
+
+.manager-support-actions .manager-table-action {
+    width: 100%;
+    min-height: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.manager-support-content {
+    max-width: 460px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.manager-support-view-btn {
+    margin-top: 0;
+    align-self: flex-start;
+    min-width: 84px;
+    min-height: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+}
+
+.manager-support-review-meta {
+    margin-top: 6px;
+}
+
+.manager-support-detail {
+    display: grid;
+    gap: 18px;
+}
+
+.manager-support-detail-block {
+    display: grid;
+    gap: 8px;
+}
+
+.manager-support-detail-label {
+    color: var(--gray-light);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.manager-support-detail-block p {
+    margin: 0;
+    color: var(--gray-text);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .manager-toeic-question-actions {
@@ -1744,10 +1920,13 @@
     }
 
     .manager-topbar,
-    .manager-hero-panel,
-    .manager-overview-banner {
+    .manager-hero-panel {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .manager-overview-hero {
+        grid-template-columns: 1fr;
     }
 
     .manager-menu-btn {
@@ -1778,7 +1957,8 @@
     }
 
     .manager-overview-chart-grid,
-    .manager-donut-shell {
+    .manager-donut-shell,
+    .manager-overview-metric-grid {
         grid-template-columns: 1fr;
     }
 
@@ -1838,9 +2018,8 @@
         padding: 18px 16px;
     }
 
-    .manager-overview-badge {
-        min-width: 0;
-        width: 100%;
+    .manager-overview-hero-copy h2 {
+        font-size: 26px;
     }
 
     .manager-session-pill,

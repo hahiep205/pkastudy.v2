@@ -1,11 +1,35 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
 
 const PAGE_SIZE = 8;
+
+function slugifyFilePart(value) {
+    return String(value || 'toeic-test')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .replace(/-{2,}/g, '-');
+}
+
+function downloadJsonFile(data, fileName) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json;charset=utf-8',
+    });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+}
 
 function createEmptyTestForm() {
     return {
@@ -14,13 +38,21 @@ function createEmptyTestForm() {
     };
 }
 
-function ToeicTestFormModal({ isOpen, mode, form, onChange, onClose, onSubmit, submitting }) {
+function ToeicTestFormModal({
+    isOpen,
+    mode,
+    form,
+    onChange,
+    onClose,
+    onSubmit,
+    submitting,
+}) {
     const isEdit = mode === 'edit';
 
     return (
         <CustomModal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Chỉnh sửa đề TOEIC' : 'Tạo đề TOEIC'}>
             <div className="cv-modal-body manager-form-grid">
-                <label className="manager-field manager-field-full">
+                <label className="manager-field">
                     <span>Tên đề</span>
                     <input
                         value={form.title}
@@ -49,21 +81,7 @@ function ToeicTestFormModal({ isOpen, mode, form, onChange, onClose, onSubmit, s
     );
 }
 
-async function fetchAllQuestionsByTest(testId) {
-    const firstPage = await axiosClient.get(`/admin/toeic/tests/${testId}/questions?page=1&limit=100`);
-    let items = firstPage.items || [];
-    const totalPages = firstPage.meta?.totalPages || 1;
-
-    for (let currentPage = 2; currentPage <= totalPages; currentPage += 1) {
-        const nextPage = await axiosClient.get(`/admin/toeic/tests/${testId}/questions?page=${currentPage}&limit=100`);
-        items = items.concat(nextPage.items || []);
-    }
-
-    return items;
-}
-
 export default function ManagerToeic() {
-    const navigate = useNavigate();
     const [searchInput, setSearchInput] = useState('');
     const deferredSearch = useDeferredValue(searchInput);
     const [search, setSearch] = useState('');
@@ -77,9 +95,9 @@ export default function ManagerToeic() {
     const [editingTest, setEditingTest] = useState(null);
     const [pendingDelete, setPendingDelete] = useState(null);
     const [submitting, setSubmitting] = useState(false);
-    const [expandedTestId, setExpandedTestId] = useState(null);
-    const [expandedQuestionsMap, setExpandedQuestionsMap] = useState({});
-    const [expandingId, setExpandingId] = useState(null);
+    const [exportingTestId, setExportingTestId] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const importInputRef = useRef(null);
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
@@ -209,47 +227,61 @@ export default function ManagerToeic() {
         }
     };
 
-    const handleToggleTestDetails = async (testId) => {
-        if (expandedTestId === testId) {
-            setExpandedTestId(null);
-            return;
-        }
+    const handleExportTest = async (test) => {
+        if (!test?.id) return;
 
-        setExpandedTestId(testId);
-
-        if (expandedQuestionsMap[testId]) return;
-
-        setExpandingId(testId);
+        setExportingTestId(test.id);
         try {
-            const allQuestions = await fetchAllQuestionsByTest(testId);
-            setExpandedQuestionsMap((current) => ({
-                ...current,
-                [testId]: allQuestions,
-            }));
+            const data = await axiosClient.get(`/admin/toeic/tests/${test.id}/export`);
+            const fileName = `${slugifyFilePart(test.title)}.toeic-test-export.v1.json`;
+            downloadJsonFile(data, fileName);
+            setToast({ message: `Đã export đề ${test.title}.`, type: 'success' });
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Không tải được danh sách câu hỏi của đề.',
+                message: err.response?.data?.error || err.message || 'Export đề TOEIC thất bại.',
                 type: 'error',
             });
         } finally {
-            setExpandingId(null);
+            setExportingTestId(null);
         }
     };
 
-    const partSummaryByTest = useMemo(() => {
-        const summary = {};
+    const handleImportButtonClick = () => {
+        importInputRef.current?.click();
+    };
 
-        Object.entries(expandedQuestionsMap).forEach(([testId, questions]) => {
-            const next = {};
-            (questions || []).forEach((question) => {
-                if (!next[question.part]) next[question.part] = [];
-                next[question.part].push(question);
+    const handleImportTest = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        setImporting(true);
+        try {
+            const rawText = await file.text();
+            let payload;
+
+            try {
+                payload = JSON.parse(rawText);
+            } catch {
+                throw new Error('File JSON không hợp lệ.');
+            }
+
+            const data = await axiosClient.post('/admin/toeic/tests/import', payload);
+            setPage(1);
+            await refetchTests(1);
+            setToast({
+                message: `Đã import đề ${data.test?.title || payload?.test?.title || file.name}.`,
+                type: 'success',
             });
-            summary[testId] = next;
-        });
-
-        return summary;
-    }, [expandedQuestionsMap]);
+        } catch (err) {
+            setToast({
+                message: err.response?.data?.error || err.message || 'Import đề TOEIC thất bại.',
+                type: 'error',
+            });
+        } finally {
+            setImporting(false);
+        }
+    };
 
     return (
         <main className="manager-page">
@@ -258,12 +290,29 @@ export default function ManagerToeic() {
                     <div>
                         <h2>Đề thi TOEIC</h2>
                         <p className="manager-muted-text">
-                            Tạo đề, chỉnh sửa đề hiện có và xem toàn bộ danh sách câu hỏi theo từng Part trong từng đề.
+                            Tạo đề, chỉnh sửa đề hiện có và quản lý nhanh các đề thi TOEIC trong hệ thống.
                         </p>
                     </div>
-                    <button type="button" className="manager-primary-btn" onClick={openCreateModal}>
-                        Tạo đề TOEIC
-                    </button>
+                    <div className="manager-head-actions">
+                        <input
+                            ref={importInputRef}
+                            type="file"
+                            accept=".json,application/json"
+                            className="manager-course-import-input"
+                            onChange={handleImportTest}
+                        />
+                        <button
+                            type="button"
+                            className="manager-secondary-btn manager-course-import-btn"
+                            onClick={handleImportButtonClick}
+                            disabled={importing}
+                        >
+                            {importing ? 'Đang import...' : 'Import'}
+                        </button>
+                        <button type="button" className="manager-primary-btn" onClick={openCreateModal}>
+                            Tạo đề TOEIC
+                        </button>
+                    </div>
                 </div>
 
                 <div className="manager-toolbar manager-toolbar-courses">
@@ -306,115 +355,56 @@ export default function ManagerToeic() {
                         <div className="manager-chart-empty">Không có đề TOEIC nào khớp với bộ lọc hiện tại.</div>
                     ) : null}
 
-                    {!loading && items.map((test) => {
-                        const isExpanded = expandedTestId === test.id;
-                        const partMap = partSummaryByTest[test.id] || {};
-
-                        return (
-                            <article key={test.id} className="manager-content-card">
-                                <div className="manager-content-card-top">
-                                    <div className="manager-content-main">
-                                        <span className="manager-content-label">Đề #{test.id}</span>
-                                        <h3>{test.title}</h3>
-                                    </div>
-                                    <span className="manager-table-pill">Parts: {test.partsUsed || 0}</span>
+                    {!loading && items.map((test) => (
+                        <article key={test.id} className="manager-content-card">
+                            <div className="manager-content-card-top">
+                                <div className="manager-content-main">
+                                    <span className="manager-content-label">Đề #{test.id}</span>
+                                    <h3>{test.title}</h3>
                                 </div>
+                                <span className="manager-table-pill">Parts: {test.partsUsed || 0}</span>
+                            </div>
 
-                                <p className="manager-muted-text manager-card-description">
-                                    {test.description || 'Chưa có mô tả cho đề thi này.'}
-                                </p>
+                            <p className="manager-muted-text manager-card-description">
+                                {test.description || 'Chưa có mô tả cho đề thi này.'}
+                            </p>
 
-                                <div className="manager-course-metrics">
-                                    <div>
-                                        <span>Nhóm câu hỏi</span>
-                                        <strong>{test.groupCount}</strong>
-                                    </div>
-                                    <div>
-                                        <span>Câu hỏi</span>
-                                        <strong>{test.questionCount}</strong>
-                                    </div>
-                                    <div>
-                                        <span>Ngày tạo</span>
-                                        <strong>{new Date(test.createdAt).toLocaleDateString('vi-VN')}</strong>
-                                    </div>
+                            <div className="manager-course-metrics">
+                                <div>
+                                    <span>Nhóm câu hỏi</span>
+                                    <strong>{test.groupCount}</strong>
                                 </div>
-
-                                <div className="manager-table-actions">
-                                    <Link to={`/manager/toeic/${test.id}`} className="manager-inline-action">
-                                        Mở builder
-                                    </Link>
-                                    <button type="button" className="manager-table-action" onClick={() => openEditModal(test)}>
-                                        Sửa
-                                    </button>
-                                    <button type="button" className="manager-table-action is-danger" onClick={() => setPendingDelete(test)}>
-                                        Xóa
-                                    </button>
+                                <div>
+                                    <span>Câu hỏi</span>
+                                    <strong>{test.questionCount}</strong>
                                 </div>
+                                <div>
+                                    <span>Ngày tạo</span>
+                                    <strong>{new Date(test.createdAt).toLocaleDateString('vi-VN')}</strong>
+                                </div>
+                            </div>
 
-                                {isExpanded ? (
-                                    <div className="manager-toeic-test-parts">
-                                        {!expandedQuestionsMap[test.id] && expandingId === test.id ? (
-                                            <div className="manager-chart-empty manager-chart-empty-compact">Đang tải danh sách câu hỏi theo part...</div>
-                                        ) : null}
-
-                                        {expandedQuestionsMap[test.id] ? (
-                                            [1, 2, 3, 4, 5, 6, 7].map((part) => {
-                                                const partQuestions = partMap[part] || [];
-                                                if (!partQuestions.length) return null;
-
-                                                return (
-                                                    <section key={part} className="manager-toeic-part-block">
-                                                        <div className="manager-panel-head manager-panel-head-wrap">
-                                                            <div>
-                                                                <h3>Part {part}</h3>
-                                                                <p className="manager-muted-text">{partQuestions.length} câu hỏi</p>
-                                                            </div>
-                                                            <Link to={`/manager/toeic/${test.id}?part=${part}`} className="manager-inline-action">
-                                                                Xem toàn bộ part
-                                                            </Link>
-                                                        </div>
-
-                                                        <div className="manager-toeic-question-list">
-                                                            {partQuestions.map((question) => (
-                                                                <article
-                                                                    key={question.id}
-                                                                    className="manager-toeic-question-item is-clickable"
-                                                                    onClick={() => {
-                                                                        navigate(`/manager/toeic/${test.id}?part=${part}&question=${question.id}&edit=1`);
-                                                                    }}
-                                                                >
-                                                                    <div className="manager-content-main">
-                                                                        <span className="manager-content-label">Câu #{question.questionNumber}</span>
-                                                                        <strong>{question.questionText || 'Câu hỏi không có nội dung text'}</strong>
-                                                                    </div>
-                                                                    <div className="manager-table-actions">
-                                                                        <Link
-                                                                            to={`/manager/toeic/${test.id}?part=${part}&question=${question.id}`}
-                                                                            className="manager-table-action"
-                                                                            onClick={(event) => event.stopPropagation()}
-                                                                        >
-                                                                            Chi tiết
-                                                                        </Link>
-                                                                        <Link
-                                                                            to={`/manager/toeic/${test.id}?part=${part}&question=${question.id}&edit=1`}
-                                                                            className="manager-table-action"
-                                                                            onClick={(event) => event.stopPropagation()}
-                                                                        >
-                                                                            Sửa
-                                                                        </Link>
-                                                                    </div>
-                                                                </article>
-                                                            ))}
-                                                        </div>
-                                                    </section>
-                                                );
-                                            })
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                            </article>
-                        );
-                    })}
+                            <div className="manager-table-actions">
+                                <Link to={`/manager/toeic/${test.id}`} className="manager-inline-action">
+                                    Xem chi tiết
+                                </Link>
+                                <button type="button" className="manager-table-action" onClick={() => openEditModal(test)}>
+                                    Sửa
+                                </button>
+                                <button
+                                    type="button"
+                                    className="manager-table-action"
+                                    onClick={() => handleExportTest(test)}
+                                    disabled={Number(exportingTestId) === Number(test.id)}
+                                >
+                                    {Number(exportingTestId) === Number(test.id) ? 'Đang export...' : 'Export'}
+                                </button>
+                                <button type="button" className="manager-table-action is-danger" onClick={() => setPendingDelete(test)}>
+                                    Xóa
+                                </button>
+                            </div>
+                        </article>
+                    ))}
                 </div>
 
                 <div className="manager-pagination">

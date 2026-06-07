@@ -11,17 +11,20 @@ export function AuthProvider({ children }) {
         if (normalized?.token) {
             localStorage.setItem('token', normalized.token);
         }
+        window.dispatchEvent(new CustomEvent('auth:user-changed', { detail: { user: normalized } }));
     };
 
     const logout = () => {
         setUser(guestUser);
         localStorage.removeItem('user');
         localStorage.removeItem('token');
+        window.dispatchEvent(new CustomEvent('auth:user-changed', { detail: { user: guestUser } }));
     };
 
     useEffect(() => {
         const handleUnauthorized = () => {
             setUser(guestUser);
+            window.dispatchEvent(new CustomEvent('auth:user-changed', { detail: { user: guestUser } }));
         };
 
         window.addEventListener('auth:unauthorized', handleUnauthorized);

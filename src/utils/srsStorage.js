@@ -1,17 +1,14 @@
 import { calculateSM2, SM2_DEFAULT_EF } from './sm2';
+import { getUserScopedJson, setUserScopedJson } from './userStorage';
 
 const SRS_KEY = 'pka_srs_queue_v1';
 
 function getQueue() {
-  try {
-    return JSON.parse(localStorage.getItem(SRS_KEY)) || [];
-  } catch {
-    return [];
-  }
+  return getUserScopedJson(SRS_KEY, []) || [];
 }
 
 function saveQueue(queue) {
-  localStorage.setItem(SRS_KEY, JSON.stringify(queue));
+  setUserScopedJson(SRS_KEY, queue);
 }
 
 function addDays(days) {

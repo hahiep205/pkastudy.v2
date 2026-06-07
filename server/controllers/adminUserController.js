@@ -3,6 +3,8 @@ const {
   fetchAdminUser,
   changeAdminUserRole,
   changeAdminUserStatus,
+  resetAdminUserStudy,
+  removeAdminUser,
 } = require('../services/adminUserService');
 
 async function getUsers(req, res, next) {
@@ -41,9 +43,29 @@ async function updateUserStatus(req, res, next) {
   }
 }
 
+async function resetUserStudy(req, res, next) {
+  try {
+    const data = await resetAdminUserStudy(req.userId, req.params.userId);
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function deleteUser(req, res, next) {
+  try {
+    const data = await removeAdminUser(req.userId, req.params.userId);
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getUsers,
   getUser,
   updateUserRole,
   updateUserStatus,
+  resetUserStudy,
+  deleteUser,
 };

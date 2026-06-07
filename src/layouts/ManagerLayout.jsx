@@ -12,6 +12,9 @@ const pageCopy = {
     '/manager/users': {
         title: 'Quản lý người dùng',
     },
+    '/manager/support': {
+        title: 'Quản lý góp ý',
+    },
     '/manager/courses': {
         title: 'Quản lý khóa học',
     },

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { xpToeicFullTest, xpToeicPartComplete } from "../../utils/xpSystem";
 import axiosClient from "../../utils/axiosClient";
 import { mapApiTestToFrontendFormat } from "../../utils/toeicAdapter";
+import { recordToeicFullTestProgress } from "../../utils/dashboardProgress";
 
 function formatTime(s) {
   return `${Math.floor(s / 60)
@@ -2091,6 +2092,7 @@ function FullTestMode({ onBack, variants }) {
       }
 
       setTestResult(data);
+      recordToeicFullTestProgress(data?.totalScore);
       setPhase("result");
     } catch (err) {
       console.error("Submit failed", err);

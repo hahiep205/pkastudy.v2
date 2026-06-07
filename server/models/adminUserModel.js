@@ -159,6 +159,45 @@ async function countAdmins({ status } = {}) {
   return Number(rows[0]?.total || 0);
 }
 
+async function resetAdminUserStudyData(userId) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    await connection.query('DELETE FROM User_Word_Progress WHERE user_id = ?', [userId]);
+    await connection.query('DELETE FROM SRS_Reviews WHERE user_id = ?', [userId]);
+    await connection.query('DELETE FROM Toeic_Test_Records WHERE user_id = ?', [userId]);
+    await connection.query(
+      'DELETE FROM Topics WHERE user_id = ? AND is_custom = 1',
+      [userId]
+    );
+    await connection.query('DELETE FROM User_Progress WHERE user_id = ?', [userId]);
+    await connection.query(
+      `INSERT INTO User_Progress (user_id, current_xp, level, current_streak, last_study_date)
+       VALUES (?, 0, 1, 0, NULL)`,
+      [userId]
+    );
+
+    await connection.commit();
+    return true;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function deleteAdminUser(userId) {
+  const [result] = await pool.query(
+    'DELETE FROM Users WHERE id = ?',
+    [userId]
+  );
+
+  return result.affectedRows > 0;
+}
+
 module.exports = {
   ROOT_ADMIN_ID,
   ensureRootAdminUser,
@@ -167,4 +206,6 @@ module.exports = {
   updateAdminUserRole,
   updateAdminUserStatus,
   countAdmins,
+  resetAdminUserStudyData,
+  deleteAdminUser,
 };

@@ -25,6 +25,7 @@ export default function Match({
     words,
     initialLearnedWordIds = [],
     onSaveLearnedWords,
+    onSessionComplete,
     onExit,
     onBackToTopic,
 }) {
@@ -71,14 +72,15 @@ export default function Match({
     }, [board.pairs.length, onExit]);
 
     useEffect(() => {
-        if (board.pairs.length > 0 && matchedWordIds.length === board.pairs.length) {
+        if (!isCompleted && board.pairs.length > 0 && matchedWordIds.length === board.pairs.length) {
             const nextSelection = createDraftRememberedSelection(board.pairs, matchedWordIds, initialLearnedWordIds);
             setSelectedWordIds(getInitialRememberedSelection(words, nextSelection));
             setIsCompleted(true);
+            onSessionComplete?.();
             setSelection({ side: null, wordId: null });
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-    }, [board.pairs, initialLearnedWordIds, matchedWordIds, words]);
+    }, [board.pairs, initialLearnedWordIds, isCompleted, matchedWordIds, onSessionComplete, words]);
 
     const activeLeftItems = useMemo(
         () => board.leftItems.filter((item) => !matchedWordIds.includes(item.wordId)),

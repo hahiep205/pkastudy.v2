@@ -68,6 +68,7 @@ export default function Typing({
     words,
     initialLearnedWordIds = [],
     onSaveLearnedWords,
+    onSessionComplete,
     onExit,
     onBackToTopic,
     learnUntilMastered = false,
@@ -281,6 +282,7 @@ export default function Typing({
 
         if (result.isCompleted) {
             setIsCompleted(true);
+            onSessionComplete?.();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
@@ -298,6 +300,7 @@ export default function Typing({
         const nextSelection = createDraftRememberedSelection(questions, attemptsByWordId, initialLearnedWordIds);
         setSelectedWordIds(getInitialRememberedSelection(words, nextSelection));
         setIsCompleted(true);
+        onSessionComplete?.();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 

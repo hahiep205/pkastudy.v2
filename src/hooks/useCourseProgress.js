@@ -1,72 +1,67 @@
-/**
- * useCourseProgress — Track which words a user has "remembered"
- *
- * Strategy:
- *  - Optimistic update: update localStorage immediately so UI feels instant
- *  - If logged in: sync to backend via /api/word-progress
- *  - On mount: fetch server state and merge (server wins for conflicts)
- */
 import { useState, useEffect, useCallback, useRef } from "react";
 import axiosClient from "../utils/axiosClient";
+import { useAuth } from "../contexts/useAuth";
 import { syncRememberedWordProgress } from "../utils/dashboardProgress";
+import {
+  getUserScopedJson,
+  getUserScopedStorageKey,
+  setUserScopedJson,
+} from "../utils/userStorage";
 
 const STORAGE_KEY = "pka_remembered";
 
-function getLocalRemembered() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
+function getLocalRemembered(user) {
+  return getUserScopedJson(STORAGE_KEY, {}, user) || {};
 }
 
-function saveLocalRemembered(map) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+function saveLocalRemembered(map, user) {
+  setUserScopedJson(STORAGE_KEY, map, user);
 }
 
-function isLoggedIn() {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    return Boolean(user?.token || user?.id);
-  } catch {
-    return false;
-  }
+function isLoggedIn(user) {
+  return Boolean(user?.token || user?.id);
 }
 
 export function useCourseProgress() {
-  const [remembered, setRemembered] = useState(getLocalRemembered);
+  const { user } = useAuth();
+  const storageKey = getUserScopedStorageKey(STORAGE_KEY, user);
+  const [remembered, setRemembered] = useState(() => getLocalRemembered(user));
   const isMountedRef = useRef(true);
-  const pendingRef = useRef({}); // accumulate changes for batch sync
+  const pendingRef = useRef({});
   const syncTimerRef = useRef(null);
 
-  // ── Load server state on mount ────────────────────────────────────────────
   useEffect(() => {
     isMountedRef.current = true;
-    if (!isLoggedIn()) return;
+    pendingRef.current = {};
+    setRemembered(getLocalRemembered(user));
+
+    if (!isLoggedIn(user)) {
+      return () => {
+        isMountedRef.current = false;
+      };
+    }
 
     axiosClient
       .get("/word-progress")
       .then((res) => {
         const serverMap = res || {};
         if (!isMountedRef.current) return;
-        // Merge: server state takes precedence (handles multi-device scenarios)
-        const local = getLocalRemembered();
-        const merged = { ...local, ...serverMap };
-        saveLocalRemembered(merged);
-        setRemembered(merged);
+        saveLocalRemembered(serverMap, user);
+        setRemembered(serverMap);
       })
-      .catch((e) =>
-        console.warn("[WordProgress] Failed to load from server:", e?.message),
-      );
+      .catch((e) => {
+        console.warn("[WordProgress] Failed to load from server:", e?.message);
+      });
 
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
+  }, [storageKey, user]);
 
-  // ── Debounced batch sync to server ────────────────────────────────────────
+  useEffect(() => () => clearTimeout(syncTimerRef.current), []);
+
   const scheduleBatchSync = useCallback(() => {
-    if (!isLoggedIn()) return;
+    if (!isLoggedIn(user)) return;
     clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(async () => {
       const pending = pendingRef.current;
@@ -83,21 +78,19 @@ export function useCourseProgress() {
       } catch (e) {
         console.warn("[WordProgress] Batch sync failed:", e?.message);
       }
-    }, 800); // debounce 800ms — batch multiple rapid toggles
-  }, []);
+    }, 800);
+  }, [user]);
 
-  // ── Core save function ────────────────────────────────────────────────────
   const saveRemembered = useCallback(
     (newMap) => {
       const previousMap = remembered;
       setRemembered(newMap);
-      saveLocalRemembered(newMap);
+      saveLocalRemembered(newMap, user);
       syncRememberedWordProgress(previousMap, newMap);
     },
-    [remembered],
+    [remembered, user],
   );
 
-  // ── Toggle a single word ──────────────────────────────────────────────────
   const toggleWord = useCallback(
     (wordId) => {
       const newMap = { ...remembered };
@@ -108,7 +101,6 @@ export function useCourseProgress() {
       }
       saveRemembered(newMap);
 
-      // Queue server sync (only numeric IDs from built-in flashcards)
       const numId = parseInt(wordId, 10);
       if (!isNaN(numId)) {
         pendingRef.current[numId] = Boolean(newMap[wordId]);
@@ -152,7 +144,6 @@ export function useCourseProgress() {
 
       saveRemembered(newMap);
 
-      // Batch sync numeric IDs
       topicWordIds.forEach((wordId) => {
         const numId = parseInt(wordId, 10);
         if (!isNaN(numId)) {

@@ -39,7 +39,7 @@ VITE_API_BASE_URL=http://localhost:4000/api
 Backend `server/.env`:
 
 ```env
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
 DB_PASS=

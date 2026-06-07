@@ -17,6 +17,7 @@ import LandingPage from './pages/landingPage/LandingPage';
 import Login from './pages/Login';
 import ManagerCourses from './pages/manager/Courses';
 import ManagerOverview from './pages/manager/Overview';
+import ManagerSupport from './pages/manager/Support';
 import ManagerToeic from './pages/manager/Toeic';
 import ManagerToeicBuilder from './pages/manager/ToeicBuilder';
 import ManagerTopics from './pages/manager/Topics';
@@ -56,6 +57,7 @@ function App() {
                     <Route path="/manager" element={<ManagerLayout />}>
                         <Route index element={<ManagerOverview />} />
                         <Route path="users" element={<ManagerUsers />} />
+                        <Route path="support" element={<ManagerSupport />} />
                         <Route path="courses" element={<ManagerCourses />} />
                         <Route path="courses/:courseId/topics" element={<ManagerTopics />} />
                         <Route path="toeic" element={<ManagerToeic />} />

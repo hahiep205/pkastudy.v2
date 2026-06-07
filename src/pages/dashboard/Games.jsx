@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import flappyLogo from '../../assets/images/logo-flappybird.png';
 import FlappyBirdExperience, { BIRD_OPTIONS, GAME_CARD, GAME_ID } from '../../components/games/FlappyBirdExperience';
+import CourseTopicPicker from '../../components/games/CourseTopicPicker';
 import SpacedRepetitionSection from '../../components/games/SpacedRepetitionSection';
 import Quiz from '../../components/Quiz';
 import Typing from '../../components/Typing';
@@ -11,6 +12,8 @@ import Flashcard from '../../components/Flashcard';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import axiosClient from '../../utils/axiosClient';
+import { getDashboardUserKey, recordStudyModeCompletion } from '../../utils/dashboardProgress';
+import { recordGamePlay } from '../../utils/userStats';
 import { addToSrs, getDueItems as getLocalDueItems, reviewItem as reviewLocalItem } from '../../utils/srsStorage';
 import {
   fetchDueReviews,
@@ -19,6 +22,7 @@ import {
   mapReviewRatingToQualityScore,
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
+import { xpStudyModeComplete } from '../../utils/xpSystem';
 
 const VOCAB_GAMES = [
   { id: 'quiz', name: 'Trắc nghiệm', icon: '🎯', desc: '4 đáp án, chọn nghĩa đúng', color: '#6366f1' },
@@ -27,6 +31,23 @@ const VOCAB_GAMES = [
   { id: 'match', name: 'Nối từ', icon: '🔗', desc: 'Ghép từ vựng với nghĩa đúng', color: '#ec4899' },
   { id: 'flashcard', name: 'Flashcard', icon: '🃏', desc: 'Lật thẻ, ôn lại từ nhanh chóng', color: '#8b5cf6' },
 ];
+
+function getCurrentStudyUserKey() {
+  try {
+    const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    return getDashboardUserKey(storedUser);
+  } catch {
+    return 'guest';
+  }
+}
+
+function trackStudySessionComplete(modeName) {
+  recordGamePlay(getCurrentStudyUserKey());
+  if (modeName) {
+    xpStudyModeComplete(modeName);
+    recordStudyModeCompletion(modeName);
+  }
+}
 
 function mapDueItemToWord(item) {
   return {
@@ -524,6 +545,7 @@ export default function Games() {
       words: activeWords,
       allTopicWords: selectedTopic.words,
       initialLearnedWordIds: activeWords.filter((word) => remembered[word.id]).map((word) => word.id),
+      onSessionComplete: () => trackStudySessionComplete(vocabGame?.id),
       onExit: handleExitGame,
       onBackToTopic: handleBackToPicker,
       learnUntilMastered: false,
@@ -575,6 +597,7 @@ export default function Games() {
         <FlappyBirdExperience
           topic={selectedFlappyTopic}
           selectedBird={selectedFlappyBird}
+          onSessionComplete={() => trackStudySessionComplete('flappy-bird')}
           onBackToPicker={() => setActiveFunGamePhase('picker')}
           onBackGallery={() => {
             setActiveGameId(null);
@@ -589,7 +612,7 @@ export default function Games() {
   if (activeGameId === GAME_ID && activeFunGamePhase === 'picker') {
     return (
       <main ref={pageRef} className="dash-main games-page" id="page-games">
-        <TopicPicker
+        <CourseTopicPicker
           dueReviewWords={dueReviewWords}
           gameInfo={flappyPickerInfo}
           onSelect={async (topic) => {
@@ -663,7 +686,7 @@ export default function Games() {
   if (phase === 'picker' && vocabGame) {
     return (
       <main ref={pageRef} className="dash-main games-page" id="page-games">
-        <TopicPicker
+        <CourseTopicPicker
           dueReviewWords={dueReviewWords}
           gameInfo={vocabGame}
           onSelect={handleTopicSelect}

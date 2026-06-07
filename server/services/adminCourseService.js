@@ -1,11 +1,14 @@
 const {
   listAdminCourses,
   getAdminCourseById,
+  getAdminCourseExportById,
   getAdminCourseBySlug,
   createAdminCourse,
   updateAdminCourse,
   deleteAdminCourse,
 } = require('../models/adminCourseModel');
+const { getAdminTopicBySlug } = require('../models/adminTopicModel');
+const pool = require('../db');
 const {
   parsePaginationQuery,
   parseSearchQuery,
@@ -84,10 +87,145 @@ function normalizeThumbnailUrl(value) {
   return trimmed;
 }
 
+function normalizeImportRoot(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw Object.assign(new Error('Import payload must be an object'), { status: 400 });
+  }
+
+  if (payload.format !== 'pkastudy-course-export') {
+    throw Object.assign(new Error('Unsupported import format'), { status: 400 });
+  }
+
+  if (Number(payload.version) !== 1) {
+    throw Object.assign(new Error('Unsupported import version'), { status: 400 });
+  }
+
+  return payload;
+}
+
+function normalizeImportedFlashcard(payload, fallbackLanguage, wordIndex, topicLabel) {
+  const word = normalizeRequiredText(payload?.word, `Word #${wordIndex + 1} in ${topicLabel}`);
+  const meaning = normalizeRequiredText(payload?.meaning, `Meaning #${wordIndex + 1} in ${topicLabel}`);
+
+  return {
+    word,
+    transcription: normalizeOptionalText(payload?.transcription),
+    meaning,
+    wordType: normalizeOptionalText(payload?.wordType),
+    example: normalizeOptionalText(payload?.example),
+    exampleVi: normalizeOptionalText(payload?.exampleVi),
+    language: normalizeLanguage(payload?.language || fallbackLanguage),
+  };
+}
+
+function normalizeImportedTopic(payload, index, fallbackLanguage) {
+  const title = normalizeRequiredText(payload?.title, `Topic title #${index + 1}`);
+  const slug = normalizeSlug(payload?.slug, title);
+  const description = normalizeOptionalText(payload?.description);
+  const sortOrder = normalizeSortOrder(payload?.sortOrder ?? index);
+  const flashcardsPayload = payload?.flashcards;
+
+  if (flashcardsPayload !== undefined && !Array.isArray(flashcardsPayload)) {
+    throw Object.assign(new Error(`Flashcards in topic "${title}" must be an array`), { status: 400 });
+  }
+
+  const flashcards = (flashcardsPayload || []).map((flashcard, wordIndex) =>
+    normalizeImportedFlashcard(flashcard, fallbackLanguage, wordIndex, `topic "${title}"`)
+  );
+
+  const seenWords = new Set();
+  flashcards.forEach((flashcard) => {
+    const dedupeKey = flashcard.word.trim().toLowerCase();
+    if (seenWords.has(dedupeKey)) {
+      throw Object.assign(new Error(`Duplicate word "${flashcard.word}" in topic "${title}"`), { status: 400 });
+    }
+    seenWords.add(dedupeKey);
+  });
+
+  return {
+    title,
+    slug,
+    description,
+    sortOrder,
+    flashcards,
+  };
+}
+
+function normalizeImportedCoursePayload(payload) {
+  const root = normalizeImportRoot(payload);
+  const coursePayload = root.course;
+  if (!coursePayload || typeof coursePayload !== 'object' || Array.isArray(coursePayload)) {
+    throw Object.assign(new Error('Import file is missing course data'), { status: 400 });
+  }
+
+  const title = normalizeRequiredText(coursePayload?.title, 'Course title');
+  const slug = normalizeSlug(coursePayload?.slug, title);
+  const description = normalizeOptionalText(coursePayload?.description);
+  const thumbnailUrl = normalizeThumbnailUrl(coursePayload?.thumbnailUrl);
+  const language = normalizeLanguage(coursePayload?.language);
+  const sortOrder = normalizeSortOrder(coursePayload?.sortOrder);
+  const topicsPayload = root.topics;
+
+  if (!Array.isArray(topicsPayload)) {
+    throw Object.assign(new Error('Import file is missing topics array'), { status: 400 });
+  }
+
+  const topics = topicsPayload.map((topic, index) => normalizeImportedTopic(topic, index, language));
+  const seenTopicSlugs = new Set();
+  topics.forEach((topic) => {
+    if (seenTopicSlugs.has(topic.slug)) {
+      throw Object.assign(new Error(`Duplicate topic slug "${topic.slug}" in import file`), { status: 400 });
+    }
+    seenTopicSlugs.add(topic.slug);
+  });
+
+  return {
+    course: {
+      title,
+      slug,
+      description,
+      thumbnailUrl,
+      language,
+      sortOrder,
+    },
+    topics,
+  };
+}
+
 async function ensureUniqueCourseSlug(slug, excludeCourseId = null) {
   const existing = await getAdminCourseBySlug(slug);
   if (existing && Number(existing.id) !== Number(excludeCourseId)) {
     throw Object.assign(new Error('Course slug already exists'), { status: 400 });
+  }
+}
+
+async function resolveUniqueCourseSlug(baseSlug) {
+  let candidate = baseSlug;
+  let suffix = 1;
+
+  while (true) {
+    const existing = await getAdminCourseBySlug(candidate);
+    if (!existing) {
+      return candidate;
+    }
+
+    suffix += 1;
+    candidate = `${baseSlug}-copy${suffix > 2 ? `-${suffix - 1}` : ''}`;
+  }
+}
+
+async function resolveUniqueTopicSlug(baseSlug, reservedSlugs = new Set()) {
+  let candidate = baseSlug;
+  let suffix = 1;
+
+  while (true) {
+    const existing = await getAdminTopicBySlug(candidate);
+    if (!existing && !reservedSlugs.has(candidate)) {
+      return candidate;
+    }
+
+    suffix += 1;
+    candidate = `${baseSlug}-copy${suffix > 2 ? `-${suffix - 1}` : ''}`;
   }
 }
 
@@ -121,6 +259,157 @@ async function fetchAdminCourse(courseId) {
   }
 
   return course;
+}
+
+async function exportAdminCourseEntry(courseId) {
+  const parsedCourseId = Number.parseInt(courseId, 10);
+  if (!Number.isFinite(parsedCourseId) || parsedCourseId <= 0) {
+    throw Object.assign(new Error('Invalid course id'), { status: 400 });
+  }
+
+  const data = await getAdminCourseExportById(parsedCourseId);
+  if (!data) {
+    throw Object.assign(new Error('Course not found'), { status: 404 });
+  }
+
+  const flashcardsByTopicId = data.flashcards.reduce((accumulator, flashcard) => {
+    const key = Number(flashcard.topicId);
+    if (!accumulator[key]) {
+      accumulator[key] = [];
+    }
+
+    accumulator[key].push({
+      word: flashcard.word,
+      transcription: flashcard.transcription,
+      meaning: flashcard.meaning,
+      wordType: flashcard.wordType,
+      example: flashcard.example,
+      exampleVi: flashcard.exampleVi,
+      language: flashcard.language || data.language || 'en',
+    });
+
+    return accumulator;
+  }, {});
+
+  return {
+    format: 'pkastudy-course-export',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    source: {
+      app: 'pkastudy',
+      entity: 'course',
+    },
+    course: {
+      title: data.title,
+      slug: data.slug,
+      description: data.description,
+      thumbnailUrl: data.thumbnailUrl,
+      language: data.language,
+      sortOrder: data.sortOrder,
+    },
+    topics: data.topics.map((topic) => ({
+      title: topic.title,
+      slug: topic.slug,
+      description: topic.description,
+      sortOrder: topic.sortOrder,
+      flashcards: flashcardsByTopicId[Number(topic.id)] || [],
+    })),
+  };
+}
+
+async function importAdminCourseEntry(payload) {
+  const normalized = normalizeImportedCoursePayload(payload);
+  const resolvedCourseSlug = await resolveUniqueCourseSlug(normalized.course.slug);
+  const reservedTopicSlugs = new Set();
+  const resolvedTopics = [];
+
+  for (const topic of normalized.topics) {
+    const resolvedSlug = await resolveUniqueTopicSlug(topic.slug, reservedTopicSlugs);
+    reservedTopicSlugs.add(resolvedSlug);
+    resolvedTopics.push({
+      ...topic,
+      slug: resolvedSlug,
+    });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [courseResult] = await connection.query(
+      `INSERT INTO Courses (slug, title, description, thumbnail_url, language, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        resolvedCourseSlug,
+        normalized.course.title,
+        normalized.course.description,
+        normalized.course.thumbnailUrl,
+        normalized.course.language,
+        normalized.course.sortOrder,
+      ]
+    );
+
+    for (const topic of resolvedTopics) {
+      const [topicResult] = await connection.query(
+        `INSERT INTO Topics (course_id, slug, title, description, sort_order)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          courseResult.insertId,
+          topic.slug,
+          topic.title,
+          topic.description,
+          topic.sortOrder,
+        ]
+      );
+
+      for (const flashcard of topic.flashcards) {
+        await connection.query(
+          `INSERT INTO Flashcards (topic_id, word, transcription, meaning, word_type, example, example_vi, language)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            topicResult.insertId,
+            flashcard.word,
+            flashcard.transcription,
+            flashcard.meaning,
+            flashcard.wordType,
+            flashcard.example,
+            flashcard.exampleVi,
+            flashcard.language,
+          ]
+        );
+      }
+    }
+
+    await connection.commit();
+
+    const importedCourse = await getAdminCourseById(courseResult.insertId);
+    return {
+      course: importedCourse,
+      importedCounts: {
+        topics: resolvedTopics.length,
+        flashcards: resolvedTopics.reduce((sum, topic) => sum + topic.flashcards.length, 0),
+      },
+      slugChanges: {
+        course: {
+          original: normalized.course.slug,
+          imported: resolvedCourseSlug,
+        },
+        topics: resolvedTopics
+          .filter((topic, index) => topic.slug !== normalized.topics[index].slug)
+          .map((topic, index) => ({
+            title: topic.title,
+            original: normalized.topics[index].slug,
+            imported: topic.slug,
+          })),
+      },
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function createAdminCourseEntry(payload) {
@@ -197,6 +486,8 @@ async function deleteAdminCourseEntry(courseId) {
 module.exports = {
   fetchAdminCourses,
   fetchAdminCourse,
+  exportAdminCourseEntry,
+  importAdminCourseEntry,
   createAdminCourseEntry,
   updateAdminCourseEntry,
   deleteAdminCourseEntry,

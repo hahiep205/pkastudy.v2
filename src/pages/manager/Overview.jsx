@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import axiosClient from '../../utils/axiosClient';
+import { getDashboardUserKey } from '../../utils/dashboardProgress';
+import { getStatsSummary } from '../../utils/userStats';
 
 function formatNumber(value) {
     return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
@@ -28,16 +30,30 @@ function OverviewBarChart({ points, maxCount }) {
     const innerHeight = height - padding.top - padding.bottom;
     const slotWidth = innerWidth / points.length;
     const barWidth = Math.min(Math.max(slotWidth * 0.52, 18), 34);
+    const yAxisTicks = (() => {
+        if (max <= 4) {
+            return Array.from({ length: max + 1 }, (_, index) => index);
+        }
+
+        const step = Math.ceil(max / 4);
+        const ticks = new Set([0]);
+
+        for (let value = step; value < max; value += step) {
+            ticks.add(value);
+        }
+
+        ticks.add(max);
+        return Array.from(ticks).sort((a, b) => a - b);
+    })();
 
     return (
         <div className="manager-chart-wrap">
             <svg viewBox={`0 0 ${width} ${height}`} className="manager-bar-chart-svg" role="img" aria-label="Biểu đồ cột người dùng đăng ký mới">
-                {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-                    const y = padding.top + innerHeight * tick;
-                    const label = Math.round(max - (max * tick));
+                {yAxisTicks.map((tickValue) => {
+                    const y = padding.top + innerHeight - ((tickValue / max) * innerHeight);
 
                     return (
-                        <g key={tick}>
+                        <g key={tickValue}>
                             <line
                                 x1={padding.left}
                                 y1={y}
@@ -51,7 +67,7 @@ function OverviewBarChart({ points, maxCount }) {
                                 textAnchor="end"
                                 className="manager-bar-chart-axis-text"
                             >
-                                {label}
+                                {tickValue}
                             </text>
                         </g>
                     );
@@ -180,6 +196,16 @@ export default function ManagerOverview() {
     const [chartLoading, setChartLoading] = useState(true);
     const [summaryError, setSummaryError] = useState('');
     const [chartError, setChartError] = useState('');
+    const vocabStudySummary = useMemo(() => {
+        try {
+            const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+            return getStatsSummary(getDashboardUserKey(storedUser));
+        } catch {
+            return getStatsSummary('guest');
+        }
+    }, []);
+    const totalVocabularyActivities = Number(summary?.totalSrsReviews || 0) + Number(vocabStudySummary?.totalGamesPlayed || 0);
+    const totalLearningActivities = Number(summary?.totalToeicAttempts || 0) + totalVocabularyActivities;
 
     useEffect(() => {
         let active = true;
@@ -239,26 +265,26 @@ export default function ManagerOverview() {
             hint: `Flashcards: ${formatNumber(summary?.totalFlashcards)}`,
         },
         {
+            label: 'Đề TOEIC',
+            value: summary?.totalToeicTests,
+            hint: `Câu hỏi: ${formatNumber(summary?.totalToeicQuestions)}`,
+        },
+        {
+            label: 'Lượt học từ vựng',
+            value: totalVocabularyActivities,
+            hint: 'Bao gồm flashcard, quiz, listening, typing, match, flappy bird và ôn SRS.',
+        },
+        {
             label: 'Lượt thi TOEIC',
             value: summary?.totalToeicAttempts,
             hint: 'Tổng số lượt làm bài TOEIC đã được ghi nhận.',
         },
-        {
-            label: 'Lượt ôn SRS',
-            value: summary?.totalSrsReviews,
-            hint: 'Tổng số lần ôn tập từ vựng đang có trong hệ thống.',
-        },
-        {
-            label: 'Tổng hoạt động học',
-            value: summary?.totalActivities,
-            hint: `TOEIC ${formatNumber(summary?.activityBreakdown?.toeicAttempts)} / SRS ${formatNumber(summary?.activityBreakdown?.srsReviews)}`,
-        },
-    ]), [summary]);
+    ]), [summary, totalVocabularyActivities]);
 
     const activityChartItems = useMemo(() => ([
         { label: 'Thi TOEIC', value: Number(summary?.activityBreakdown?.toeicAttempts || 0) },
-        { label: 'Ôn SRS', value: Number(summary?.activityBreakdown?.srsReviews || 0) },
-    ]), [summary]);
+        { label: 'Học từ vựng', value: totalVocabularyActivities },
+    ]), [summary, totalVocabularyActivities]);
 
     const displayedChart = useMemo(() => {
         if (!chart?.points?.length) {
@@ -300,39 +326,27 @@ export default function ManagerOverview() {
         };
     }, [chart, rangeDays]);
 
-    const insightItems = useMemo(() => ([
-        {
-            label: 'Kho nội dung',
-            value: `${formatNumber(summary?.totalCourses)} khóa học / ${formatNumber(summary?.totalFlashcards)} thẻ từ`,
-        },
-        {
-            label: 'Lưu lượng thi',
-            value: `${formatNumber(summary?.totalToeicAttempts)} lượt thi TOEIC`,
-        },
-        {
-            label: 'Lưu lượng ôn tập',
-            value: `${formatNumber(summary?.totalSrsReviews)} lượt ôn SRS`,
-        },
-        {
-            label: 'Theo dõi chính',
-            value: 'Người dùng mới, hoạt động học và tăng trưởng nội dung.',
-        },
-    ]), [summary]);
-
     return (
         <main className="manager-page">
-            <section className="manager-panel manager-overview-banner">
-                <div>
-                    <span className="manager-panel-eyebrow">Tổng quan hệ thống</span>
-                    <h2>Bức tranh vận hành hiện tại</h2>
+            <section className="manager-panel manager-overview-hero">
+                <div className="manager-overview-hero-copy">
+                    <h2>Tổng quan vận hành</h2>
                     <p>
-                        Theo dõi nhanh người dùng, nội dung học và nhịp hoạt động gần đây bằng giao diện gọn,
-                        đồng nhất với hệ thống hiện tại.
+                        Theo dõi nhanh người dùng, nội dung và hoạt động học tập trong hệ thống.
                     </p>
+                    <div className="manager-overview-hero-notes">
+                        <span>Người dùng</span>
+                        <span>Nội dung</span>
+                        <span>Hoạt động học</span>
+                    </div>
                 </div>
-                <div className="manager-overview-badge">
-                    <span>Tổng người dùng</span>
-                    <strong>{summaryLoading ? '...' : formatNumber(summary?.totalUsers)}</strong>
+
+                <div className="manager-overview-hero-metrics">
+                    <article className="manager-overview-metric-card is-primary">
+                        <span>Người dùng hoạt động hôm nay</span>
+                        <strong>{summaryLoading ? '...' : formatNumber(summary?.activeUsersToday)}</strong>
+                        <small>Người dùng có phát sinh hoạt động học trong ngày hôm nay.</small>
+                    </article>
                 </div>
             </section>
 
@@ -387,22 +401,6 @@ export default function ManagerOverview() {
                         <OverviewBarChart points={displayedChart.points} maxCount={displayedChart.maxCount} />
                     ) : null}
 
-                    {!chartLoading && !chartError && displayedChart ? (
-                        <div className="manager-chart-meta">
-                            <div>
-                                <span>Tổng trong kỳ</span>
-                                <strong>{formatNumber(displayedChart.totalRegistrations)}</strong>
-                            </div>
-                            <div>
-                                <span>Khoảng thời gian</span>
-                                <strong>{displayedChart.range?.startDate} {'->'} {displayedChart.range?.endDate}</strong>
-                            </div>
-                            <div>
-                                <span>Mức cao nhất</span>
-                                <strong>{formatNumber(displayedChart.maxCount)}</strong>
-                            </div>
-                        </div>
-                    ) : null}
                 </article>
 
                 <article className="manager-panel">
@@ -418,46 +416,12 @@ export default function ManagerOverview() {
                     {!summaryLoading ? (
                         <OverviewDonutChart
                             items={activityChartItems}
-                            total={summary?.totalActivities}
+                            total={totalLearningActivities}
                             emptyMessage="Chưa có dữ liệu để hiển thị."
                         />
                     ) : null}
 
-                    {!summaryLoading ? (
-                        <div className="manager-chart-meta">
-                            <div>
-                                <span>Thi TOEIC</span>
-                                <strong>{formatNumber(summary?.activityBreakdown?.toeicAttempts)}</strong>
-                            </div>
-                            <div>
-                                <span>Ôn SRS</span>
-                                <strong>{formatNumber(summary?.activityBreakdown?.srsReviews)}</strong>
-                            </div>
-                            <div>
-                                <span>Tổng hoạt động</span>
-                                <strong>{formatNumber(summary?.totalActivities)}</strong>
-                            </div>
-                        </div>
-                    ) : null}
                 </article>
-            </section>
-
-            <section className="manager-panel">
-                <div className="manager-panel-head manager-panel-head-wrap">
-                    <div>
-                        <h3>Điểm cần theo dõi</h3>
-                        <p className="manager-muted-text">Một vài chỉ số tổng hợp để nắm nhanh tình hình hiện tại.</p>
-                    </div>
-                </div>
-
-                <div className="manager-kv-list manager-kv-list-single manager-overview-notes">
-                    {insightItems.map((item) => (
-                        <div key={item.label}>
-                            <span>{item.label}</span>
-                            <strong>{summaryLoading ? '...' : item.value}</strong>
-                        </div>
-                    ))}
-                </div>
             </section>
         </main>
     );

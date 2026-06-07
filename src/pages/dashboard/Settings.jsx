@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
+import axiosClient from '../../utils/axiosClient';
 
 const SETTINGS_STORAGE_KEY = 'pka_settings_preferences_v1';
 
@@ -101,20 +102,34 @@ export default function Settings() {
         setSubmitState('idle');
     };
 
-    const handleSubmitFeedback = () => {
+    const handleSubmitFeedback = async () => {
         if (!feedbackTitle.trim() || !feedbackContent.trim()) {
             setSubmitState('error');
             setTimeout(() => setSubmitState('idle'), 1800);
             return;
         }
 
-        setSubmitState('success');
-        setFeedbackTitle('');
-        setFeedbackContent('');
-        setTimeout(() => {
-            closeFeedback();
-            setSubmitState('idle');
-        }, 1800);
+        setSubmitState('submitting');
+
+        try {
+            await axiosClient.post('/support', {
+                type: feedbackType,
+                title: feedbackTitle.trim(),
+                content: feedbackContent.trim(),
+                sourcePage: '/dashboard/settings',
+            });
+
+            setSubmitState('success');
+            setFeedbackTitle('');
+            setFeedbackContent('');
+            setTimeout(() => {
+                closeFeedback();
+                setSubmitState('idle');
+            }, 1800);
+        } catch {
+            setSubmitState('error');
+            setTimeout(() => setSubmitState('idle'), 1800);
+        }
     };
 
     return (
@@ -282,8 +297,11 @@ export default function Settings() {
                                 type="button"
                                 className={`settings2-submit ${submitState}`}
                                 onClick={handleSubmitFeedback}
+                                disabled={submitState === 'submitting'}
                             >
-                                {submitState === 'success'
+                                {submitState === 'submitting'
+                                    ? 'Đang gửi phản hồi...'
+                                    : submitState === 'success'
                                     ? 'Đã gửi phản hồi'
                                     : submitState === 'error'
                                         ? 'Vui lòng điền đầy đủ thông tin'

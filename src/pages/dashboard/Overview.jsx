@@ -8,7 +8,6 @@ import {
     completeDashboardTask,
     getDashboardUserKey,
     readDashboardProgress,
-    recordFlashcardSessionProgress,
     subscribeDashboardProgress,
     syncDashboardProgressWithServer
 } from '../../utils/dashboardProgress';
@@ -107,19 +106,17 @@ export default function Overview() {
 
     const tasks = dashboardProgress.tasks;
     const tasksView = tasks.map((task) => {
-        if (task.id === 'learn-ten-words') {
+        if (task.id === 'vocab-modes') {
             return {
                 ...task,
-                desc: `Đã thuộc ${dashboardProgress.learnedWordIdsToday.length}/10 từ mới hôm nay · +20 EXP`,
+                desc: `Hoàn thành ${(dashboardProgress.completedStudyModesToday || []).length}/6 mode: Flashcard, Quiz, Listening, Typing, Match, Flappy Bird · +24 EXP`,
             };
         }
 
-        if (task.id === 'game-session') {
-            const currentCount = Number.isFinite(task.currentCount) ? task.currentCount : 0;
-            const targetCount = Number.isFinite(task.targetCount) && task.targetCount > 0 ? task.targetCount : 5;
+        if (task.id === 'toeic-fulltest') {
             return {
                 ...task,
-                desc: `${currentCount}/${targetCount} lần chơi Flashcard hôm nay · +25 EXP`,
+                desc: 'Đạt tối thiểu 200 điểm trong 1 bài TOEIC Full Test hôm nay · +50 EXP',
             };
         }
 

@@ -11,10 +11,14 @@ const {
   getUser,
   updateUserRole,
   updateUserStatus,
+  resetUserStudy,
+  deleteUser,
 } = require('../controllers/adminUserController');
 const {
   getCourses,
   getCourse,
+  exportCourse,
+  importCourse,
   createCourse,
   updateCourse,
   deleteCourse,
@@ -37,6 +41,8 @@ const {
 const {
   getToeicTests,
   getToeicTest,
+  exportToeicTest,
+  importToeicTest,
   createToeicTest,
   updateToeicTest,
   deleteToeicTest,
@@ -50,6 +56,10 @@ const {
   updateToeicQuestion,
   deleteToeicQuestion,
 } = require('../controllers/adminToeicController');
+const {
+  getAdminSupport,
+  updateAdminSupportStatus,
+} = require('../controllers/supportController');
 
 const router = express.Router();
 
@@ -64,9 +74,16 @@ router.get('/users', getUsers);
 router.get('/users/:userId', getUser);
 router.patch('/users/:userId/role', updateUserRole);
 router.patch('/users/:userId/status', updateUserStatus);
+router.post('/users/:userId/reset-study', resetUserStudy);
+router.delete('/users/:userId', deleteUser);
+
+router.get('/support', getAdminSupport);
+router.patch('/support/:ticketId/status', updateAdminSupportStatus);
 
 router.get('/courses', getCourses);
+router.post('/courses/import', importCourse);
 router.get('/courses/:courseId', getCourse);
+router.get('/courses/:courseId/export', exportCourse);
 router.post('/courses', createCourse);
 router.put('/courses/:courseId', updateCourse);
 router.delete('/courses/:courseId', deleteCourse);
@@ -83,7 +100,9 @@ router.put('/flashcards/:flashcardId', updateFlashcard);
 router.delete('/flashcards/:flashcardId', deleteFlashcard);
 
 router.get('/toeic/tests', getToeicTests);
+router.post('/toeic/tests/import', importToeicTest);
 router.get('/toeic/tests/:testId', getToeicTest);
+router.get('/toeic/tests/:testId/export', exportToeicTest);
 router.post('/toeic/tests', createToeicTest);
 router.put('/toeic/tests/:testId', updateToeicTest);
 router.delete('/toeic/tests/:testId', deleteToeicTest);

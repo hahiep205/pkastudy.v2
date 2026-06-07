@@ -1,6 +1,8 @@
 const {
   fetchAdminCourses,
   fetchAdminCourse,
+  exportAdminCourseEntry,
+  importAdminCourseEntry,
   createAdminCourseEntry,
   updateAdminCourseEntry,
   deleteAdminCourseEntry,
@@ -19,6 +21,24 @@ async function getCourse(req, res, next) {
   try {
     const data = await fetchAdminCourse(req.params.courseId);
     res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function exportCourse(req, res, next) {
+  try {
+    const data = await exportAdminCourseEntry(req.params.courseId);
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function importCourse(req, res, next) {
+  try {
+    const data = await importAdminCourseEntry(req.body);
+    res.status(201).json({ data });
   } catch (error) {
     next(error);
   }
@@ -54,6 +74,8 @@ async function deleteCourse(req, res, next) {
 module.exports = {
   getCourses,
   getCourse,
+  exportCourse,
+  importCourse,
   createCourse,
   updateCourse,
   deleteCourse,

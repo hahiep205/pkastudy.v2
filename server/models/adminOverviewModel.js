@@ -22,8 +22,11 @@ async function getAdminOverviewSummary() {
   const [rows] = await pool.query(
     `SELECT
       (SELECT COUNT(*) FROM Users) AS totalUsers,
+      (SELECT COUNT(*) FROM User_Progress WHERE last_study_date = CURDATE()) AS activeUsersToday,
       (SELECT COUNT(*) FROM Courses) AS totalCourses,
       (SELECT COUNT(*) FROM Flashcards) AS totalFlashcards,
+      (SELECT COUNT(*) FROM Toeic_Tests) AS totalToeicTests,
+      (SELECT COUNT(*) FROM Toeic_Questions) AS totalToeicQuestions,
       (SELECT COUNT(*) FROM Toeic_Test_Records) AS totalToeicAttempts,
       (SELECT COUNT(*) FROM SRS_Reviews) AS totalSrsReviews`
   );
@@ -32,8 +35,11 @@ async function getAdminOverviewSummary() {
 
   return {
     totalUsers: Number(row.totalUsers || 0),
+    activeUsersToday: Number(row.activeUsersToday || 0),
     totalCourses: Number(row.totalCourses || 0),
     totalFlashcards: Number(row.totalFlashcards || 0),
+    totalToeicTests: Number(row.totalToeicTests || 0),
+    totalToeicQuestions: Number(row.totalToeicQuestions || 0),
     totalToeicAttempts: Number(row.totalToeicAttempts || 0),
     totalSrsReviews: Number(row.totalSrsReviews || 0),
   };

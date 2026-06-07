@@ -1,6 +1,8 @@
 const {
   fetchAdminToeicTests,
   fetchAdminToeicTest,
+  exportAdminToeicTestEntry,
+  importAdminToeicTestEntry,
   createAdminToeicTestEntry,
   updateAdminToeicTestEntry,
   deleteAdminToeicTestEntry,
@@ -36,6 +38,24 @@ async function getToeicTest(req, res, next) {
 async function createToeicTest(req, res, next) {
   try {
     const data = await createAdminToeicTestEntry(req.body);
+    res.status(201).json({ data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function exportToeicTest(req, res, next) {
+  try {
+    const data = await exportAdminToeicTestEntry(req.params.testId);
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function importToeicTest(req, res, next) {
+  try {
+    const data = await importAdminToeicTestEntry(req.body);
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -144,6 +164,8 @@ async function deleteToeicQuestion(req, res, next) {
 module.exports = {
   getToeicTests,
   getToeicTest,
+  exportToeicTest,
+  importToeicTest,
   createToeicTest,
   updateToeicTest,
   deleteToeicTest,
