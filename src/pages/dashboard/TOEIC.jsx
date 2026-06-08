@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { xpToeicFullTest, xpToeicPartComplete } from "../../utils/xpSystem";
 import axiosClient from "../../utils/axiosClient";
 import { mapApiTestToFrontendFormat } from "../../utils/toeicAdapter";
@@ -98,6 +99,41 @@ const READING_TEST_SECTION_DURATIONS = {
 };
 
 // We will now fetch lists and questions dynamically via API instead of hardcoded SETS.
+
+function normalizeResourceKey(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function resolveRecommendedResourceLink(resource, courses) {
+  if (!resource?.courseMatchers?.length || !Array.isArray(courses) || courses.length === 0) {
+    return resource.link;
+  }
+
+  const normalizedMatchers = resource.courseMatchers.map(normalizeResourceKey);
+  const matchedCourse = courses.find((course) => {
+    const candidates = [
+      course?.slug,
+      course?.title,
+      course?.description,
+      course?.courseId,
+      course?.id,
+    ]
+      .filter(Boolean)
+      .map(normalizeResourceKey);
+
+    return normalizedMatchers.some((matcher) =>
+      candidates.some((candidate) => candidate === matcher || candidate.includes(matcher) || matcher.includes(candidate)),
+    );
+  });
+
+  if (!matchedCourse) return resource.fallbackLink || resource.link || "/dashboard/courses";
+  return `/dashboard/courses/${matchedCourse.slug || matchedCourse.courseId || matchedCourse.id}`;
+}
 
 function ModeGrid({ modes, onSelect }) {
   return (
@@ -2640,6 +2676,8 @@ const getRecommendedResources = (score) => {
         tag: "Nâng cao (Target 850+)",
         icon: "🏆",
         link: "/dashboard/courses/toeic-hackers",
+        fallbackLink: "/dashboard/courses",
+        courseMatchers: ["toeic-hackers", "hackers toeic 1000 vol 3", "hackers toeic vocabulary"],
         linkLabel: "Học từ vựng Hackers"
       },
       {
@@ -2660,6 +2698,8 @@ const getRecommendedResources = (score) => {
         tag: "Phù hợp với bạn",
         icon: "📖",
         link: "/dashboard/courses/toeic-hackers",
+        fallbackLink: "/dashboard/courses",
+        courseMatchers: ["toeic-hackers", "hackers toeic vocabulary", "hackers toeic 1000 vol 3"],
         linkLabel: "Học từ vựng Hackers"
       },
       {
@@ -2680,6 +2720,8 @@ const getRecommendedResources = (score) => {
         tag: "Phù hợp với bạn",
         icon: "🌱",
         link: "/dashboard/courses/toeic-starter",
+        fallbackLink: "/dashboard/courses",
+        courseMatchers: ["toeic-starter", "starter toeic vocabulary"],
         linkLabel: "Học từ vựng Starter"
       },
       {
@@ -2688,6 +2730,8 @@ const getRecommendedResources = (score) => {
         tag: "Khuyên dùng",
         icon: "📕",
         link: "/dashboard/courses/toeic-basic",
+        fallbackLink: "/dashboard/courses/toeic-basic",
+        courseMatchers: ["toeic-basic", "600 essential words", "600 essential words for the toeic"],
         linkLabel: "Xem 50 bài học"
       }
     ];
@@ -2699,6 +2743,8 @@ const getRecommendedResources = (score) => {
       tag: "Phù hợp với bạn",
       icon: "🐣",
       link: "/dashboard/courses/toeic-very-easy",
+      fallbackLink: "/dashboard/courses/very-easy-toeic",
+      courseMatchers: ["toeic-very-easy", "very easy toeic vocabulary"],
       linkLabel: "Học từ vựng cơ bản"
     },
     {
@@ -2707,6 +2753,8 @@ const getRecommendedResources = (score) => {
       tag: "Nền tảng",
       icon: "📕",
       link: "/dashboard/courses/toeic-basic",
+      fallbackLink: "/dashboard/courses/toeic-basic",
+      courseMatchers: ["toeic-basic", "600 essential words", "600 essential words for the toeic"],
       linkLabel: "Xem 50 bài học"
     }
   ];
@@ -2715,6 +2763,7 @@ const getRecommendedResources = (score) => {
 function ToeicDashboard({ onStartTest, onStartPractice }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState([]);
   const [targetScore, setTargetScore] = useState(() => {
     return parseInt(localStorage.getItem("toeic_target_score") || "650", 10);
   });
@@ -2731,6 +2780,16 @@ function ToeicDashboard({ onStartTest, onStartPractice }) {
         console.error(err);
         setLoading(false);
       });
+
+    axiosClient.get("/courses")
+      .then((res) => {
+        const data = res.data || res;
+        setCourses(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        console.error("Fetch courses for TOEIC recommendations error:", err);
+        setCourses([]);
+      });
   }, []);
 
   const handleSaveTarget = () => {
@@ -2742,6 +2801,13 @@ function ToeicDashboard({ onStartTest, onStartPractice }) {
 
   const latestRecord = history[0] || null;
   const currentScore = latestRecord ? latestRecord.total_score : 0;
+  const recommendedResources = useMemo(
+    () => getRecommendedResources(currentScore).map((resource) => ({
+      ...resource,
+      resolvedLink: resolveRecommendedResourceLink(resource, courses),
+    })),
+    [currentScore, courses],
+  );
   const currentBand = getToeicBand(currentScore);
   const targetBand = getToeicBand(targetScore);
   const percent = Math.min(100, Math.round((currentScore / targetScore) * 100));
@@ -2889,8 +2955,8 @@ function ToeicDashboard({ onStartTest, onStartPractice }) {
           Được cá nhân hóa dựa trên điểm số hiện tại của bạn (<strong>{currentScore} điểm</strong>)
         </p>
         <div className="toeic-resources-grid">
-          {getRecommendedResources(currentScore).map((res, idx) => (
-            <div key={idx} className="toeic-resource-item-card">
+          {recommendedResources.map((res, idx) => (
+            <Link key={idx} to={res.resolvedLink} className="toeic-resource-item-card">
               <span className="toeic-resource-item-icon">{res.icon}</span>
               <div className="toeic-resource-item-body">
                 <div className="toeic-resource-item-header">
@@ -2898,11 +2964,11 @@ function ToeicDashboard({ onStartTest, onStartPractice }) {
                   <span className="toeic-resource-item-badge">{res.tag}</span>
                 </div>
                 <p>{res.desc}</p>
-                <a href={res.link} className="toeic-resource-item-link">
+                <span className="toeic-resource-item-link">
                   {res.linkLabel} →
-                </a>
+                </span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

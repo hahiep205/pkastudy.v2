@@ -428,7 +428,7 @@ export default function ManagerCourses() {
 
                             <div className="manager-table-actions">
                                 <Link to={`/manager/courses/${course.id}/topics`} className="manager-inline-action">
-                                    Xem chi ti?t
+                                    Xem chi tiết
                                 </Link>
                                 <button type="button" className="manager-table-action" onClick={() => openEditModal(course)}>
                                     Sửa

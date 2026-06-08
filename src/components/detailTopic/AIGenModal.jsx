@@ -4,8 +4,9 @@ import { useState } from 'react';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
 
-const AI_API_URL = 'https://platform.beeknoee.com/api/v1/chat/completions';
-const AI_BEARER = 'sk-bee-c3b440a14f7a434283c95709c96c5879';
+const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
+const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || 'sk-bee-9b56ef380e6d34ac104b81462524f6ff3693a8e68066cfe888f42ddddfbf3df6';
+const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'glm-4.5-flash';
 
 const LANG_CONFIG = {
     en: {
@@ -450,6 +451,36 @@ function parseGeneratedWords(rawText, requestedCount) {
     return normalized;
 }
 
+async function buildAiError(resp) {
+    let detail = '';
+
+    try {
+        const data = await resp.json();
+        detail =
+            data?.error?.message ||
+            data?.error?.details ||
+            data?.message ||
+            data?.detail ||
+            '';
+    } catch {
+        detail = '';
+    }
+
+    if (resp.status === 429) {
+        return 'AI đang bận hoặc đã chạm giới hạn tạm thời. Vui lòng đợi 30-60 giây rồi thử lại.';
+    }
+
+    if (resp.status === 401 || resp.status === 403) {
+        return 'Cấu hình AI hiện tại không hợp lệ hoặc đã hết quyền truy cập.';
+    }
+
+    if (resp.status >= 500) {
+        return 'Máy chủ AI đang gặp sự cố tạm thời. Vui lòng thử lại sau ít phút.';
+    }
+
+    return detail || `HTTP ${resp.status}`;
+}
+
 export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
     const [theme, setTheme] = useState('');
     const [count, setCount] = useState(10);
@@ -463,6 +494,8 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
     const langLabel = currentLang.label;
 
     const handleGenerate = async () => {
+        if (status === 'loading') return;
+
         if (!theme.trim()) {
             setToastMessage('Vui lòng nhập chủ đề');
             return;
@@ -481,7 +514,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                     Authorization: `Bearer ${AI_BEARER}`
                 },
                 body: JSON.stringify({
-                    model: 'llama3.1-8b',
+                    model: AI_MODEL,
                     messages: [
                         { role: 'system', content: currentLang.systemPrompt },
                         { role: 'user', content: prompt }
@@ -493,7 +526,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
             });
 
             if (!resp.ok) {
-                throw new Error(`HTTP ${resp.status}`);
+                throw new Error(await buildAiError(resp));
             }
 
             const data = await resp.json();

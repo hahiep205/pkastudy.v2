@@ -17,8 +17,9 @@ marked.setOptions({
     }
 });
 
-const API_URL = 'https://platform.beeknoee.com/api/v1/chat/completions';
-const MODEL = 'llama3.1-8b';
+const API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
+const API_BEARER = import.meta.env.VITE_BEE_AI_BEARER || 'sk-bee-9b56ef380e6d34ac104b81462524f6ff3693a8e68066cfe888f42ddddfbf3df6';
+const MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'glm-4.5-flash';
 
 const SYSTEM_PROMPT = `Bạn là trợ lý AI gia sư của PKA Study — nền tảng học ngoại ngữ thông minh dành cho sinh viên và người học.
 
@@ -95,7 +96,7 @@ export default function FloatChat() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer sk-bee-c3b440a14f7a434283c95709c96c5879`
+                    'Authorization': `Bearer ${API_BEARER}`
                 },
                 body: JSON.stringify({
                     model: MODEL,
@@ -204,7 +205,7 @@ export default function FloatChat() {
                     {messages.map((msg, index) => (
                         <div key={index} className={`float-msg ${msg.sender === 'bot' ? 'float-msg-bot' : 'float-msg-user'}`}>
                             {msg.sender === 'user' || msg.isTyping ? (
-                                <span>{msg.isTyping ? <span className="float-typing"><span>●</span><span>●</span><span>●</span></span> : msg.text}</span>
+                                <span>{msg.isTyping ? <span className="float-typing"><span></span><span></span><span></span></span> : msg.text}</span>
                             ) : (
                                 <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text || '') }} />
                             )}

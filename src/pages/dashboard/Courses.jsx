@@ -105,19 +105,27 @@ export default function Courses() {
         setModalType('topic-form');
     };
 
-    const handleSaveTopic = () => {
+    const handleSaveTopic = async () => {
         if (!topicForm.title.trim()) {
             setToastMessage('Vui lòng nhập tên chủ đề');
             return;
         }
 
+        let result;
         if (editingTopic) {
-            updateTopic(editingTopic.id, topicForm);
+            result = await updateTopic(editingTopic.id, topicForm);
         } else {
-            createTopic(topicForm);
+            result = await createTopic(topicForm);
+        }
+
+        if (result?.error) {
+            setToastMessage(result.error);
+            return;
         }
 
         setModalType(null);
+        setEditingTopic(null);
+        setTopicForm({ title: '', description: '', lang: 'en' });
         setToastMessage('');
     };
 
@@ -134,7 +142,8 @@ export default function Courses() {
                     <div className="welcome-eyebrow">Thư viện tài liệu</div>
                     <h1 className="welcome-title">Học từ vựng cùng pkastudy!</h1>
                     <p className="welcome-sub">
-                        Thư viện học tập được sắp xếp theo chủ đề rõ ràng, giúp bạn học từ vựng và luyện tập đều đặn mỗi ngày.
+                        Thư viện học tập được sắp xếp theo chủ đề rõ ràng, giúp bạn học từ vựng
+                        và luyện tập đều đặn mỗi ngày.
                     </p>
                 </div>
                 <div className="courses-banner-badges">
@@ -312,6 +321,8 @@ export default function Courses() {
                 isOpen={modalType === 'topic-form'}
                 onClose={() => {
                     setModalType(null);
+                    setEditingTopic(null);
+                    setTopicForm({ title: '', description: '', lang: 'en' });
                     setToastMessage('');
                 }}
                 onSave={handleSaveTopic}

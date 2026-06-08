@@ -1,4 +1,39 @@
 const pool = require('../db');
+const CUSTOM_TOPICS_COURSE_SLUG = '__custom_user_topics__';
+
+async function ensureCustomTopicsCourseId() {
+  const [existingRows] = await pool.query(
+    `SELECT id
+     FROM Courses
+     WHERE slug = ?
+     LIMIT 1`,
+    [CUSTOM_TOPICS_COURSE_SLUG]
+  );
+
+  if (existingRows[0]?.id) {
+    return existingRows[0].id;
+  }
+
+  const [sortRows] = await pool.query(
+    `SELECT COALESCE(MAX(sort_order), 0) + 1000 AS nextSortOrder
+     FROM Courses`
+  );
+
+  const nextSortOrder = Number(sortRows[0]?.nextSortOrder || 1000);
+  const [insertResult] = await pool.query(
+    `INSERT INTO Courses (slug, title, description, language, sort_order)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      CUSTOM_TOPICS_COURSE_SLUG,
+      'Custom Topics Anchor',
+      'System course used internally for user-owned custom topics.',
+      'en',
+      nextSortOrder,
+    ]
+  );
+
+  return insertResult.insertId;
+}
 
 // ── Custom Topics ──────────────────────────────────────────────────────────
 
@@ -33,10 +68,11 @@ async function getCustomTopicWithWords(userId, topicId) {
 }
 
 async function createCustomTopic(userId, { title, description, lang }) {
+  const customCourseId = await ensureCustomTopicsCourseId();
   const [result] = await pool.query(
     `INSERT INTO Topics (course_id, title, description, user_id, is_custom, sort_order)
-     VALUES (NULL, ?, ?, ?, 1, 0)`,
-    [title, description || null, userId]
+     VALUES (?, ?, ?, ?, 1, 0)`,
+    [customCourseId, title, description || null, userId]
   );
   return { id: result.insertId, title, description, words: [] };
 }
@@ -109,6 +145,7 @@ async function deleteWordFromCustomTopic(userId, topicId, wordId) {
 }
 
 module.exports = {
+  CUSTOM_TOPICS_COURSE_SLUG,
   getCustomTopicsByUser,
   getCustomTopicWithWords,
   createCustomTopic,

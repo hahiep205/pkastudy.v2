@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { CUSTOM_TOPICS_COURSE_SLUG } = require('./customCoursesModel');
 
 async function getAllCourses() {
   const [rows] = await pool.query(
@@ -17,6 +18,7 @@ async function getAllCourses() {
     FROM Courses c
     LEFT JOIN Topics t ON t.course_id = c.id
     LEFT JOIN Flashcards f ON f.topic_id = t.id
+    WHERE c.slug <> ?
     GROUP BY
       c.id,
       c.slug,
@@ -27,7 +29,8 @@ async function getAllCourses() {
       c.sort_order,
       c.created_at,
       c.updated_at
-    ORDER BY c.sort_order ASC, c.id ASC`
+    ORDER BY c.sort_order ASC, c.id ASC`,
+    [CUSTOM_TOPICS_COURSE_SLUG]
   );
 
   return rows;

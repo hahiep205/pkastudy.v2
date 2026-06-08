@@ -1,8 +1,9 @@
 const pool = require('../db');
+const { CUSTOM_TOPICS_COURSE_SLUG } = require('./customCoursesModel');
 
 async function listAdminCourses({ limit, offset, search }) {
-  const whereClauses = [];
-  const whereParams = [];
+  const whereClauses = ['c.slug <> ?'];
+  const whereParams = [CUSTOM_TOPICS_COURSE_SLUG];
 
   if (search) {
     whereClauses.push('(c.title LIKE ? OR c.slug LIKE ?)');

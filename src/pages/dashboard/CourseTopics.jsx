@@ -41,21 +41,23 @@ export default function CourseTopics() {
     setModalOpen(true);
   };
 
-  const handleSaveTopic = () => {
+  const handleSaveTopic = async () => {
     if (!topicForm.title.trim()) {
       setToastMessage("Vui lòng nhập tên chủ đề");
       return;
     }
 
     const result = editingTopic
-      ? updateTopic(editingTopic.id, topicForm)
-      : createTopic(topicForm);
+      ? await updateTopic(editingTopic.id, topicForm)
+      : await createTopic(topicForm);
     if (result?.error) {
       setToastMessage(result.error);
       return;
     }
 
     setModalOpen(false);
+    setEditingTopic(null);
+    setTopicForm({ title: "", description: "", lang: "en" });
     setToastMessage("");
   };
 
@@ -65,7 +67,6 @@ export default function CourseTopics() {
     setToastMessage("Đã xóa chủ đề");
   };
 
-  // Fetch course info and topics from API
   const [courseTitle, setCourseTitle] = useState("");
   const [apiTopics, setApiTopics] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -104,7 +105,6 @@ export default function CourseTopics() {
     };
   }, [courseId]);
 
-  // Set up reveal animation for topic cards
   useEffect(() => {
     const revealEls = Array.from(
       document.querySelectorAll(".cv-topics-grid .reveal"),
@@ -133,7 +133,6 @@ export default function CourseTopics() {
     );
 
     revealEls.forEach((el) => {
-      // Check if element is already in viewport
       if (el.getBoundingClientRect().top < window.innerHeight * 0.9) {
         el.classList.add("revealed");
       } else {
@@ -162,7 +161,7 @@ export default function CourseTopics() {
     if (!loading && !title && apiTopics.length === 0) {
       return (
         <div style={{ textAlign: "center", padding: "50px" }}>
-          <h2>⚠️ Topic không tồn tại hoặc đang được phát triển.</h2>
+          <h2>Topic không tồn tại hoặc đang được phát triển.</h2>
           <br />
           <button
             className="btn btn-secondary"
@@ -337,6 +336,8 @@ export default function CourseTopics() {
         isOpen={modalOpen}
         onClose={() => {
           setModalOpen(false);
+          setEditingTopic(null);
+          setTopicForm({ title: "", description: "", lang: "en" });
           setToastMessage("");
         }}
         onSave={handleSaveTopic}

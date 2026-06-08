@@ -1,9 +1,9 @@
 /**
- * useCustomCourses — Custom (user-owned) topics & words
+ * useCustomCourses - Custom (user-owned) topics & words
  *
  * Strategy:
- *  - If user is authenticated → use backend API (source of truth)
- *  - Otherwise → fall back to localStorage (guest mode)
+ *  - If user is authenticated -> use backend API (source of truth)
+ *  - Otherwise -> fall back to localStorage (guest mode)
  *  - On first load with API, migrate any existing localStorage data once
  */
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -12,7 +12,6 @@ import axiosClient from "../utils/axiosClient";
 const CUSTOM_KEY = "pka_custom_courses";
 const MIGRATED_KEY = "pka_custom_courses_migrated_v1";
 
-// ── localStorage helpers (guest mode & migration) ──────────────────────────
 const getLocalCourses = () => {
   try {
     return JSON.parse(localStorage.getItem(CUSTOM_KEY)) || [];
@@ -20,12 +19,13 @@ const getLocalCourses = () => {
     return [];
   }
 };
+
 const saveLocalCourses = (courses) =>
   localStorage.setItem(CUSTOM_KEY, JSON.stringify(courses));
+
 const createLocalId = (prefix) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-// ── Check if user has a valid token (i.e. is logged in) ────────────────────
 function isLoggedIn() {
   try {
     const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -35,7 +35,6 @@ function isLoggedIn() {
   }
 }
 
-// ── Map API topic to internal format ──────────────────────────────────────
 function mapApiTopic(apiTopic) {
   return {
     id: String(apiTopic.id),
@@ -58,13 +57,11 @@ function mapApiTopic(apiTopic) {
   };
 }
 
-// ── Main hook ──────────────────────────────────────────────────────────────
 export function useCustomCourses() {
   const [customCourses, setCustomCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const isMountedRef = useRef(true);
 
-  // ── Migration: push localStorage topics to API once ─────────────────────
   const migrateLocalToServer = useCallback(async (serverTopics) => {
     if (localStorage.getItem(MIGRATED_KEY)) return;
     const local = getLocalCourses();
@@ -78,9 +75,10 @@ export function useCustomCourses() {
     }
 
     console.log(
-      "[CustomCourses] Migrating localStorage topics to server…",
+      "[CustomCourses] Migrating localStorage topics to server...",
       local.length,
     );
+
     for (const topic of local) {
       try {
         const res = await axiosClient.post("/courses/custom/topics", {
@@ -113,11 +111,11 @@ export function useCustomCourses() {
         console.warn("Topic migration failed:", topic.title, err?.message);
       }
     }
+
     localStorage.setItem(MIGRATED_KEY, "1");
     console.log("[CustomCourses] Migration done!");
   }, []);
 
-  // ── Load from API ────────────────────────────────────────────────────────
   const loadFromServer = useCallback(async () => {
     setLoading(true);
     try {
@@ -125,7 +123,7 @@ export function useCustomCourses() {
       const topics = (Array.isArray(res) ? res : []).map(mapApiTopic);
       if (isMountedRef.current) setCustomCourses(topics);
       await migrateLocalToServer(topics);
-      // Reload after possible migration
+
       const res2 = await axiosClient.get("/courses/custom/topics");
       const topics2 = (Array.isArray(res2) ? res2 : []).map(mapApiTopic);
       if (isMountedRef.current) setCustomCourses(topics2);
@@ -152,13 +150,10 @@ export function useCustomCourses() {
     };
   }, [loadFromServer]);
 
-  // ── TOPIC CRUD ────────────────────────────────────────────────────────────
-
   const createTopic = useCallback(
     async ({ title, description, lang }) => {
       if (!title?.trim()) return { error: "Tên chủ đề không được để trống." };
       if (!isLoggedIn()) {
-        // Guest mode
         const local = getLocalCourses();
         if (
           local.some(
@@ -240,8 +235,6 @@ export function useCustomCourses() {
     },
     [customCourses, loadFromServer],
   );
-
-  // ── WORD CRUD ─────────────────────────────────────────────────────────────
 
   const addWordToTopic = useCallback(
     async (topicId, wordData) => {

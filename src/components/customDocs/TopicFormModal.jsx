@@ -1,10 +1,5 @@
-// TẠO TOPIC CUSTOM
-
 import CustomModal from './CustomModal';
 import ToastNotice from '../common/ToastNotice';
-import { languageLabels } from '../../utils/language';
-
-const supportedLanguages = ['en', 'ko', 'ja', 'zh', 'fr'];
 
 export default function TopicFormModal({
     isOpen,
@@ -30,7 +25,7 @@ export default function TopicFormModal({
         <CustomModal
             isOpen={isOpen}
             onClose={onClose}
-            title={editingTopic ? '✏️ Sửa chủ đề' : createTopicTitle}
+            title={editingTopic ? 'Sửa chủ đề' : createTopicTitle}
         >
             <ToastNotice message={toastMessage} onHide={onToastHide} />
             <div className="cv-modal-body">
@@ -41,7 +36,7 @@ export default function TopicFormModal({
                     <input
                         className="cv-form-input"
                         maxLength="60"
-                        placeholder="Ví dụ: 🏢 Từ vựng văn phòng"
+                        placeholder="Ví dụ: Từ vựng văn phòng"
                         value={topicForm.title}
                         onChange={(event) => {
                             setTopicForm({ ...topicForm, title: event.target.value });
@@ -50,7 +45,7 @@ export default function TopicFormModal({
                     />
                 </div>
                 <div className="cv-form-row">
-                    <div className="cv-form-group" style={{ flex: 2 }}>
+                    <div className="cv-form-group" style={{ flex: 1 }}>
                         <label className="cv-form-label">Mô tả</label>
                         <textarea
                             className="cv-form-input cv-form-textarea"
@@ -62,23 +57,6 @@ export default function TopicFormModal({
                                 onToastHide?.();
                             }}
                         />
-                    </div>
-                    <div className="cv-form-group" style={{ flex: 1 }}>
-                        <label className="cv-form-label">Ngôn ngữ</label>
-                        <select
-                            className="cv-form-input cv-form-select"
-                            value={topicForm.lang}
-                            onChange={(event) => {
-                                setTopicForm({ ...topicForm, lang: event.target.value });
-                                onToastHide?.();
-                            }}
-                        >
-                            {supportedLanguages.map((languageCode) => (
-                                <option key={languageCode} value={languageCode}>
-                                    {languageLabels[languageCode]}
-                                </option>
-                            ))}
-                        </select>
                     </div>
                 </div>
             </div>

@@ -59,11 +59,6 @@ export default function Stats() {
         [courses],
     );
 
-    const builtInTopicTotal = useMemo(
-        () => courses.reduce((sum, course) => sum + Number(course.topic_count || 0), 0),
-        [courses],
-    );
-
     const totalRemembered = useMemo(
         () => Object.keys(remembered).filter((key) => remembered[key]).length,
         [remembered],
@@ -73,32 +68,6 @@ export default function Stats() {
     const grandTotal = Math.max(builtInTotal + customTotal, totalRemembered, 1);
     const grandDone = builtInDone + customDone;
     const pct = Math.round((grandDone / grandTotal) * 100);
-
-    const courseStats = useMemo(() => {
-        const stats = [];
-
-        if (builtInTotal > 0) {
-            stats.push({
-                name: 'Kho học TOEIC',
-                total: builtInTotal,
-                done: builtInDone,
-                subtitle: `${builtInTopicTotal} chủ đề · ${courses.length} khóa học`,
-                tone: 'blue',
-            });
-        }
-
-        if (customCourses.length > 0) {
-            stats.push({
-                name: 'Tài liệu cá nhân',
-                total: customTotal,
-                done: customDone,
-                subtitle: `${customCourses.length} chủ đề`,
-                tone: 'orange',
-            });
-        }
-
-        return stats;
-    }, [builtInDone, builtInTotal, builtInTopicTotal, courses.length, customCourses.length, customDone, customTotal]);
 
     const personalStats = [
         {
@@ -127,15 +96,13 @@ export default function Stats() {
         },
     ];
 
-    const toneMap = { blue: 'blue', orange: 'orange' };
-
     return (
         <main className="dash-main stats-page stats2-page" id="page-stats">
             <section className="stats2-hero reveal" data-reveal-order="0">
                 <div className="stats2-hero-copy">
                     <div className="stats2-kicker">Thống kê</div>
                     <h1>Tổng quan tiến trình học tập</h1>
-                    <p>Theo dõi tiến độ học tập trên kho TOEIC, tài liệu cá nhân và những mốc EXP bạn đang tích lũy.</p>
+                    <p>Theo dõi tiến độ học tập, lượng từ đã ghi nhớ và những mốc EXP bạn đang tích lũy.</p>
                 </div>
             </section>
 
@@ -165,42 +132,6 @@ export default function Stats() {
             </section>
 
             <div className="stats2-grid">
-                {courseStats.map((course) => {
-                    const coursePct = course.total > 0 ? Math.round((course.done / course.total) * 100) : 0;
-                    const tone = toneMap[course.tone] || 'blue';
-
-                    return (
-                        <section key={course.name} className={`stats2-board stats2-board-${tone} reveal`}>
-                            <header className="stats2-board-header">
-                                <div className="stats2-board-copy">
-                                    <h2>{course.name}</h2>
-                                    <p>{course.subtitle}</p>
-                                </div>
-                            </header>
-
-                            <div className="stats2-course-bar-wrap">
-                                <div className="stats2-course-bar">
-                                    <div className="stats2-course-fill" style={{ width: `${coursePct}%` }}></div>
-                                </div>
-                            </div>
-
-                            <div className="stats2-history">
-                                <article className="stats2-history-item">
-                                    <div className="stats2-leader-main">
-                                        <div className="stats2-leader-copy">
-                                            <strong>Đã hoàn thành</strong>
-                                            <small>{course.done} từ</small>
-                                        </div>
-                                    </div>
-                                    <div className="stats2-history-values">
-                                        <span>{course.total - course.done} từ còn lại</span>
-                                    </div>
-                                </article>
-                            </div>
-                        </section>
-                    );
-                })}
-
                 <section className="stats2-board stats2-board-streak reveal">
                     <header className="stats2-board-header">
                         <div className="stats2-board-copy">
