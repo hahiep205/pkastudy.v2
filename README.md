@@ -1,42 +1,82 @@
-# pkastudy
+# ĐỒ ÁN CƠ SỞ - NHÓM 6
 
-Project học từ vựng và luyện TOEIC.
+## Đề tài: Xây dựng website học từ vựng kết hợp ôn luyện TOEIC bằng React.js và MySQL
 
-- Frontend: React + Vite
-- Backend: Express
-- Database: MySQL / MariaDB
+## Thành viên nhóm
 
-## Yêu cầu
+| Họ và tên         | MSSV     |
+| ----------------- | -------- |
+| Hà Văn Hiệp       | 23010104 |
+| Tạ Thu Hương Linh | 23010686 |
+| Vương Huy Huy     | 23010714 |
 
-- Node.js 18+
-- npm
-- MySQL hoặc MariaDB
+---
 
-## 1. Cài dependencies
+## Công nghệ sử dụng
 
-Frontend:
+### Frontend
 
-```powershell
-cd C:\path\to\pkastudy
+* React.js
+* Vite
+
+### Backend
+
+* Express.js
+* Node.js
+
+### Database
+
+* MySQL 8+
+
+---
+
+## Yêu cầu hệ thống
+
+* Node.js 18 trở lên
+* npm
+* MySQL 8+
+
+---
+
+## Cài đặt dự án
+
+### 1. Clone repository
+
+```bash
+git clone <repository-url>
+cd pkastudy
+```
+
+### 2. Cài đặt dependencies
+
+#### Frontend
+
+```bash
 npm install
 ```
 
-Backend:
+#### Backend
 
-```powershell
-cd C:\path\to\pkastudy\server
+```bash
+cd server
 npm install
 ```
 
-## 2. Cấu hình môi trường
+---
 
-Frontend `.env`:
+## Cấu hình môi trường
+
+### Frontend (`.env`)
+
+Tạo file `.env` trong thư mục gốc:
 
 ```env
 VITE_API_BASE_URL=http://localhost:4000/api
 ```
 
-Backend `server/.env`:
+### Backend (`server/.env`)
+
+Tạo file `.env` trong thư mục `server`:
 
 ```env
 DB_HOST=127.0.0.1
@@ -46,89 +86,164 @@ DB_PASS=
 DB_NAME=pkastudy
 ```
 
-Nếu MySQL có mật khẩu thì sửa `DB_PASS` cho đúng.
+> Nếu MySQL có mật khẩu, hãy cập nhật giá trị `DB_PASS` cho phù hợp.
 
-## 2.1. Migration cho manager/admin phase 1
+---
 
-Nếu database đã được tạo từ trước, chạy thêm migration:
+## Tạo Database
 
-- [server/sql/migration-admin-phase1.sql](C:/Users/hahie/OneDrive/Desktop/pkastudy/pkastudy/server/sql/migration-admin-phase1.sql)
+### Tạo database
 
-Migration này thêm:
-
-- `Users.role`
-- `Users.status`
-- `Courses.thumbnail_url`
-
-Sau đó có thể nâng quyền một tài khoản có sẵn thành admin:
-
-```powershell
-cd C:\path\to\pkastudy\server
-npm run make-admin -- admin@example.com
+```sql
+CREATE DATABASE pkastudy;
 ```
 
-## 3. Tạo database và import schema
+### Import schema
 
-Tạo database `pkastudy`, sau đó import file:
-
-- [server/sql/create-tables.sql](C:/Users/hahie/OneDrive/Desktop/pkastudy/pkastudy/server/sql/create-tables.sql)
-
-Ví dụ với MySQL CLI:
-
-```powershell
-mysql -u root pkastudy < C:\path\to\pkastudy\server\sql\create-tables.sql
+```bash
+mysql -u root pkastudy < server/sql/create-tables.sql
 ```
 
-Nếu dùng XAMPP, có thể import file này bằng `phpMyAdmin`.
+Hoặc sử dụng phpMyAdmin để import file:
 
-## 4. Seed dữ liệu
-
-Chạy trong thư mục `server`:
-
-```powershell
-cd C:\path\to\pkastudy\server
-node scripts/seed-external-data.js
+```text
+server/sql/create-tables.sql
 ```
 
-Hoặc:
+---
 
-```powershell
+## Seed dữ liệu mẫu
+
+Di chuyển vào thư mục backend:
+
+```bash
+cd server
 npm run seed:external-data
 ```
 
-## 5. Chạy backend
+### Tài khoản mặc định
 
-```powershell
-cd C:\path\to\pkastudy\server
+| Loại tài khoản | Username | Password |
+| -------------- | -------- | -------- |
+| Admin          | admin    | admin    |
+| User           | user     | user     |
+
+Tài khoản `user/user` đã có dữ liệu mẫu để kiểm thử:
+
+* Học từ vựng
+* Flashcard
+* Quiz
+* Listening
+* Typing
+* Match
+* Flappy Bird
+* TOEIC Practice
+* Hệ thống SRS
+
+---
+
+## Chạy dự án
+
+### Chạy Backend
+
+```bash
+cd server
 npm run dev
 ```
 
-Backend chạy tại:
+Backend mặc định chạy tại:
 
-- `http://localhost:4000`
+```text
+http://localhost:4000
+```
 
-## 6. Chạy frontend
+### Chạy Frontend
 
-```powershell
-cd C:\path\to\pkastudy
+```bash
 npm run dev
 ```
 
-Frontend chạy tại:
+Frontend mặc định chạy tại:
 
-- `http://localhost:5173`
+```text
+http://localhost:5173
+```
 
-## 7. Thứ tự chạy đầy đủ
+---
 
-1. Start MySQL
-2. Tạo database `pkastudy`
-3. Import `server/sql/create-tables.sql`
-4. Chạy `node scripts/seed-external-data.js`
-5. Chạy backend: `npm run dev`
-6. Chạy frontend: `npm run dev`
+## Quy trình khởi động đầy đủ
+
+1. Khởi động MySQL.
+2. Tạo database `pkastudy`.
+3. Import file `server/sql/create-tables.sql`.
+4. Chạy `npm install` trong thư mục gốc.
+5. Chạy `npm install` trong thư mục `server`.
+6. Chạy:
+
+```bash
+npm run seed:external-data
+```
+
+7. Khởi động backend:
+
+```bash
+cd server
+npm run dev
+```
+
+8. Khởi động frontend:
+
+```bash
+npm run dev
+```
+
+---
+
+## Cấu trúc thư mục
+
+```text
+pkastudy/
+│
+├── src/                    # Frontend React
+├── public/
+├── server/
+│   ├── sql/
+│   │   └── create-tables.sql
+│   ├── routes/
+│   ├── controllers/
+│   ├── services/
+│   └── server.js
+│
+├── .env
+├── package.json
+└── README.md
+```
+
+---
 
 ## Lưu ý
 
-- Không dùng `npm run db:init` vì `server/scripts/init-db.js` hiện không tồn tại.
-- Nếu dùng XAMPP và `root` không có mật khẩu, để `DB_PASS=` trống.
-- Nếu frontend không gọi được backend, kiểm tra lại `VITE_API_BASE_URL`.
+* Nếu sử dụng XAMPP với tài khoản `root` không có mật khẩu, hãy để:
+
+```env
+DB_PASS=
+```
+
+* Nếu frontend không kết nối được backend, hãy kiểm tra:
+
+```env
+VITE_API_BASE_URL
+```
+
+* Đảm bảo MySQL đang hoạt động trước khi chạy backend.
+
+* Không sử dụng:
+
+```bash
+npm run db:init
+```
+
+vì script này không tồn tại trong dự án.
+
+---
+
