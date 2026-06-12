@@ -1,6 +1,7 @@
 const pool = require('../db');
 const {
   getDueReviewsByUserId,
+  getReviewQueueByUserId,
   getFlashcardsByIds,
   getReviewsByUserIdAndFlashcardIdsForUpdate,
   upsertReviews,
@@ -9,6 +10,38 @@ const { calculateSM2, SM2_DEFAULT_EF } = require('../utils/sm2');
 
 async function fetchDueReviewsByUserId(userId) {
   return getDueReviewsByUserId(userId);
+}
+
+async function fetchReviewQueueByUserId(userId) {
+  return getReviewQueueByUserId(userId);
+}
+
+async function enqueueImmediateReviewBatch(userId, flashcardIds) {
+  const uniqueFlashcardIds = [...new Set((flashcardIds || []).filter((id) => Number.isInteger(id) && id > 0))];
+  if (uniqueFlashcardIds.length === 0) return [];
+
+  const flashcards = await getFlashcardsByIds(uniqueFlashcardIds);
+  if (flashcards.length !== uniqueFlashcardIds.length) {
+    const existingIds = new Set(flashcards.map((item) => item.id));
+    const missingFlashcardId = uniqueFlashcardIds.find((id) => !existingIds.has(id));
+    const error = new Error(`Flashcard not found: ${missingFlashcardId}`);
+    error.status = 400;
+    throw error;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const reviewRows = uniqueFlashcardIds.map((flashcardId) => ({
+    userId,
+    flashcardId,
+    interval: 0,
+    ef: SM2_DEFAULT_EF,
+    repetition: 0,
+    nextReviewDate: today,
+    lastReviewedAt: null,
+  }));
+
+  await upsertReviews(reviewRows);
+  return flashcards;
 }
 
 async function saveReviewBatch(userId, reviewItems) {
@@ -38,9 +71,9 @@ async function saveReviewBatch(userId, reviewItems) {
       currentReviews.map((item) => [
         item.flashcardId,
         {
-          interval: item.interval,
-          ef: item.ef,
-          repetition: item.repetition,
+          interval: Number(item.interval ?? 0),
+          ef: Number(item.ef ?? SM2_DEFAULT_EF),
+          repetition: Number(item.repetition ?? 0),
         },
       ])
     );
@@ -113,5 +146,7 @@ async function saveReviewBatch(userId, reviewItems) {
 
 module.exports = {
   fetchDueReviewsByUserId,
+  fetchReviewQueueByUserId,
+  enqueueImmediateReviewBatch,
   saveReviewBatch,
 };

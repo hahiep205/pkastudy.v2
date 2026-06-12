@@ -2,7 +2,7 @@ const pool = require('../db');
 
 async function getProgressByUserId(userId) {
   const [rows] = await pool.query(
-    'SELECT user_id AS userId, current_xp, level, current_streak FROM User_Progress WHERE user_id = ?',
+    'SELECT user_id AS userId, current_xp, level, current_streak, last_study_date FROM User_Progress WHERE user_id = ?',
     [userId]
   );
 

@@ -161,29 +161,35 @@
 }
 
 @media (min-width: 769px) {
-    #cv-words-view>.cv-subview-header+.flashcard-shell {
+    #cv-words-view>.cv-subview-header+.flashcard-shell,
+    #page-games.study-modes-surface>.cv-subview-header+.flashcard-shell {
         margin-top: 24px;
         gap: 24px;
     }
 
-    #cv-words-view .flashcard-card {
+    #cv-words-view .flashcard-card,
+    #page-games.study-modes-surface .flashcard-card {
         width: 100%;
         max-width: 615px;
         min-height: 450px;
         margin-top: 0;
     }
 
-    #cv-words-view .flashcard-card-inner {
+    #cv-words-view .flashcard-card-inner,
+    #page-games.study-modes-surface .flashcard-card-inner {
         min-height: 450px;
     }
 
-    #cv-words-view .flashcard-actions {
+    #cv-words-view .flashcard-actions,
+    #page-games.study-modes-surface .flashcard-actions {
         width: min(100%, 615px);
         margin: 0 auto;
     }
 
     #cv-words-view .flashcard-action-btn,
-    #cv-words-view .flashcard-action-switch {
+    #cv-words-view .flashcard-action-switch,
+    #page-games.study-modes-surface .flashcard-action-btn,
+    #page-games.study-modes-surface .flashcard-action-switch {
         min-height: 56px;
     }
 }
@@ -1483,12 +1489,14 @@ body.app-dark-mode .flashcard-action-switch:hover {
 }
 
 @media (min-width: 769px) {
-    #cv-words-view .quiz-card {
+    #cv-words-view .quiz-card,
+    #page-games.study-modes-surface .quiz-card {
         width: 100%;
         max-width: 615px;
     }
 
-    #cv-words-view .quiz-actions {
+    #cv-words-view .quiz-actions,
+    #page-games.study-modes-surface .quiz-actions {
         width: min(100%, 615px);
     }
 }
@@ -1788,12 +1796,14 @@ body.app-dark-mode .flashcard-action-switch:hover {
 }
 
 @media (min-width: 769px) {
-    #cv-words-view .listening-card {
+    #cv-words-view .listening-card,
+    #page-games.study-modes-surface .listening-card {
         width: 100%;
         max-width: 615px;
     }
 
-    #cv-words-view .listening-actions {
+    #cv-words-view .listening-actions,
+    #page-games.study-modes-surface .listening-actions {
         width: min(100%, 615px);
     }
 }
@@ -1997,12 +2007,14 @@ body.app-dark-mode .flashcard-action-switch:hover {
 }
 
 @media (min-width: 769px) {
-    #cv-words-view .match-shell-card {
+    #cv-words-view .match-shell-card,
+    #page-games.study-modes-surface .match-shell-card {
         width: 100%;
         max-width: 760px;
     }
 
-    #cv-words-view .match-actions {
+    #cv-words-view .match-actions,
+    #page-games.study-modes-surface .match-actions {
         width: min(100%, 760px);
     }
 }
@@ -2412,12 +2424,14 @@ body.app-dark-mode .flashcard-action-switch:hover {
 }
 
 @media (min-width: 769px) {
-    #cv-words-view .typing-card {
+    #cv-words-view .typing-card,
+    #page-games.study-modes-surface .typing-card {
         width: 100%;
         max-width: 615px;
     }
 
-    #cv-words-view .typing-actions {
+    #cv-words-view .typing-actions,
+    #page-games.study-modes-surface .typing-actions {
         width: min(100%, 615px);
     }
 }
@@ -2760,8 +2774,35 @@ body.app-dark-mode .flashcard-completion-stat-row strong {
     border-radius: 12px;
 }
 
-@media (min-width: 768px) {
-    .flashcard-completion-actions .btn.btn-primary {
-        grid-column: 1 / -1;
+.quiz-shell .flashcard-completion-actions button {
+    position: relative;
+}
+
+.quiz-shell .flashcard-completion-actions button:first-of-type,
+.quiz-shell .flashcard-completion-actions button:last-of-type {
+    font-size: 0;
+}
+
+.quiz-shell .flashcard-completion-actions button:first-of-type::after,
+.quiz-shell .flashcard-completion-actions button:last-of-type::after {
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.quiz-shell .flashcard-completion-actions button:first-of-type::after {
+    content: "Làm lại";
+}
+
+.quiz-shell .flashcard-completion-actions button:last-of-type::after {
+    content: "Quay về chủ đề";
+}
+
+@media (min-width: 769px) {
+    .flashcard-completion-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .flashcard-completion-actions button {
+        grid-column: auto;
     }
 }

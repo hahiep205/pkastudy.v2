@@ -48,7 +48,32 @@ async function getCustomTopicsByUser(userId) {
      ORDER BY t.created_at DESC`,
     [userId]
   );
-  return rows;
+
+  if (rows.length === 0) {
+    return rows;
+  }
+
+  const topicIds = rows.map((row) => row.id);
+  const [words] = await pool.query(
+    `SELECT id, topic_id, word, transcription, meaning AS mean, word_type AS wordtype,
+            example, example_vi, language
+     FROM Flashcards
+     WHERE topic_id IN (?)
+     ORDER BY topic_id DESC, id ASC`,
+    [topicIds]
+  );
+
+  const wordsByTopicId = new Map();
+  words.forEach((word) => {
+    const topicWords = wordsByTopicId.get(word.topic_id) || [];
+    topicWords.push(word);
+    wordsByTopicId.set(word.topic_id, topicWords);
+  });
+
+  return rows.map((row) => ({
+    ...row,
+    words: wordsByTopicId.get(row.id) || [],
+  }));
 }
 
 async function getCustomTopicWithWords(userId, topicId) {

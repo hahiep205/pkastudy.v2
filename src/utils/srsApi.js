@@ -53,6 +53,24 @@ export async function fetchDueReviews() {
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
+export async function fetchReviewQueue() {
+  const response = await fetch(buildApiUrl('api/srs/queue'), {
+    headers: buildAuthHeaders(),
+  });
+  const payload = await parseJsonResponse(response, 'KhĂ´ng thá»ƒ táº£i hĂ ng Ä‘á»£i Ă´n táº­p.');
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+export async function enqueueImmediateReviews(flashcardIds) {
+  const response = await fetch(buildApiUrl('api/srs/enqueue'), {
+    method: 'POST',
+    headers: buildAuthHeaders(),
+    body: JSON.stringify({ flashcard_ids: flashcardIds }),
+  });
+  const payload = await parseJsonResponse(response, 'Khong the dua tu vao hang doi SRS.');
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
 export async function submitSrsReviewBatch(reviewItems) {
   const response = await fetch(buildApiUrl('api/srs/review'), {
     method: 'POST',

@@ -1,35 +1,18 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
+import FileFormatModal from '../../components/common/FileFormatModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import {
+    downloadToeicExportFile,
+    downloadToeicSampleFile,
+    IMPORT_FILE_ACCEPT,
+    parseToeicImportFile,
+} from '../../utils/adminImportExport';
 
 const PAGE_SIZE = 8;
-
-function slugifyFilePart(value) {
-    return String(value || 'toeic-test')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .replace(/-{2,}/g, '-');
-}
-
-function downloadJsonFile(data, fileName) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: 'application/json;charset=utf-8',
-    });
-    const objectUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(objectUrl);
-}
 
 function createEmptyTestForm() {
     return {
@@ -97,6 +80,9 @@ export default function ManagerToeic() {
     const [submitting, setSubmitting] = useState(false);
     const [exportingTestId, setExportingTestId] = useState(null);
     const [importing, setImporting] = useState(false);
+    const [downloadingSample, setDownloadingSample] = useState(false);
+    const [exportTargetTest, setExportTargetTest] = useState(null);
+    const [isSampleModalOpen, setIsSampleModalOpen] = useState(false);
     const importInputRef = useRef(null);
 
     useEffect(() => {
@@ -227,14 +213,20 @@ export default function ManagerToeic() {
         }
     };
 
-    const handleExportTest = async (test) => {
+    const handleExportTest = (test) => {
         if (!test?.id) return;
+        setExportTargetTest(test);
+    };
 
+    const handleExportTestWithFormat = async (fileFormat) => {
+        if (!exportTargetTest?.id) return;
+
+        const test = exportTargetTest;
+        setExportTargetTest(null);
         setExportingTestId(test.id);
         try {
             const data = await axiosClient.get(`/admin/toeic/tests/${test.id}/export`);
-            const fileName = `${slugifyFilePart(test.title)}.toeic-test-export.v1.json`;
-            downloadJsonFile(data, fileName);
+            downloadToeicExportFile(data, fileFormat);
             setToast({ message: `Đã export đề ${test.title}.`, type: 'success' });
         } catch (err) {
             setToast({
@@ -250,6 +242,25 @@ export default function ManagerToeic() {
         importInputRef.current?.click();
     };
 
+    const handleDownloadSample = async (fileFormat) => {
+        setDownloadingSample(true);
+        try {
+            downloadToeicSampleFile(fileFormat);
+            setIsSampleModalOpen(false);
+            setToast({
+                message: `Đã tải file import mẫu đề TOEIC dưới dạng ${fileFormat === 'excel' ? 'Excel' : 'JSON'}.`,
+                type: 'success',
+            });
+        } catch (err) {
+            setToast({
+                message: err.message || 'Tải file import mẫu thất bại.',
+                type: 'error',
+            });
+        } finally {
+            setDownloadingSample(false);
+        }
+    };
+
     const handleImportTest = async (event) => {
         const file = event.target.files?.[0];
         event.target.value = '';
@@ -257,15 +268,7 @@ export default function ManagerToeic() {
 
         setImporting(true);
         try {
-            const rawText = await file.text();
-            let payload;
-
-            try {
-                payload = JSON.parse(rawText);
-            } catch {
-                throw new Error('File JSON không hợp lệ.');
-            }
-
+            const payload = await parseToeicImportFile(file);
             const data = await axiosClient.post('/admin/toeic/tests/import', payload);
             setPage(1);
             await refetchTests(1);
@@ -297,7 +300,7 @@ export default function ManagerToeic() {
                         <input
                             ref={importInputRef}
                             type="file"
-                            accept=".json,application/json"
+                            accept={IMPORT_FILE_ACCEPT}
                             className="manager-course-import-input"
                             onChange={handleImportTest}
                         />
@@ -308,6 +311,14 @@ export default function ManagerToeic() {
                             disabled={importing}
                         >
                             {importing ? 'Đang import...' : 'Import'}
+                        </button>
+                        <button
+                            type="button"
+                            className="manager-secondary-btn"
+                            onClick={() => setIsSampleModalOpen(true)}
+                            disabled={downloadingSample}
+                        >
+                            {downloadingSample ? 'Đang tải mẫu...' : 'Tải file Import mẫu'}
                         </button>
                         <button type="button" className="manager-primary-btn" onClick={openCreateModal}>
                             Tạo đề TOEIC
@@ -438,6 +449,48 @@ export default function ManagerToeic() {
                 onClose={closeForm}
                 onSubmit={handleSubmitTest}
                 submitting={submitting}
+            />
+
+            <FileFormatModal
+                isOpen={Boolean(exportTargetTest)}
+                onClose={() => setExportTargetTest(null)}
+                title="Chọn định dạng export đề TOEIC"
+                description="Hãy chọn loại file muốn tải xuống. Cấu trúc file export sẽ tương thích trực tiếp với file import."
+                options={[
+                    {
+                        value: 'excel',
+                        label: 'Excel (.xlsx)',
+                        description: 'Workbook phù hợp để chỉnh sửa test, groups và questions trực tiếp trên bảng tính.',
+                        onSelect: handleExportTestWithFormat,
+                    },
+                    {
+                        value: 'json',
+                        label: 'JSON (.json)',
+                        description: 'Giữ nguyên định dạng JSON hiện tại để tiếp tục dùng luồng import/export đã ổn định.',
+                        onSelect: handleExportTestWithFormat,
+                    },
+                ]}
+            />
+
+            <FileFormatModal
+                isOpen={isSampleModalOpen}
+                onClose={() => setIsSampleModalOpen(false)}
+                title="Tải file import mẫu đề TOEIC"
+                description="File mẫu gồm thông tin đề, groups và questions để admin chỉnh sửa nhanh trước khi import."
+                options={[
+                    {
+                        value: 'excel',
+                        label: 'Excel (.xlsx)',
+                        description: 'Workbook gồm các sheet Test, Groups và Questions.',
+                        onSelect: handleDownloadSample,
+                    },
+                    {
+                        value: 'json',
+                        label: 'JSON (.json)',
+                        description: 'JSON mẫu cùng schema với file export/import hiện tại.',
+                        onSelect: handleDownloadSample,
+                    },
+                ]}
             />
 
             <ConfirmActionModal

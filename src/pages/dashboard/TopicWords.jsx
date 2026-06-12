@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
+import ToastNotice from '../../components/common/ToastNotice';
 import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
@@ -13,11 +14,14 @@ import Quiz from '../../components/Quiz';
 import Listening from '../../components/Listening';
 import Typing from '../../components/Typing';
 import Match from '../../components/Match';
+import flappyLogo from '../../assets/images/logo-flappybird-course.png';
+import FlappyBirdExperience, { BIRD_OPTIONS, GAME_CARD } from '../../components/games/FlappyBirdExperience';
 import { getDashboardUserKey, recordFlashcardSessionProgress, recordStudyModeCompletion } from '../../utils/dashboardProgress';
 import { recordGamePlay } from '../../utils/userStats';
 import { getSpeechLang } from '../../utils/studyModes';
-import { addToSrs, removeFromSrs, reviewItem } from '../../utils/srsStorage';
+import { addToSrs, enqueueToSrsNow, removeFromSrs, reviewItem } from '../../utils/srsStorage';
 import {
+  enqueueImmediateReviews,
   hasServerFlashcardId,
   hasServerSrsAccess,
   mapReviewRatingToQualityScore,
@@ -25,6 +29,10 @@ import {
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
 import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
+
+const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
+const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || 'sk-bee-9b56ef380e6d34ac104b81462524f6ff3693a8e68066cfe888f42ddddfbf3df6';
+const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'glm-4.5-flash';
 
 const SVG_ICONS = {
   VOICE: (
@@ -52,7 +60,111 @@ const SVG_ICONS = {
       <path d="M7.828 11H20v2H7.828l5.364 5.364-1.414 1.414L4 12l7.778-7.778 1.414 1.414z" />
     </svg>
   ),
+  AI: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+      <path d="M11 2L13.09 8.26L19 10.35L13.09 12.44L11 18.7L8.91 12.44L3 10.35L8.91 8.26L11 2ZM18 14L19.25 17.75L23 19L19.25 20.25L18 24L16.75 20.25L13 19L16.75 17.75L18 14Z" />
+    </svg>
+  ),
 };
+
+const FILLABLE_WORD_FIELDS = ['transcription', 'wordtype', 'example', 'example_vi'];
+const ALWAYS_REFRESH_WORD_FIELDS = ['wordtype'];
+
+const AI_LANGUAGE_META = {
+  en: {
+    name: 'English',
+    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in English. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+  },
+  ko: {
+    name: 'Korean',
+    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in Korean. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+  },
+  ja: {
+    name: 'Japanese',
+    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in Japanese. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+  },
+  zh: {
+    name: 'Simplified Chinese',
+    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in Simplified Chinese. Keep "example_vi" in Vietnamese. For transcription, use valid pinyin with tone marks. Use concise, accurate, natural content.',
+  },
+  fr: {
+    name: 'French',
+    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in French. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+  },
+};
+
+function cleanAiText(value) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s"'`]+|[\s"'`]+$/g, '')
+    .trim();
+}
+
+function extractJsonObject(text) {
+  const cleaned = String(text || '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error('AI không trả về JSON object hợp lệ');
+  }
+  return cleaned.slice(start, end + 1);
+}
+
+function getMissingWordFields(word) {
+  return FILLABLE_WORD_FIELDS.filter((field) => !cleanAiText(word?.[field]));
+}
+
+function buildFillWordPrompt(word, missingFields, langName) {
+  const currentValues = FILLABLE_WORD_FIELDS.map((field) => `${field}: ${cleanAiText(word?.[field]) || '(empty)'}`).join('\n');
+
+  return `Complete missing fields for this ${langName} vocabulary item.
+
+Return ONLY one valid JSON object with EXACTLY these 4 keys:
+transcription, wordtype, example, example_vi
+
+Rules:
+- Preserve existing values logically. The app will only use fields that are currently empty.
+- Re-evaluate "wordtype" from the word and Vietnamese meaning, and correct it if the current value is inaccurate.
+- Fill ONLY the missing fields listed below with natural, correct content.
+- If "example" is generated, "example_vi" must be the correct Vietnamese translation of that exact example.
+- If "example" already exists but "example_vi" is missing, translate the existing example.
+- "wordtype" should be specific, for example: noun, verb, adjective, adverb, phrase.
+- "transcription" must be an accurate pronunciation/transcription for the word.
+- Keep output short, accurate, and directly usable.
+- No markdown, no explanation, no extra text.
+
+Word: ${cleanAiText(word?.word)}
+Vietnamese meaning: ${cleanAiText(word?.mean)}
+Language: ${langName}
+Missing fields: ${missingFields.join(', ')}
+
+Current values:
+${currentValues}`;
+}
+
+async function buildAiError(resp) {
+  let detail = '';
+  try {
+    const data = await resp.json();
+    detail = data?.error?.message || data?.error?.details || data?.message || data?.detail || '';
+  } catch {
+    detail = '';
+  }
+
+  if (resp.status === 429) {
+    return 'AI đang bận hoặc tạm chạm giới hạn. Vui lòng thử lại sau ít phút.';
+  }
+  if (resp.status === 401 || resp.status === 403) {
+    return 'Cấu hình AI hiện tại không hợp lệ hoặc đã hết quyền truy cập.';
+  }
+  if (resp.status >= 500) {
+    return 'Máy chủ AI đang gặp sự cố tạm thời. Vui lòng thử lại sau.';
+  }
+  return detail || `HTTP ${resp.status}`;
+}
 
 const VOCAB_GAMES = [
   { id: 'flashcard', name: 'Flashcard', icon: '🃏', desc: 'Lật thẻ, ôn lại từ nhanh chóng', color: '#8b5cf6' },
@@ -62,7 +174,16 @@ const VOCAB_GAMES = [
   { id: 'match', name: 'Nối từ', icon: '🔗', desc: 'Ghép từ vựng với nghĩa đúng', color: '#ec4899' },
 ];
 
-const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match']);
+const VOCAB_GAMES_DISPLAY = [
+  VOCAB_GAMES.find((game) => game.id === 'flashcard'),
+  { ...VOCAB_GAMES.find((game) => game.id === 'quiz'), name: 'Quiz' },
+  { ...VOCAB_GAMES.find((game) => game.id === 'listen'), name: 'Listening' },
+  { ...VOCAB_GAMES.find((game) => game.id === 'typing'), name: 'Typing' },
+  { ...VOCAB_GAMES.find((game) => game.id === 'match'), name: 'Match' },
+  { id: 'flappy-bird', name: GAME_CARD.title, icon: '🐦', desc: GAME_CARD.description, color: '#0ea5e9' },
+].filter(Boolean);
+
+const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match', 'flappy-bird']);
 
 function getWordKey(word) {
   return word.id ?? word.flashcardId;
@@ -86,7 +207,56 @@ function trackStudySessionComplete(modeName) {
   recordStudyModeCompletion(normalizedMode);
 }
 
+function FlappyBirdPicker({ selectedBird, onPickBird, onStart, onBack }) {
+  return (
+    <section className="flappy-setup-shell">
+      <div className="flappy-setup-panel">
+        <div className="flappy-setup-header">
+          <div>
+            <div className="flappy-setup-eyebrow">Bắt đầu lượt chơi</div>
+            <div className="flappy-setup-title-row">
+              <h2>{GAME_CARD.title}</h2>
+            </div>
+            <p>{GAME_CARD.description}</p>
+          </div>
+          <button type="button" className="btn btn-secondary btn-small" onClick={onBack}>
+            Quay lại
+          </button>
+        </div>
+
+        <div className="flappy-selected-topic-panel">
+          <div className="flappy-selected-topic-copy">
+            <span className="flappy-selected-topic-label">Chọn Bird</span>
+            <strong>Chọn nhân vật bạn muốn dùng cho lượt chơi này.</strong>
+            <p>Sau khi chọn chim và nhấn bắt đầu, bạn sẽ vào chơi ngay trong chủ đề hiện tại.</p>
+          </div>
+          <div className="flappy-bird-picker-grid">
+            {BIRD_OPTIONS.map((bird) => (
+              <button
+                key={bird.id}
+                type="button"
+                className={`flappy-bird-option${selectedBird === bird.id ? ' is-active' : ''}`}
+                onClick={() => onPickBird(bird.id)}
+              >
+                <img className="flappy-bird-option-image" src={bird.image} alt={`Bird ${bird.label}`} />
+                <span>{bird.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flappy-setup-footer" style={{ paddingBottom: '36px' }}>
+          <button type="button" className="btn btn-primary" onClick={onStart}>
+            Bắt đầu chơi
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function TopicWords() {
+  const pageRef = useRef(null);
   const { courseId: rawCourseId, topicId } = useParams();
   const { remembered, toggleWord, replaceRememberedInTopic } = useCourseProgress();
   const { customCourses, addWordToTopic, updateWordInTopic, deleteWordFromTopic, addManyWordsToTopic, createTopic } = useCustomCourses();
@@ -99,14 +269,48 @@ export default function TopicWords() {
   const [pickerWord, setPickerWord] = useState(null);
   const [pendingDeleteWord, setPendingDeleteWord] = useState(null);
   const [activeMode, setActiveMode] = useState(null);
+  const [selectedFlappyBird, setSelectedFlappyBird] = useState(BIRD_OPTIONS[0]?.id || 'yellow');
   const [studyWordIds, setStudyWordIds] = useState(null);
   const [builtInWords, setBuiltInWords] = useState([]);
   const [builtInStatus, setBuiltInStatus] = useState('idle');
   const [builtInError, setBuiltInError] = useState('');
+  const [aiFillingWordId, setAiFillingWordId] = useState(null);
+  const [toastMessage, setToastMessage] = useState('');
 
   const courseId = rawCourseId || 'custom';
   const isCustom = courseId === 'custom';
   const useServerSrs = hasServerSrsAccess();
+  const isFlappySetup = activeMode === 'flappy-bird-setup';
+  const isFlappyPlaying = activeMode === 'flappy-bird';
+  const isFlappyLayoutActive = isFlappySetup || isFlappyPlaying;
+
+  useEffect(() => {
+    const pageEl = pageRef.current;
+    if (!pageEl) return undefined;
+
+    const topbarEl = document.querySelector('.topbar');
+    const mobileNavEl = document.querySelector('.mobile-nav');
+
+    const update = () => {
+      const topbarHeight = topbarEl?.getBoundingClientRect().height || 0;
+      const navVisible = mobileNavEl ? window.getComputedStyle(mobileNavEl).display !== 'none' : false;
+      const mobileNavHeight = navVisible ? mobileNavEl?.getBoundingClientRect().height || 0 : 0;
+
+      pageEl.style.setProperty('--games-dashboard-topbar-h', `${Math.round(topbarHeight)}px`);
+      pageEl.style.setProperty('--games-mobile-nav-h', `${Math.round(mobileNavHeight)}px`);
+    };
+
+    update();
+    const resizeObserver = new ResizeObserver(update);
+    if (topbarEl) resizeObserver.observe(topbarEl);
+    if (mobileNavEl) resizeObserver.observe(mobileNavEl);
+    window.addEventListener('resize', update);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
 
   // Fetch course info from API instead of static data
   const [courseInfo, setCourseInfo] = useState(null);
@@ -237,6 +441,91 @@ const activeWords = !studyWordIds
     setPendingDeleteWord(null);
   };
 
+  const handleFillMissingWordData = async (word) => {
+    if (!isCustom || !word) return;
+
+    const wordId = getWordKey(word);
+    if (aiFillingWordId === wordId) return;
+
+    const baseWord = cleanAiText(word.word);
+    const meaning = cleanAiText(word.mean);
+    const missingFields = getMissingWordFields(word);
+
+    if (!baseWord || !meaning) {
+      setToastMessage('Cần có từ vựng và nghĩa tiếng Việt trước khi dùng AI bổ sung dữ liệu.');
+      return;
+    }
+
+    if (missingFields.length === 0) {
+      setToastMessage('Từ này đã đủ dữ liệu rồi.');
+      return;
+    }
+
+    const aiMeta = AI_LANGUAGE_META[topicLang] || AI_LANGUAGE_META.en;
+    setAiFillingWordId(wordId);
+
+    try {
+      const resp = await fetch(AI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${AI_BEARER}`,
+        },
+        body: JSON.stringify({
+          model: AI_MODEL,
+          messages: [
+            { role: 'system', content: aiMeta.systemPrompt },
+            { role: 'user', content: buildFillWordPrompt(word, missingFields, aiMeta.name) },
+          ],
+          max_tokens: 800,
+          temperature: 0.2,
+          stream: false,
+        }),
+      });
+
+      if (!resp.ok) {
+        throw new Error(await buildAiError(resp));
+      }
+
+      const data = await resp.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      const parsed = JSON.parse(extractJsonObject(text));
+
+      const updates = {
+        word: word.word || '',
+        mean: word.mean || '',
+        transcription: cleanAiText(word.transcription),
+        wordtype: cleanAiText(word.wordtype),
+        example: cleanAiText(word.example),
+        example_vi: cleanAiText(word.example_vi),
+      };
+
+      ALWAYS_REFRESH_WORD_FIELDS.forEach((field) => {
+        const nextValue = cleanAiText(parsed?.[field]);
+        if (nextValue) {
+          updates[field] = nextValue;
+        }
+      });
+
+      missingFields.forEach((field) => {
+        if (ALWAYS_REFRESH_WORD_FIELDS.includes(field)) return;
+        updates[field] = cleanAiText(parsed?.[field]);
+      });
+
+      const stillMissing = missingFields.filter((field) => !updates[field]);
+      if (stillMissing.length > 0) {
+        throw new Error('AI chưa bổ sung đủ dữ liệu hợp lệ cho từ này. Vui lòng thử lại.');
+      }
+
+      await updateWordInTopic(topicId, word.id, updates);
+      setToastMessage('AI đã bổ sung dữ liệu còn thiếu cho từ vựng.');
+    } catch (error) {
+      setToastMessage(error?.message || 'Không thể dùng AI để bổ sung dữ liệu lúc này.');
+    } finally {
+      setAiFillingWordId(null);
+    }
+  };
+
   const openWordModal = (wordObj = null) => {
     setEditingWord(wordObj);
     setWordModalOpen(true);
@@ -265,6 +554,35 @@ const activeWords = !studyWordIds
     if (!useServerSrs || !hasServerFlashcardId(word)) {
       removeFromSrs(wordId);
     }
+  };
+
+  const enqueueWordsForImmediateSrs = async (targetWords) => {
+    const serverFlashcardIds = [];
+
+    targetWords.forEach((word) => {
+      if (useServerSrs && hasServerFlashcardId(word)) {
+        serverFlashcardIds.push(word.flashcardId);
+        return;
+      }
+
+      enqueueToSrsNow(word, topicId, courseId);
+    });
+
+    if (serverFlashcardIds.length > 0) {
+      try {
+        await enqueueImmediateReviews(serverFlashcardIds);
+      } catch (error) {
+        console.error('Failed to enqueue immediate SRS reviews.', error);
+      }
+    }
+  };
+
+  const handleSaveStudyCompletion = async (selectedWordIds, targetWords = activeWords) => {
+    const selectedSet = new Set(selectedWordIds);
+    const wordsToReview = targetWords.filter((word) => !selectedSet.has(getWordKey(word)));
+
+    replaceRememberedInTopic(targetWords.map((word) => getWordKey(word)), selectedWordIds);
+    await enqueueWordsForImmediateSrs(wordsToReview);
   };
 
   const handleSaveFlashcard = async (selectedWordIds) => {
@@ -331,6 +649,12 @@ const activeWords = !studyWordIds
     if (!words.length) return;
 
     setStudyWordIds(null);
+    if (modeName === 'flappy-bird') {
+      setActiveMode('flappy-bird-setup');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (IMMERSIVE_MODES.has(modeName)) {
       setActiveMode(modeName);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -361,6 +685,14 @@ const activeWords = !studyWordIds
     },
   };
 
+  const flappyTopic = {
+    id: topic?.id || topicId,
+    title: topicTitle,
+    source: courseTitle,
+    lang: topicLang,
+    words,
+  };
+
   const handleStudyWrongWords = (wrongWordIds) => {
     setStudyWordIds(wrongWordIds);
     setActiveMode('flashcard');
@@ -382,15 +714,60 @@ const activeWords = !studyWordIds
   } else if (activeMode === 'quiz') {
     modeView = <Quiz {...studyModeProps} onSaveLearnedWords={handleQuizComplete} onStudyWrongWords={handleStudyWrongWords} />;
   } else if (activeMode === 'listen') {
-    modeView = <Listening {...studyModeProps} onSaveLearnedWords={saveRememberedWords} />;
+    modeView = <Listening {...studyModeProps} onSaveLearnedWords={handleSaveStudyCompletion} />;
   } else if (activeMode === 'typing') {
-    modeView = <Typing {...studyModeProps} onSaveLearnedWords={saveRememberedWords} />;
+    modeView = <Typing {...studyModeProps} onSaveLearnedWords={handleSaveStudyCompletion} />;
   } else if (activeMode === 'match') {
-    modeView = <Match {...studyModeProps} onSaveLearnedWords={saveRememberedWords} />;
+    modeView = <Match {...studyModeProps} onSaveLearnedWords={handleSaveStudyCompletion} />;
+  } else if (activeMode === 'flappy-bird-setup') {
+    modeView = (
+      <FlappyBirdPicker
+        selectedBird={selectedFlappyBird}
+        onPickBird={setSelectedFlappyBird}
+        onStart={() => {
+          setActiveMode('flappy-bird');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onBack={() => {
+          setActiveMode(null);
+          setStudyWordIds(null);
+        }}
+      />
+    );
+  } else if (activeMode === 'flappy-bird') {
+    modeView = (
+      <FlappyBirdExperience
+        topic={flappyTopic}
+        selectedBird={selectedFlappyBird}
+        onSessionComplete={() => trackStudySessionComplete('flappy-bird')}
+        onBackToPicker={() => setActiveMode('flappy-bird-setup')}
+        onBackGallery={() => {
+          setActiveMode(null);
+          setStudyWordIds(null);
+        }}
+      />
+    );
+  }
+
+  if (isFlappyLayoutActive && modeView) {
+    return (
+      <main
+        ref={pageRef}
+        className={`dash-main games-page${isFlappyPlaying ? ' is-game-active' : ''}`}
+        id="page-games"
+      >
+        {modeView}
+      </main>
+    );
   }
 
   return (
-    <main className={`dash-main cv-subview${isCustom ? ' cv-custom-mode' : ''}`} id="cv-words-view">
+      <main
+        ref={pageRef}
+        className={`dash-main cv-subview${isCustom ? ' cv-custom-mode' : ''}`}
+        id="cv-words-view"
+      >
+      <ToastNotice message={toastMessage} onHide={() => setToastMessage('')} />
       <div className="cv-subview-header">
         <Link className="cv-breadcrumb-btn" to={backUrl}>
           {SVG_ICONS.BACK}
@@ -400,7 +777,7 @@ const activeWords = !studyWordIds
         <span className="cv-breadcrumb-current" id="cv-topic-title">{topicTitle}</span>
       </div>
 
-      {isCustom && !IMMERSIVE_MODES.has(activeMode) ? (
+      {isCustom && !IMMERSIVE_MODES.has(activeMode) && activeMode !== 'flappy-bird-setup' ? (
         <div id="cv-custom-toolbar" className="cv-custom-toolbar">
           <button className="btn btn-primary btn-small" id="cv-add-word-btn" onClick={() => openWordModal(null)}>
             + Thêm từ vựng
@@ -420,17 +797,21 @@ const activeWords = !studyWordIds
               <h3 className="cv-section-title">Chọn cách học</h3>
             </div>
             <div className="games-vocab-grid" id="games-vocab-grid" style={{ marginTop: '16px', marginBottom: '24px' }}>
-              {VOCAB_GAMES.map((game) => (
+              {VOCAB_GAMES_DISPLAY.map((game) => (
                 <button
                   key={game.id}
-                  className={`games-vocab-card${activeMode === game.id ? ' active' : ''}`}
+                  className={`games-vocab-card${game.id === 'flappy-bird' ? ' games-vocab-card-image-only' : ''}${activeMode === game.id || (game.id === 'flappy-bird' && (activeMode === 'flappy-bird' || activeMode === 'flappy-bird-setup')) ? ' active' : ''}`}
                   id={`game-card-${game.id}`}
                   onClick={() => handleModeClick(game.id)}
                   style={{ '--game-color': game.color }}
                 >
-                  <span className="games-vocab-icon">{game.icon}</span>
-                  <span className="games-vocab-name">{game.name}</span>
-                  <span className="games-vocab-desc">{game.desc}</span>
+                  {game.id === 'flappy-bird' ? (
+                    <img className="games-vocab-card-banner" src={flappyLogo} alt={game.name} />
+                  ) : (
+                    <span className="games-vocab-icon">{game.icon}</span>
+                  )}
+                  {game.id !== 'flappy-bird' ? <span className="games-vocab-name">{game.name}</span> : null}
+                  {game.id !== 'flappy-bird' ? <span className="games-vocab-desc">{game.desc}</span> : null}
                   <span className="games-vocab-play">Chơi ngay →</span>
                 </button>
               ))}
@@ -540,6 +921,17 @@ const activeWords = !studyWordIds
                               {SVG_ICONS.EDIT}
                             </button>
                             <button
+                              className={`cv-action-btn cv-action-ai${aiFillingWordId === wordKey ? ' is-loading' : ''}`}
+                              title={aiFillingWordId === wordKey ? 'AI đang bổ sung dữ liệu' : 'AI bổ sung dữ liệu còn thiếu'}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleFillMissingWordData(word);
+                              }}
+                              disabled={aiFillingWordId === wordKey}
+                            >
+                              {SVG_ICONS.AI}
+                            </button>
+                            <button
                               className="cv-action-btn cv-action-delete"
                               title="Xóa từ"
                               onClick={(event) => {
@@ -610,9 +1002,12 @@ const activeWords = !studyWordIds
           onClose={() => setPickerWord(null)}
           word={pickerWord}
           customCourses={customCourses}
-          onAdd={(targetTopicId, newWordObj) => {
-            addWordToTopic(targetTopicId, newWordObj);
-            setPickerWord(null);
+          onAdd={async (targetTopicId, newWordObj) => {
+            const result = await addWordToTopic(targetTopicId, newWordObj);
+            if (!result?.error) {
+              setPickerWord(null);
+            }
+            return result;
           }}
           onCreateTopic={(topicData) => createTopic(topicData)}
         />

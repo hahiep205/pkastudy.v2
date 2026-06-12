@@ -91,6 +91,42 @@ export function addToSrs(word, topicId, courseId) {
   saveQueue(queue);
 }
 
+export function enqueueToSrsNow(word, topicId, courseId) {
+  const queue = getQueue();
+  const existingItem = queue.find((item) => item.wordId === word.id);
+  const now = new Date().toISOString();
+
+  if (existingItem) {
+    existingItem.interval = 0;
+    existingItem.repetition = 0;
+    existingItem.ef = SM2_DEFAULT_EF;
+    existingItem.nextReview = now;
+    existingItem.failCount = (existingItem.failCount || 0) + 1;
+    saveQueue(queue);
+    return;
+  }
+
+  queue.push({
+    wordId: word.id,
+    word: word.word,
+    mean: word.mean,
+    transcription: word.transcription || '',
+    example: word.example || '',
+    example_vi: word.example_vi || '',
+    wordtype: word.wordtype || '',
+    topicId,
+    courseId,
+    interval: 0,
+    repetition: 0,
+    ef: SM2_DEFAULT_EF,
+    nextReview: now,
+    addedAt: now,
+    failCount: 0,
+  });
+
+  saveQueue(queue);
+}
+
 export function addManyToSrs(words, topicId, courseId) {
   words.forEach((word) => addToSrs(word, topicId, courseId));
 }
@@ -120,7 +156,7 @@ export function reviewItem(wordId, quality) {
   const queue = getQueue();
   const itemIndex = queue.findIndex((item) => item.wordId === wordId);
 
-  if (itemIndex === -1) return;
+  if (itemIndex === -1) return null;
 
   const item = { ...queue[itemIndex] };
   const schedule = getPreviewSchedule(item, quality);
@@ -137,6 +173,7 @@ export function reviewItem(wordId, quality) {
 
   queue[itemIndex] = item;
   saveQueue(queue);
+  return item;
 }
 
 export function removeFromSrs(wordId) {

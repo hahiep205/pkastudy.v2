@@ -14,8 +14,9 @@ import { useCustomCourses } from '../../hooks/useCustomCourses';
 import axiosClient from '../../utils/axiosClient';
 import { getDashboardUserKey, recordStudyModeCompletion } from '../../utils/dashboardProgress';
 import { recordGamePlay } from '../../utils/userStats';
-import { addToSrs, getDueItems as getLocalDueItems, reviewItem as reviewLocalItem } from '../../utils/srsStorage';
+import { addToSrs, enqueueToSrsNow, getDueItems as getLocalDueItems, reviewItem as reviewLocalItem } from '../../utils/srsStorage';
 import {
+  enqueueImmediateReviews,
   fetchDueReviews,
   hasServerFlashcardId,
   hasServerSrsAccess,
@@ -32,6 +33,20 @@ const VOCAB_GAMES = [
   { id: 'match', name: 'Nối từ', icon: '🔗', desc: 'Ghép từ vựng với nghĩa đúng', color: '#ec4899' },
   { id: 'flashcard', name: 'Flashcard', icon: '🃏', desc: 'Lật thẻ, ôn lại từ nhanh chóng', color: '#8b5cf6' },
 ];
+
+const VOCAB_GAMES_DISPLAY = [
+  VOCAB_GAMES.find((game) => game.id === 'flashcard'),
+  { ...VOCAB_GAMES.find((game) => game.id === 'quiz'), name: 'Quiz' },
+  { ...VOCAB_GAMES.find((game) => game.id === 'listen'), name: 'Listening' },
+  { ...VOCAB_GAMES.find((game) => game.id === 'typing'), name: 'Typing' },
+  { ...VOCAB_GAMES.find((game) => game.id === 'match'), name: 'Match' },
+].filter(Boolean);
+
+const BACK_ICON = (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+    <path d="M7.828 11H20v2H7.828l5.364 5.364-1.414 1.414L4 12l7.778-7.778 1.414 1.414z" />
+  </svg>
+);
 
 function getCurrentStudyUserKey() {
   try {
@@ -63,6 +78,27 @@ function mapDueItemToWord(item) {
     example_vi: item.example_vi,
     wordtype: item.wordtype,
   };
+}
+
+async function enqueueWordsForImmediateSrs(words, useServerSrs, topicId, courseId) {
+  const serverFlashcardIds = [];
+
+  words.forEach((word) => {
+    if (useServerSrs && hasServerFlashcardId(word)) {
+      serverFlashcardIds.push(word.flashcardId);
+      return;
+    }
+
+    enqueueToSrsNow(word, topicId, courseId);
+  });
+
+  if (serverFlashcardIds.length > 0) {
+    try {
+      await enqueueImmediateReviews(serverFlashcardIds);
+    } catch (error) {
+      console.error('Failed to enqueue immediate SRS reviews.', error);
+    }
+  }
 }
 
 function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
@@ -528,7 +564,7 @@ export default function Games() {
 
   const handleStudyWrongWords = (wrongWordIds) => {
     setStudyWordIds(wrongWordIds);
-    setVocabGame(VOCAB_GAMES.find((game) => game.id === 'flashcard') || vocabGame);
+    setVocabGame(VOCAB_GAMES_DISPLAY.find((game) => game.id === 'flashcard') || vocabGame);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -586,12 +622,25 @@ export default function Games() {
         replaceRememberedInTopic(activeWords.map((word) => word.id), correctWordIds);
       },
       onStartQuiz: () => {
-        setVocabGame(VOCAB_GAMES.find((game) => game.id === 'quiz') || vocabGame);
+        setVocabGame(VOCAB_GAMES_DISPLAY.find((game) => game.id === 'quiz') || vocabGame);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       },
       onStudyWrongWords: handleStudyWrongWords,
     }
     : null;
+
+  if (studyModeProps && ['listen', 'typing', 'match'].includes(vocabGame?.id)) {
+    studyModeProps.onSaveLearnedWords = async (selectedWordIds) => {
+      const selectedSet = new Set(selectedWordIds);
+      const wordsToReview = activeWords.filter((word) => !selectedSet.has(word.id));
+
+      replaceRememberedInTopic(activeWords.map((word) => word.id), selectedWordIds);
+
+      if (!selectedTopic?.isSrs) {
+        await enqueueWordsForImmediateSrs(wordsToReview, useServerSrs, selectedTopic?.id, 'game');
+      }
+    };
+  }
 
   if (activeGameId === GAME_ID && activeFunGamePhase === 'playing' && selectedFlappyTopic) {
     return (
@@ -679,7 +728,15 @@ export default function Games() {
     };
 
     return (
-      <main ref={pageRef} className="dash-main games-page" id="page-games">
+      <main ref={pageRef} className="dash-main cv-subview study-modes-surface" id="page-games">
+        <div className="cv-subview-header">
+          <button type="button" className="cv-breadcrumb-btn" onClick={handleBackToPicker}>
+            {BACK_ICON}
+            <span>{selectedTopic.source || 'Chon chu de'}</span>
+          </button>
+          <span className="cv-breadcrumb-sep">&gt;</span>
+          <span className="cv-breadcrumb-current">{selectedTopic.title || vocabGame?.name || 'Dang hoc'}</span>
+        </div>
         {modeMap[vocabGame?.id] ?? null}
       </main>
     );
@@ -714,7 +771,7 @@ export default function Games() {
 
         <div className="games-section-label" id="games-vocab-label">Học từ vựng</div>
         <div className="games-vocab-grid" id="games-vocab-grid">
-          {VOCAB_GAMES.map((game) => (
+          {VOCAB_GAMES_DISPLAY.map((game) => (
             <button
               key={game.id}
               className="games-vocab-card"

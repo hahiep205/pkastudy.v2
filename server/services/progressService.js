@@ -1,6 +1,13 @@
 const { getProgressByUserId, updateStreak, updateXPAndLevel, getLeaderboard } = require('../models/progressModel');
 const { createVocabActivityLog, normalizeVocabActivityMode } = require('../models/vocabActivityModel');
 
+function formatLocalDateForMysql(value = new Date()) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 async function fetchUserProgress(userId) {
   return getProgressByUserId(userId);
 }
@@ -31,7 +38,7 @@ async function checkAndUpdateStreak(userId) {
   }
 
   // YYYY-MM-DD format for MySQL
-  const studyDateStr = new Date().toISOString().slice(0, 10);
+  const studyDateStr = formatLocalDateForMysql(today);
   
   if (!lastStudyDate || lastStudyDate.getTime() !== today.getTime()) {
     await updateStreak(userId, newStreak, studyDateStr);

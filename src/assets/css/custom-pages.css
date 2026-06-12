@@ -4013,6 +4013,8 @@ body.app-dark-mode .settings2-role-card small {
 }
 
 .flappy-result-footer .btn {
+    width: 100%;
+    flex: 1 1 100%;
     min-width: 100%;
 }
 

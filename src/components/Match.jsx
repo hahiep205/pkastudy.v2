@@ -166,8 +166,8 @@ export default function Match({
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleSave = () => {
-        onSaveLearnedWords?.(selectedWordIds);
+    const handleSave = async () => {
+        await onSaveLearnedWords?.(selectedWordIds);
         setIsSaved(true);
         sessionLockedRef.current = true;
         onBackToTopic?.();

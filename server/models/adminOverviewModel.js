@@ -1,5 +1,6 @@
 const pool = require('../db');
 const { ensureVocabActivityTable } = require('./vocabActivityModel');
+const { CUSTOM_TOPICS_COURSE_SLUG } = require('./customCoursesModel');
 
 function formatDateKey(value) {
   if (typeof value === 'string') {
@@ -25,14 +26,37 @@ async function getAdminOverviewSummary() {
   const [rows] = await pool.query(
     `SELECT
       (SELECT COUNT(*) FROM Users) AS totalUsers,
-      (SELECT COUNT(*) FROM User_Progress WHERE last_study_date = CURDATE()) AS activeUsersToday,
-      (SELECT COUNT(*) FROM Courses) AS totalCourses,
-      (SELECT COUNT(*) FROM Flashcards) AS totalFlashcards,
+      (SELECT COUNT(*)
+       FROM (
+         SELECT p.user_id
+         FROM User_Progress p
+         WHERE p.last_study_date = CURDATE()
+         UNION
+         SELECT v.user_id
+         FROM Vocab_Activity_Logs v
+         WHERE DATE(v.created_at) = CURDATE()
+         UNION
+         SELECT t.user_id
+         FROM Toeic_Test_Records t
+         WHERE DATE(t.created_at) = CURDATE()
+         UNION
+         SELECT s.user_id
+         FROM SRS_Reviews s
+         WHERE DATE(COALESCE(s.last_reviewed_at, s.created_at)) = CURDATE()
+       ) AS active_users_today) AS activeUsersToday,
+      (SELECT COUNT(*) FROM Courses WHERE slug <> ?) AS totalCourses,
+      (SELECT COUNT(*)
+       FROM Flashcards f
+       INNER JOIN Topics t ON t.id = f.topic_id
+       INNER JOIN Courses c ON c.id = t.course_id
+       WHERE c.slug <> ?
+         AND COALESCE(t.is_custom, 0) = 0) AS totalFlashcards,
       (SELECT COUNT(*) FROM Toeic_Tests) AS totalToeicTests,
       (SELECT COUNT(*) FROM Toeic_Questions) AS totalToeicQuestions,
       (SELECT COUNT(*) FROM Toeic_Test_Records) AS totalToeicAttempts,
       (SELECT COUNT(*) FROM SRS_Reviews) AS totalSrsReviews,
-      (SELECT COUNT(*) FROM Vocab_Activity_Logs) AS totalVocabModeCompletions`
+      (SELECT COUNT(*) FROM Vocab_Activity_Logs) AS totalVocabModeCompletions`,
+    [CUSTOM_TOPICS_COURSE_SLUG, CUSTOM_TOPICS_COURSE_SLUG]
   );
 
   const row = rows[0] || {};

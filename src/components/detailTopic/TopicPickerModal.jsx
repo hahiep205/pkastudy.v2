@@ -115,7 +115,7 @@ export default function TopicPickerModal({ isOpen, onClose, word, customCourses,
         setMessage(null);
     };
 
-    const handleConfirmNew = () => {
+    const handleConfirmNew = async () => {
         const name = newTopicName.trim();
         if (!name) {
             setMessage({ type: 'error', text: 'Nhập tên danh sách trước khi tạo mới.' });
@@ -129,17 +129,17 @@ export default function TopicPickerModal({ isOpen, onClose, word, customCourses,
         }
 
         const wordLang = word.language || 'en';
-        const newTopic = onCreateTopic?.({ title: name, description: '', lang: wordLang });
+        const newTopic = await onCreateTopic?.({ title: name, description: '', lang: wordLang });
 
         if (!newTopic?.id) {
             setMessage({ type: 'error', text: 'Không thể tạo danh sách mới. Hãy thử lại.' });
             return;
         }
 
-        onAdd?.(newTopic.id, { ...word, language: word.language || wordLang });
+        await onAdd?.(newTopic.id, { ...word, language: word.language || wordLang });
     };
 
-    const handleAddSelected = () => {
+    const handleAddSelected = async () => {
         if (!selectedTopicId) return;
 
         const duplicateTopic = getDuplicateTopic(selectedTopicId);
@@ -151,7 +151,7 @@ export default function TopicPickerModal({ isOpen, onClose, word, customCourses,
             return;
         }
 
-        onAdd?.(selectedTopicId, { ...word, language: word.language || 'en' });
+        await onAdd?.(selectedTopicId, { ...word, language: word.language || 'en' });
     };
 
     return (

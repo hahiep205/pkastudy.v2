@@ -175,13 +175,20 @@ export function useCustomCourses() {
         return newTopic;
       }
       try {
-        await axiosClient.post("/courses/custom/topics", {
+        const createdTopic = await axiosClient.post("/courses/custom/topics", {
           title: title.trim(),
           description,
           lang,
         });
         await loadFromServer();
-        return {};
+        return mapApiTopic(
+          createdTopic?.data || createdTopic || {
+            id: createdTopic?.id,
+            title: title.trim(),
+            description,
+            words: [],
+          },
+        );
       } catch (e) {
         return { error: e?.response?.data?.error || "Tạo chủ đề thất bại." };
       }

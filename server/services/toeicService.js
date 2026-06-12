@@ -134,8 +134,8 @@ async function submitTest(userId, testId, userAnswers, isPartial = false) {
   let xpResult = null;
   if (!isPartial) {
     await insertTestRecord(userId, testId, readingScore, listeningScore, totalScore);
-    // Award 500 XP for completing a full test
-    xpResult = await addXpService(userId, 500);
+    // Award 50 XP for completing a full test
+    xpResult = await addXpService(userId, 50);
   }
 
   return {
@@ -144,7 +144,7 @@ async function submitTest(userId, testId, userAnswers, isPartial = false) {
     totalScore,
     readingCorrect,
     listeningCorrect,
-    xpAwarded: isPartial ? 0 : 500,
+    xpAwarded: isPartial ? 0 : 50,
     newLevel: xpResult ? xpResult.newLevel : null,
     levelUp: xpResult ? xpResult.levelUp : false,
     correctAnswersMap

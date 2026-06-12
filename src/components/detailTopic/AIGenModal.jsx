@@ -422,6 +422,23 @@ function normalizeWordItem(item) {
     return normalized;
 }
 
+function getShortWordType(value = '') {
+    const normalized = cleanText(value).toLowerCase();
+
+    if (!normalized) return '';
+    if (normalized === 'n' || normalized.includes('noun')) return 'n';
+    if (normalized === 'v' || normalized.includes('verb')) return 'v';
+    if (normalized === 'adj' || normalized.includes('adjective')) return 'adj';
+    if (normalized === 'adv' || normalized.includes('adverb')) return 'adv';
+    if (normalized === 'prep' || normalized.includes('preposition')) return 'prep';
+    if (normalized === 'pron' || normalized.includes('pronoun')) return 'pron';
+    if (normalized === 'conj' || normalized.includes('conjunction')) return 'conj';
+    if (normalized === 'interj' || normalized.includes('interjection')) return 'interj';
+    if (normalized === 'phrase' || normalized.includes('phrase')) return 'phr';
+
+    return normalized.slice(0, 6);
+}
+
 function parseGeneratedWords(rawText, requestedCount) {
     const parsed = JSON.parse(extractJsonArray(rawText));
     if (!Array.isArray(parsed)) {
@@ -483,7 +500,7 @@ async function buildAiError(resp) {
 
 export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
     const [theme, setTheme] = useState('');
-    const [count, setCount] = useState(10);
+    const [count, setCount] = useState(3);
     const [status, setStatus] = useState('input');
     const [errorMsg, setErrorMsg] = useState('');
     const [previewWords, setPreviewWords] = useState([]);
@@ -582,6 +599,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                 handleReset();
                 onClose();
             }}
+            boxClassName="cv-ai-modal-box"
             title="AI tạo từ vựng hàng loạt"
         >
             <ToastNotice message={toastMessage} onHide={() => setToastMessage('')} />
@@ -627,9 +645,9 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                                     value={count}
                                     onChange={(e) => setCount(Number(e.target.value))}
                                 >
+                                    <option value="1">1 từ</option>
+                                    <option value="3">3 từ</option>
                                     <option value="5">5 từ</option>
-                                    <option value="10">10 từ</option>
-                                    <option value="15">15 từ</option>
                                 </select>
                             </div>
                         </div>
@@ -689,14 +707,17 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                                 <span></span>
                                 <span>Từ vựng</span>
                                 <span>Nghĩa</span>
+                                <span>Loại từ</span>
+                                <span>Ví dụ</span>
                             </div>
                             {previewWords.map((word, index) => (
-                                <div key={index} className="cv-ai-preview-row">
+                                <div key={index} className="cv-ai-preview-row" onClick={() => handleToggleCheck(index)}>
                                     <div className="cv-ai-preview-check">
                                         <input
                                             type="checkbox"
                                             checked={selectedIndexes.has(index)}
                                             onChange={() => handleToggleCheck(index)}
+                                            onClick={(event) => event.stopPropagation()}
                                         />
                                     </div>
                                     <div className="cv-ai-preview-word">
@@ -704,6 +725,11 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                                         <div className="cv-ai-preview-trans">{word.transcription}</div>
                                     </div>
                                     <div className="cv-ai-preview-mean">{word.mean}</div>
+                                    <div className="cv-ai-preview-type" data-short={getShortWordType(word.wordtype)}>{word.wordtype}</div>
+                                    <div className="cv-ai-preview-example">
+                                        <div>{word.example}</div>
+                                        <div>{word.example_vi}</div>
+                                    </div>
                                 </div>
                             ))}
                         </div>

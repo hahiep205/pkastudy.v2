@@ -1,35 +1,18 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
+import FileFormatModal from '../../components/common/FileFormatModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import {
+    downloadCourseExportFile,
+    downloadCourseSampleFile,
+    IMPORT_FILE_ACCEPT,
+    parseCourseImportFile,
+} from '../../utils/adminImportExport';
 
 const PAGE_SIZE = 8;
-
-function slugifyFilePart(value) {
-    return String(value || 'course')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .replace(/-{2,}/g, '-');
-}
-
-function downloadJsonFile(data, fileName) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: 'application/json;charset=utf-8',
-    });
-    const objectUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(objectUrl);
-}
 
 function createEmptyCourseForm() {
     return {
@@ -129,6 +112,9 @@ export default function ManagerCourses() {
     const [submitting, setSubmitting] = useState(false);
     const [exportingCourseId, setExportingCourseId] = useState(null);
     const [importing, setImporting] = useState(false);
+    const [downloadingSample, setDownloadingSample] = useState(false);
+    const [exportTargetCourse, setExportTargetCourse] = useState(null);
+    const [isSampleModalOpen, setIsSampleModalOpen] = useState(false);
     const importInputRef = useRef(null);
 
     useEffect(() => {
@@ -264,14 +250,20 @@ export default function ManagerCourses() {
         }
     };
 
-    const handleExportCourse = async (course) => {
+    const handleExportCourse = (course) => {
         if (!course?.id) return;
+        setExportTargetCourse(course);
+    };
 
+    const handleExportCourseWithFormat = async (fileFormat) => {
+        if (!exportTargetCourse?.id) return;
+
+        const course = exportTargetCourse;
+        setExportTargetCourse(null);
         setExportingCourseId(course.id);
         try {
             const data = await axiosClient.get(`/admin/courses/${course.id}/export`);
-            const fileName = `${slugifyFilePart(course.slug || course.title)}.course-export.v1.json`;
-            downloadJsonFile(data, fileName);
+            downloadCourseExportFile(data, fileFormat);
             setToast({ message: `Đã export khóa học ${course.title}.`, type: 'success' });
         } catch (err) {
             setToast({
@@ -287,6 +279,25 @@ export default function ManagerCourses() {
         importInputRef.current?.click();
     };
 
+    const handleDownloadSample = async (fileFormat) => {
+        setDownloadingSample(true);
+        try {
+            downloadCourseSampleFile(fileFormat);
+            setIsSampleModalOpen(false);
+            setToast({
+                message: `Đã tải file import mẫu khóa học dưới dạng ${fileFormat === 'excel' ? 'Excel' : 'JSON'}.`,
+                type: 'success',
+            });
+        } catch (err) {
+            setToast({
+                message: err.message || 'Tải file import mẫu thất bại.',
+                type: 'error',
+            });
+        } finally {
+            setDownloadingSample(false);
+        }
+    };
+
     const handleImportCourse = async (event) => {
         const file = event.target.files?.[0];
         event.target.value = '';
@@ -294,15 +305,7 @@ export default function ManagerCourses() {
 
         setImporting(true);
         try {
-            const rawText = await file.text();
-            let payload;
-
-            try {
-                payload = JSON.parse(rawText);
-            } catch {
-                throw new Error('File JSON không hợp lệ.');
-            }
-
+            const payload = await parseCourseImportFile(file);
             const data = await axiosClient.post('/admin/courses/import', payload);
             setPage(1);
             await refetchCourses(1);
@@ -334,7 +337,7 @@ export default function ManagerCourses() {
                         <input
                             ref={importInputRef}
                             type="file"
-                            accept=".json,application/json"
+                            accept={IMPORT_FILE_ACCEPT}
                             className="manager-course-import-input"
                             onChange={handleImportCourse}
                         />
@@ -345,6 +348,14 @@ export default function ManagerCourses() {
                             disabled={importing}
                         >
                             {importing ? 'Đang import...' : 'Import'}
+                        </button>
+                        <button
+                            type="button"
+                            className="manager-secondary-btn"
+                            onClick={() => setIsSampleModalOpen(true)}
+                            disabled={downloadingSample}
+                        >
+                            {downloadingSample ? 'Đang tải mẫu...' : 'Tải file Import mẫu'}
                         </button>
                         <button type="button" className="manager-primary-btn" onClick={openCreateModal}>
                             Tạo khóa học
@@ -484,6 +495,48 @@ export default function ManagerCourses() {
                 onClose={closeForm}
                 onSubmit={handleSubmitCourse}
                 submitting={submitting}
+            />
+
+            <FileFormatModal
+                isOpen={Boolean(exportTargetCourse)}
+                onClose={() => setExportTargetCourse(null)}
+                title="Chọn định dạng export khóa học"
+                description="Hãy chọn loại file muốn tải xuống. Cấu trúc file export sẽ tương thích trực tiếp với file import."
+                options={[
+                    {
+                        value: 'excel',
+                        label: 'Excel (.xlsx)',
+                        description: 'Phù hợp khi admin muốn chỉnh sửa topic và từ vựng trực tiếp trên bảng tính.',
+                        onSelect: handleExportCourseWithFormat,
+                    },
+                    {
+                        value: 'json',
+                        label: 'JSON (.json)',
+                        description: 'Giữ nguyên định dạng JSON hiện tại để tiếp tục dùng luồng import/export đã ổn định.',
+                        onSelect: handleExportCourseWithFormat,
+                    },
+                ]}
+            />
+
+            <FileFormatModal
+                isOpen={isSampleModalOpen}
+                onClose={() => setIsSampleModalOpen(false)}
+                title="Tải file import mẫu khóa học"
+                description="File mẫu gồm thông tin khóa học, 2 topic và mỗi topic có 2 từ vựng để admin dễ tăng giảm dữ liệu trước khi import."
+                options={[
+                    {
+                        value: 'excel',
+                        label: 'Excel (.xlsx)',
+                        description: 'Workbook gồm các sheet Course, Topics và Flashcards.',
+                        onSelect: handleDownloadSample,
+                    },
+                    {
+                        value: 'json',
+                        label: 'JSON (.json)',
+                        description: 'JSON mẫu cùng schema với file export/import hiện tại.',
+                        onSelect: handleDownloadSample,
+                    },
+                ]}
             />
 
             <ConfirmActionModal

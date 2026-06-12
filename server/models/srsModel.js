@@ -6,7 +6,7 @@ async function getDueReviewsByUserId(userId) {
       r.id AS reviewId,
       r.user_id AS userId,
       r.flashcard_id AS flashcardId,
-      r.interval_days AS interval,
+      r.interval_days AS \`interval\`,
       r.ef,
       r.repetition,
       r.next_review_date AS nextReviewDate,
@@ -29,6 +29,41 @@ async function getDueReviewsByUserId(userId) {
     JOIN Flashcards f ON f.id = r.flashcard_id
     WHERE r.user_id = ?
       AND r.next_review_date <= CURDATE()
+    ORDER BY r.next_review_date ASC, r.id ASC`,
+    [userId]
+  );
+
+  return rows;
+}
+
+async function getReviewQueueByUserId(userId) {
+  const [rows] = await pool.query(
+    `SELECT
+      r.id AS reviewId,
+      r.user_id AS userId,
+      r.flashcard_id AS flashcardId,
+      r.interval_days AS \`interval\`,
+      r.ef,
+      r.repetition,
+      r.next_review_date AS nextReviewDate,
+      r.last_reviewed_at AS lastReviewedAt,
+      r.created_at AS reviewCreatedAt,
+      r.updated_at AS reviewUpdatedAt,
+      f.id AS flashcardDbId,
+      COALESCE(f.external_id, CAST(f.id AS CHAR)) AS id,
+      f.topic_id AS topicId,
+      f.word,
+      f.transcription,
+      f.meaning AS mean,
+      f.word_type AS wordtype,
+      f.example,
+      f.example_vi AS example_vi,
+      f.language,
+      f.created_at AS flashcardCreatedAt,
+      f.updated_at AS flashcardUpdatedAt
+    FROM SRS_Reviews r
+    JOIN Flashcards f ON f.id = r.flashcard_id
+    WHERE r.user_id = ?
     ORDER BY r.next_review_date ASC, r.id ASC`,
     [userId]
   );
@@ -66,7 +101,7 @@ async function getReviewsByUserIdAndFlashcardIds(userId, flashcardIds, db = pool
     `SELECT
       r.id AS reviewId,
       r.flashcard_id AS flashcardId,
-      r.interval_days AS interval,
+      r.interval_days AS \`interval\`,
       r.ef,
       r.repetition,
       r.next_review_date AS nextReviewDate,
@@ -87,7 +122,7 @@ async function getReviewsByUserIdAndFlashcardIdsForUpdate(userId, flashcardIds, 
     `SELECT
       r.id AS reviewId,
       r.flashcard_id AS flashcardId,
-      r.interval_days AS interval,
+      r.interval_days AS \`interval\`,
       r.ef,
       r.repetition,
       r.next_review_date AS nextReviewDate,
@@ -137,6 +172,7 @@ async function upsertReviews(reviewRows, db = pool) {
 
 module.exports = {
   getDueReviewsByUserId,
+  getReviewQueueByUserId,
   getFlashcardsByIds,
   getReviewsByUserIdAndFlashcardIds,
   getReviewsByUserIdAndFlashcardIdsForUpdate,

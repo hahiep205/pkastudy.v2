@@ -47,11 +47,12 @@ function calculateSM2(quality, interval, ef, repetition) {
     nextRepetition = currentRepetition + 1;
 
     if (nextRepetition === 1) {
-      nextInterval = 1;
+      nextInterval = quality === 3 ? 2 : quality === 4 ? 4 : 7;
     } else if (nextRepetition === 2) {
-      nextInterval = 6;
+      nextInterval = quality === 3 ? 4 : quality === 4 ? 7 : 10;
     } else {
-      nextInterval = Math.max(1, Math.round(currentInterval * currentEf));
+      const qualityMultiplier = quality === 3 ? 0.85 : quality === 4 ? 1 : 1.2;
+      nextInterval = Math.max(1, Math.round(currentInterval * currentEf * qualityMultiplier));
     }
   }
 

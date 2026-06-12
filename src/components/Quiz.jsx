@@ -329,7 +329,7 @@ export default function Quiz({
                         </div>
 
                         <div className="flashcard-completion-actions">
-                            {correctCount < totalQuestions && (
+                            {false && (
                                 <button type="button" className="btn btn-secondary" onClick={handleRequizWrongWords}>
                                     Học lại từ sai
                                 </button>

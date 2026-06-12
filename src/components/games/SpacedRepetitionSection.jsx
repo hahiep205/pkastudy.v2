@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getDueItems as getLocalDueItems,
   getFullQueue as getLocalFullQueue,
@@ -8,12 +8,14 @@ import {
 } from '../../utils/srsStorage';
 import {
   fetchDueReviews,
+  fetchReviewQueue,
   hasServerSrsAccess,
   mapReviewRatingToQualityScore,
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
 import { calculateSM2 } from '../../utils/sm2';
 import { addXp } from '../../utils/xpSystem';
+import CustomModal from '../customDocs/CustomModal';
 
 const RATINGS = [
   { key: 'forgot', label: 'Quên hoàn toàn', emoji: '😰', className: 'rating-btn rating-forgot', desc: 'Ôn lại sớm theo SM-2' },
@@ -49,10 +51,12 @@ function mapServerDueItem(item) {
     mean: item.mean,
     transcription: item.transcription,
     example: item.example,
+    example_vi: item.example_vi,
     wordtype: item.wordtype,
-    interval: item.interval,
-    ef: item.ef,
-    repetition: item.repetition,
+    interval: Number(item.interval ?? 0),
+    ef: Number(item.ef ?? 2.5),
+    repetition: Number(item.repetition ?? 0),
+    nextReview: item.nextReviewDate || item.next_review_date || null,
   };
 }
 
@@ -157,7 +161,7 @@ function FeedbackBanner({ quality, nextLabel, onNext, isLast }) {
   return (
     <div className={`review-answer-feedback ${config.cls}`}>
       <p>
-        <strong>{config.icon} {config.msg}</strong>{' '}
+        <strong>{config.msg}</strong>{' '}
         Ôn lại sau <strong>{nextLabel}</strong>.
       </p>
       <button className="btn btn-primary flashcard-action-btn flashcard-action-btn-compact review-next-btn" onClick={onNext}>
@@ -167,7 +171,7 @@ function FeedbackBanner({ quality, nextLabel, onNext, isLast }) {
   );
 }
 
-function ReviewSession({ dueItems, onFinish, useServerSrs }) {
+function ReviewSession({ dueItems, onFinish, onReviewed, useServerSrs }) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [ratedQuality, setRatedQuality] = useState(null);
@@ -175,6 +179,7 @@ function ReviewSession({ dueItems, onFinish, useServerSrs }) {
   const [results, setResults] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const advanceTimeoutRef = useRef(null);
 
   const item = dueItems[index];
   const correctCount = results.filter((entry) => entry.quality === 'good' || entry.quality === 'easy').length;
@@ -187,43 +192,64 @@ function ReviewSession({ dueItems, onFinish, useServerSrs }) {
 
     try {
       let label;
+      let updatedQueueItem = null;
 
       if (useServerSrs) {
         const updated = await submitSrsReviewBatch([
           { flashcard_id: item.flashcardId, quality: mapReviewRatingToQualityScore(quality) },
         ]);
-        label = updated[0] ? formatIntervalLabel(updated[0].interval) : getServerNextIntervalLabel(item, quality);
+        const scheduledItem = updated[0];
+        label = scheduledItem ? formatIntervalLabel(scheduledItem.interval) : getServerNextIntervalLabel(item, quality);
+        updatedQueueItem = scheduledItem
+          ? mapServerDueItem({
+            ...item,
+            ...scheduledItem,
+            word: scheduledItem.word || item.word,
+            mean: scheduledItem.mean || item.mean,
+            transcription: scheduledItem.transcription || item.transcription,
+            wordtype: scheduledItem.wordtype || item.wordtype,
+            example: item.example,
+            example_vi: item.example_vi,
+          })
+          : null;
       } else {
         label = getLocalNextIntervalLabel(item, quality);
-        reviewLocalItem(item.wordId, quality);
+        updatedQueueItem = reviewLocalItem(item.wordId, quality);
       }
 
       if (quality === 'good') addXp(8, 'SRS nhớ tốt');
       else if (quality === 'easy') addXp(15, 'SRS quá dễ');
       else if (quality === 'hard') addXp(3, 'SRS nhớ mang máng');
 
+      const nextResults = [...results, { wordId: item.wordId, quality }];
       setRatedQuality(quality);
       setNextLabel(label);
-      setResults((prev) => [...prev, { wordId: item.wordId, quality }]);
+      setResults(nextResults);
+      onReviewed?.();
+      advanceTimeoutRef.current = setTimeout(() => {
+        if (index < dueItems.length - 1) {
+          setIndex((current) => current + 1);
+          setFlipped(false);
+          setRatedQuality(null);
+          setNextLabel('');
+          return;
+        }
+
+        onFinish(nextResults);
+      }, 900);
     } catch (error) {
       console.error('Failed to submit SRS review.', error);
       setSubmitError(error?.message || 'Không thể lưu kết quả ôn tập. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, item, ratedQuality, useServerSrs]);
+  }, [dueItems.length, index, isSubmitting, item, onFinish, onReviewed, ratedQuality, results, useServerSrs]);
 
-  const handleNext = () => {
-    if (index < dueItems.length - 1) {
-      setIndex((current) => current + 1);
-      setFlipped(false);
-      setRatedQuality(null);
-      setNextLabel('');
-      return;
+  useEffect(() => () => {
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
     }
-
-    onFinish(results);
-  };
+  }, []);
 
   return (
     <div className="review-session flashcard-shell review-session-shell">
@@ -257,8 +283,6 @@ function ReviewSession({ dueItems, onFinish, useServerSrs }) {
         <FeedbackBanner
           quality={ratedQuality}
           nextLabel={nextLabel}
-          onNext={handleNext}
-          isLast={index === dueItems.length - 1}
         />
       ) : null}
 
@@ -275,7 +299,6 @@ function ReviewResult({ results, dueItems, onRestart, onGoHome }) {
   const correct = results.filter((entry) => entry.quality === 'good' || entry.quality === 'easy').length;
   const total = results.length;
   const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
-  const emoji = pct >= 80 ? '🏆' : pct >= 50 ? '👍' : '💪';
   const message = pct >= 80
     ? 'Tuyệt vời. Trí nhớ của bạn đang rất tốt.'
     : pct >= 50
@@ -286,7 +309,6 @@ function ReviewResult({ results, dueItems, onRestart, onGoHome }) {
 
   return (
     <div className="review-result">
-      <div className="review-result-icon">{emoji}</div>
       <h2 className="review-result-title">Phiên ôn tập hoàn thành</h2>
       <p className="review-result-msg">{message}</p>
 
@@ -312,7 +334,6 @@ function ReviewResult({ results, dueItems, onRestart, onGoHome }) {
       <div className="review-result-breakdown">
         {RATINGS.map((rating) => (
           <div key={rating.key} className={`breakdown-item breakdown-${rating.key}`}>
-            <span className="breakdown-emoji">{rating.emoji}</span>
             <span className="breakdown-label">{rating.label}</span>
             <span className="breakdown-count">{ratingCount(rating.key)}</span>
           </div>
@@ -357,25 +378,126 @@ function EmptyState({ useServerSrs }) {
   );
 }
 
-function UpcomingSection({ queue }) {
-  const upcoming = [...queue]
-    .sort((a, b) => new Date(a.nextReview) - new Date(b.nextReview))
-    .slice(0, 6);
+function getLocalDateStamp(value) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
 
-  if (upcoming.length === 0) return null;
+function formatReviewDate(value) {
+  return new Date(value).toLocaleDateString('vi-VN');
+}
+
+function buildUpcomingGroups(queue, dueItems = []) {
+  const todayStamp = getLocalDateStamp(new Date());
+  const groups = new Map();
+
+  const todayItems = [...dueItems]
+    .filter((item) => item)
+    .sort((a, b) => new Date(a.nextReview || 0) - new Date(b.nextReview || 0));
+
+  if (todayItems.length > 0) {
+    groups.set('today', {
+      key: 'today',
+      label: 'Hôm nay',
+      stamp: todayStamp,
+      items: todayItems,
+    });
+  }
+
+  [...queue]
+    .filter((item) => item?.nextReview && getLocalDateStamp(item.nextReview) > todayStamp)
+    .sort((a, b) => new Date(a.nextReview) - new Date(b.nextReview))
+    .forEach((item) => {
+      const dateKey = new Date(item.nextReview).toISOString().slice(0, 10);
+      if (!groups.has(dateKey)) {
+        const itemStamp = getLocalDateStamp(item.nextReview);
+        groups.set(dateKey, {
+          key: dateKey,
+          label: itemStamp === todayStamp ? 'Hôm nay' : formatReviewDate(item.nextReview),
+          stamp: itemStamp,
+          items: [],
+        });
+      }
+
+      groups.get(dateKey).items.push(item);
+    });
+
+  return [...groups.values()].sort((a, b) => a.stamp - b.stamp);
+}
+
+function UpcomingWordsModal({ group, onClose }) {
+  return (
+    <CustomModal
+      isOpen={Boolean(group)}
+      onClose={onClose}
+      title={group ? `Từ cần ôn ngày ${group.label}` : 'Từ cần ôn'}
+      boxClassName="review-upcoming-modal"
+    >
+      <div className="cv-modal-body review-upcoming-modal-body">
+        {group ? (
+          <>
+            <p className="review-upcoming-modal-copy">
+              Có <strong>{group.items.length}</strong> từ cần ôn trong ngày này.
+            </p>
+            <div className="review-upcoming-modal-list">
+              {group.items.map((item) => (
+                <div key={`${group.key}-${item.wordId}`} className="review-upcoming-modal-item">
+                  <div className="review-upcoming-modal-main">
+                    <strong>{item.word}</strong>
+                    <span>{item.mean}</span>
+                  </div>
+                  {item.wordtype ? <em>{item.wordtype}</em> : null}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+      <div className="cv-modal-footer">
+        <button type="button" className="btn btn-primary" onClick={onClose}>Đóng</button>
+      </div>
+    </CustomModal>
+  );
+}
+
+function UpcomingSection({ queue, dueItems }) {
+  const upcomingGroups = useMemo(() => buildUpcomingGroups(queue, dueItems), [queue, dueItems]);
+  const [activeGroupKey, setActiveGroupKey] = useState(null);
+
+  const activeGroup = useMemo(
+    () => upcomingGroups.find((group) => group.key === activeGroupKey) || null,
+    [activeGroupKey, upcomingGroups]
+  );
+
+  if (upcomingGroups.length === 0) return null;
 
   return (
-    <section className="review-upcoming">
-      <h3>Lịch ôn sắp tới</h3>
-      <div className="review-upcoming-list">
-        {upcoming.map((item) => (
-          <div key={item.wordId} className="review-upcoming-item">
-            <strong>{item.word}</strong>
-            <span>{new Date(item.nextReview).toLocaleDateString('vi-VN')}</span>
+    <>
+      <section className="review-upcoming">
+        <div className="review-upcoming-head">
+          <div>
+            <h3>Lịch ôn sắp tới</h3>
+            <p>Chọn một ngày để xem danh sách từ cần ôn tương ứng.</p>
           </div>
-        ))}
-      </div>
-    </section>
+          <span className="review-upcoming-total">{upcomingGroups.length} ngày</span>
+        </div>
+        <div className="review-upcoming-list review-upcoming-days">
+          {upcomingGroups.map((group) => (
+            <button
+              key={group.key}
+              type="button"
+              className="review-upcoming-item review-upcoming-day-btn"
+              onClick={() => setActiveGroupKey(group.key)}
+            >
+              <strong>{group.label}</strong>
+              <span className="review-upcoming-day-count">{group.items.length} từ cần ôn</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <UpcomingWordsModal group={activeGroup} onClose={() => setActiveGroupKey(null)} />
+    </>
   );
 }
 
@@ -399,9 +521,12 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
 
     if (useServerSrs) {
       try {
-        const items = await fetchDueReviews();
-        setDueItems(items.map(mapServerDueItem));
-        setFullQueue([]);
+        const [dueItemsFromServer, queueItemsFromServer] = await Promise.all([
+          fetchDueReviews(),
+          fetchReviewQueue(),
+        ]);
+        setDueItems(dueItemsFromServer.map(mapServerDueItem));
+        setFullQueue(queueItemsFromServer.map(mapServerDueItem));
         setStatus('ready');
         return;
       } catch (error) {
@@ -422,6 +547,20 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
     setResults(null);
     setSessionKey((current) => current + 1);
   };
+
+  const handleReviewedItem = useCallback(async () => {
+    if (useServerSrs) {
+      try {
+        const refreshedQueue = await fetchReviewQueue();
+        setFullQueue(refreshedQueue.map(mapServerDueItem));
+      } catch (error) {
+        console.error('Failed to refresh server SRS queue.', error);
+      }
+      return;
+    }
+
+    setFullQueue(getLocalFullQueue());
+  }, [useServerSrs]);
 
   if (variant === 'preview') {
     return (
@@ -497,13 +636,14 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
           key={sessionKey}
           dueItems={dueItems}
           onFinish={setResults}
+          onReviewed={handleReviewedItem}
           useServerSrs={useServerSrs}
         />
       ) : (
         <EmptyState useServerSrs={useServerSrs} />
       )}
 
-      {!useServerSrs ? <UpcomingSection queue={fullQueue} /> : null}
+      <UpcomingSection queue={fullQueue} dueItems={dueItems} />
     </div>
   );
 }

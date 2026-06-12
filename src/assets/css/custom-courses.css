@@ -689,6 +689,18 @@ body.app-dark-mode .cv-tp-message.is-error {
     color: var(--red);
 }
 
+.cv-action-ai:hover {
+    background: rgba(168, 85, 247, .12);
+    color: #7c3aed;
+}
+
+.cv-action-ai.is-loading,
+.cv-action-btn:disabled {
+    opacity: .65;
+    cursor: wait;
+    transform: none !important;
+}
+
 .cv-confirm-copy {
     margin: 0;
     font-size: .92rem;
@@ -1335,6 +1347,13 @@ body.app-dark-mode .cv-custom-card-pct {
     overflow-y: auto;
 }
 
+@media (min-width: 1024px) {
+    .cv-modal-box.cv-ai-modal-box {
+        width: min(1180px, calc(100vw - 72px));
+        max-width: min(1180px, calc(100vw - 72px));
+    }
+}
+
 .cv-ai-preview-head {
     display: grid;
     grid-template-columns: 36px 1.4fr 1.2fr 0.8fr 1.8fr;
@@ -1421,10 +1440,25 @@ body.app-dark-mode .cv-custom-card-pct {
     color: var(--gray-text);
 }
 
+.cv-ai-preview-type {
+    font-size: .76rem;
+    font-weight: 700;
+    color: var(--dark-blue);
+    text-transform: uppercase;
+}
+
 .cv-ai-preview-example {
     font-size: .76rem;
     color: var(--gray-light);
     font-style: italic;
+    display: grid;
+    gap: 4px;
+    line-height: 1.45;
+}
+
+.cv-ai-preview-example div:last-child {
+    color: var(--gray-text);
+    font-style: normal;
 }
 
 .cv-ai-selected-count {
@@ -1476,9 +1510,11 @@ body.app-dark-mode .cv-custom-card-pct {
         grid-template-columns: 1.6fr 1.4fr 80px !important;
     }
 
-    /* Ẩn header cột 7 (Hành động) — thay bằng label nhỏ hơn */
-    .cv-custom-mode .cv-word-table-head span:nth-child(7) {
-        display: flex;
+    /* Hiện header cột Hành động cho custom mode trên mobile */
+    .cv-custom-mode .cv-word-table-head span:nth-child(6) {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
     }
 
     /* Custom mode: hiện switch trong actions cell trên mobile */
@@ -1490,7 +1526,7 @@ body.app-dark-mode .cv-custom-card-pct {
     }
 
     .cv-custom-mode .cv-actions-switch {
-        display: flex;
+        display: none;
     }
 
     /* Switch nhỏ gọn trong cột actions */
@@ -1535,15 +1571,31 @@ body.app-dark-mode .cv-custom-card-pct {
         flex: 1;
     }
 
-    /* AI preview ẩn cột type & example */
+    /* AI preview mobile: chỉ giữ từ vựng, nghĩa, loại từ */
     .cv-ai-preview-head,
     .cv-ai-preview-row {
-        grid-template-columns: 36px 1.4fr 1.2fr 0fr 0fr;
+        grid-template-columns: 36px 1.35fr 1.1fr .55fr;
     }
 
-    .cv-ai-preview-type,
     .cv-ai-preview-example {
         display: none;
+    }
+
+    .cv-ai-preview-head > span:last-child {
+        display: none;
+    }
+
+    .cv-ai-preview-type {
+        font-size: 0;
+        text-align: center;
+    }
+
+    .cv-ai-preview-type::after {
+        content: attr(data-short);
+        font-size: .72rem;
+        font-weight: 700;
+        color: var(--dark-blue);
+        line-height: 1.2;
     }
 
     /* Custom card actions */
@@ -2038,6 +2090,16 @@ body.app-dark-mode .import-table thead th {
     margin-bottom: 8px;
 }
 
+@media (min-width: 1024px) {
+    .games-vocab-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    #page-games .games-vocab-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
 .games-vocab-card {
     display: flex;
     flex-direction: column;
@@ -2094,6 +2156,30 @@ body.app-dark-mode .import-table thead th {
     opacity: 0;
     transform: translateX(-4px);
     transition: opacity .18s, transform .18s;
+}
+
+.games-vocab-card-image-only {
+    padding: 0;
+    place-items: stretch;
+    align-content: stretch;
+    background: #fff;
+    border-radius: 18px;
+}
+
+.games-vocab-card-image-only .games-vocab-play,
+.games-vocab-card-image-only:hover .games-vocab-play {
+    display: none !important;
+    opacity: 0 !important;
+    transform: none !important;
+}
+
+.games-vocab-card-banner {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .games-vocab-card:hover .games-vocab-play {

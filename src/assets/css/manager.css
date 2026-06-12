@@ -1108,6 +1108,61 @@
     min-width: 160px;
 }
 
+.manager-format-modal {
+    max-width: 680px;
+}
+
+.manager-format-modal-body {
+    display: grid;
+    gap: 18px;
+}
+
+.manager-format-modal-copy {
+    margin: 0;
+    color: var(--gray-text);
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.manager-format-modal-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.manager-format-card {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+    border: 2px solid var(--border-color);
+    border-radius: 18px;
+    padding: 18px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    color: var(--dark-blue);
+    text-align: left;
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.manager-format-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(28, 176, 246, .34);
+    box-shadow: 0 14px 24px rgba(20, 61, 89, .08);
+}
+
+.manager-format-card strong {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.manager-format-card span {
+    color: var(--gray-text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.6;
+}
+
 .manager-table-shell {
     overflow-x: auto;
     border-radius: var(--radius-md);

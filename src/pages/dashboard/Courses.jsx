@@ -7,6 +7,14 @@ import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import { languageLabels } from '../../utils/language';
 
+const CUSTOM_TOPIC_EMOJIS = ['📘', '📗', '📙', '📕', '🗂️', '📝', '📚', '🧠', '🎯', '💡', '🚀', '🌟'];
+
+function getCustomTopicEmoji(topic) {
+    const source = `${topic?.id || ''}-${topic?.title || ''}`;
+    const hash = Array.from(source).reduce((total, char) => total + char.charCodeAt(0), 0);
+    return CUSTOM_TOPIC_EMOJIS[hash % CUSTOM_TOPIC_EMOJIS.length];
+}
+
 export default function Courses() {
     const location = useLocation();
     const [activeLang, setActiveLang] = useState(() => {
@@ -259,7 +267,7 @@ export default function Courses() {
                                 return (
                                     <div className="doc-card cv-custom-card reveal revealed" key={topic.id}>
                                         <div className="doc-icon-wrap cv-custom-icon-wrap">
-                                            <span className="cv-custom-card-emoji"></span>
+                                            <span className="cv-custom-card-emoji">{getCustomTopicEmoji(topic)}</span>
                                         </div>
                                         <div className="doc-info">
                                             <div className="doc-meta-row">
