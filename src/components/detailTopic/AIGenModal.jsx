@@ -5,8 +5,8 @@ import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
 
 const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || 'sk-bee-9b56ef380e6d34ac104b81462524f6ff3693a8e68066cfe888f42ddddfbf3df6';
-const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'glm-4.5-flash';
+const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
+const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
 
 const LANG_CONFIG = {
     en: {
@@ -291,7 +291,40 @@ QUALITY RULES:
 const REQUIRED_FIELDS = ['word', 'transcription', 'mean', 'wordtype', 'example', 'example_vi'];
 const DEFAULT_LANG = LANG_CONFIG.en;
 
-function buildUserPrompt({ count, label, langName, theme }) {
+function normalizeWordKey(value) {
+    return cleanText(value).toLocaleLowerCase();
+}
+
+function buildUniqueSystemPrompt(existingWords) {
+    const normalizedWords = Array.from(
+        new Set(
+            (existingWords || [])
+                .map((item) => normalizeWordKey(item?.word || item))
+                .filter(Boolean)
+        )
+    );
+
+    return `CRITICAL UNIQUENESS CONSTRAINT:
+- You MUST NOT generate any vocabulary item whose "word" duplicates or nearly duplicates any existing word already in this topic.
+- You MUST NOT generate duplicate words inside the same output array.
+- Treat uppercase/lowercase, spacing, punctuation, singular/plural, verb tense, and trivial formatting changes as duplicates.
+- If a candidate word conflicts with the existing list or another generated item, reject it internally and replace it before answering.
+- Before final output, verify every generated word is unique against the existing list and unique within the batch.
+- If any duplicate remains, the full answer is INVALID and must be regenerated internally.
+
+EXISTING WORDS IN THIS TOPIC:
+${normalizedWords.length ? normalizedWords.join(', ') : '(none)'}`;
+}
+
+function buildUserPrompt({ count, label, langName, theme, existingWords }) {
+    const normalizedExistingWords = Array.from(
+        new Set(
+            (existingWords || [])
+                .map((item) => cleanText(item?.word || item))
+                .filter(Boolean)
+        )
+    );
+
     return `Tạo ${count} từ vựng tiếng ${label} về chủ đề "${theme}".
 
 YÊU CẦU BẮT BUỘC (PHẢI TUÂN THỦ 100%):
@@ -369,6 +402,14 @@ KIỂM TRA CUỐI:
 - Nếu bất kỳ field nào sai → toàn bộ output là INVALID
 
 MẪU:
+DANH SACH TU DA CO TRONG CHU DE:
+${normalizedExistingWords.length ? normalizedExistingWords.join(', ') : '(chua co tu nao)'}
+
+QUY TAC CHONG TRUNG BAT BUOC:
+- KHONG duoc dung lai bat ky "word" nao trong danh sach tren.
+- KHONG duoc tao 2 muc co "word" giong nhau hoac chi khac viet hoa, dau cau, khoang trang, dang so it/so nhieu, bien the nho.
+- Neu co trung, phai tu thay bang tu khac truoc khi tra ve.
+
 [{"word":"...","transcription":"...","mean":"...","wordtype":"...","example":"...","example_vi":"..."}]`;
 }
 
@@ -439,18 +480,25 @@ function getShortWordType(value = '') {
     return normalized.slice(0, 6);
 }
 
-function parseGeneratedWords(rawText, requestedCount) {
+function parseGeneratedWords(rawText, requestedCount, existingWords = []) {
     const parsed = JSON.parse(extractJsonArray(rawText));
     if (!Array.isArray(parsed)) {
         throw new Error('AI không trả về danh sách hợp lệ');
     }
 
+    const existingWordKeys = new Set(
+        (existingWords || [])
+            .map((item) => normalizeWordKey(item?.word || item))
+            .filter(Boolean)
+    );
     const seen = new Set();
     const normalized = parsed
         .map(normalizeWordItem)
         .filter(Boolean)
         .filter((item) => {
-            const key = `${item.word.toLowerCase()}__${item.mean.toLowerCase()}`;
+            const wordKey = normalizeWordKey(item.word);
+            if (!wordKey || existingWordKeys.has(wordKey)) return false;
+            const key = `${wordKey}__${item.mean.toLowerCase()}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
@@ -461,7 +509,7 @@ function parseGeneratedWords(rawText, requestedCount) {
         throw new Error('AI trả về dữ liệu nhưng không có từ vựng hợp lệ để sử dụng');
     }
 
-    if (normalized.length < Math.max(3, Math.ceil(requestedCount / 2))) {
+    if (normalized.length < requestedCount) {
         throw new Error('AI trả về quá ít mục hợp lệ. Hay thử tạo lại để lấy bộ từ chất lượng hơn');
     }
 
@@ -498,9 +546,9 @@ async function buildAiError(resp) {
     return detail || `HTTP ${resp.status}`;
 }
 
-export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
+export default function AIGenModal({ isOpen, onClose, onSave, topicLang, existingWords = [] }) {
     const [theme, setTheme] = useState('');
-    const [count, setCount] = useState(3);
+    const [count, setCount] = useState(5);
     const [status, setStatus] = useState('input');
     const [errorMsg, setErrorMsg] = useState('');
     const [previewWords, setPreviewWords] = useState([]);
@@ -522,7 +570,14 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
         setStatus('loading');
 
         try {
-            const prompt = buildUserPrompt({ count, label: langLabel, theme: theme.trim() });
+            const prompt = buildUserPrompt({
+                count,
+                label: langLabel,
+                langName: currentLang.label,
+                theme: theme.trim(),
+                existingWords
+            });
+            const uniqueSystemPrompt = buildUniqueSystemPrompt(existingWords);
 
             const resp = await fetch(AI_API_URL, {
                 method: 'POST',
@@ -534,6 +589,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                     model: AI_MODEL,
                     messages: [
                         { role: 'system', content: currentLang.systemPrompt },
+                        { role: 'system', content: uniqueSystemPrompt },
                         { role: 'user', content: prompt }
                     ],
                     max_tokens: 3000,
@@ -548,7 +604,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
 
             const data = await resp.json();
             const text = data.choices?.[0]?.message?.content || '';
-            const words = parseGeneratedWords(text, count);
+            const words = parseGeneratedWords(text, count, existingWords);
 
             setPreviewWords(words);
             setSelectedIndexes(new Set(words.map((_, index) => index)));
@@ -645,9 +701,9 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang }) {
                                     value={count}
                                     onChange={(e) => setCount(Number(e.target.value))}
                                 >
-                                    <option value="1">1 từ</option>
-                                    <option value="3">3 từ</option>
                                     <option value="5">5 từ</option>
+                                    <option value="10">10 từ</option>
+                                    <option value="15">15 từ</option>
                                 </select>
                             </div>
                         </div>

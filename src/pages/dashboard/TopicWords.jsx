@@ -31,8 +31,8 @@ import { xpStudyModeComplete } from '../../utils/xpSystem';
 import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
 
 const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || 'sk-bee-9b56ef380e6d34ac104b81462524f6ff3693a8e68066cfe888f42ddddfbf3df6';
-const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'glm-4.5-flash';
+const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
+const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
 
 const SVG_ICONS = {
   VOICE: (
@@ -187,6 +187,10 @@ const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match
 
 function getWordKey(word) {
   return word.id ?? word.flashcardId;
+}
+
+function normalizeTopicWord(value) {
+  return String(value ?? '').trim().toLocaleLowerCase();
 }
 
 function getCurrentStudyUserKey() {
@@ -433,7 +437,20 @@ const activeWords = !studyWordIds
   };
 
   const handleSaveAIWords = (selectedWords) => {
-    addManyWordsToTopic(topicId, selectedWords);
+    const existingWordSet = new Set(words.map((word) => normalizeTopicWord(word?.word)).filter(Boolean));
+    const dedupedWords = selectedWords.filter((word) => {
+      const normalizedWord = normalizeTopicWord(word?.word);
+      if (!normalizedWord || existingWordSet.has(normalizedWord)) return false;
+      existingWordSet.add(normalizedWord);
+      return true;
+    });
+
+    if (dedupedWords.length === 0) {
+      setToastMessage('Không có từ mới hợp lệ để thêm vào chủ đề này.');
+      return;
+    }
+
+    addManyWordsToTopic(topicId, dedupedWords);
   };
 
   const handleDeleteWord = (wordId) => {
@@ -971,6 +988,7 @@ const activeWords = !studyWordIds
         onClose={() => setAIModalOpen(false)}
         onSave={handleSaveAIWords}
         topicLang={topicLang}
+        existingWords={words}
       />
 
       <WordDetailOverlay

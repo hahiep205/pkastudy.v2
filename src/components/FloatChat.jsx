@@ -18,8 +18,8 @@ marked.setOptions({
 });
 
 const API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const API_BEARER = import.meta.env.VITE_BEE_AI_BEARER || 'sk-bee-9b56ef380e6d34ac104b81462524f6ff3693a8e68066cfe888f42ddddfbf3df6';
-const MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'glm-4.5-flash';
+const API_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
+const MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
 
 const SYSTEM_PROMPT = `Bạn là trợ lý AI gia sư của PKA Study — nền tảng học ngoại ngữ thông minh dành cho sinh viên và người học.
 
