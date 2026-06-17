@@ -41,7 +41,7 @@ function mapApiTopic(apiTopic) {
     _serverId: apiTopic.id,
     title: apiTopic.title,
     description: apiTopic.description || "",
-    lang: "en",
+    lang: apiTopic.lang || "en",
     words: (apiTopic.words || []).map((w) => ({
       id: String(w.id),
       _serverId: w.id,
@@ -213,6 +213,7 @@ export function useCustomCourses() {
         await axiosClient.put(`/courses/custom/topics/${serverId}`, {
           title: title.trim(),
           description,
+          lang,
         });
         await loadFromServer();
         return {};
@@ -245,10 +246,18 @@ export function useCustomCourses() {
 
   const addWordToTopic = useCallback(
     async (topicId, wordData) => {
+      const normalizeLanguage = (value) => String(value || '').trim().toLowerCase();
+      const topicLanguage = (topic) => normalizeLanguage(topic?.lang || 'en');
+      const wordLanguage = normalizeLanguage(wordData?.language || wordData?.lang || '');
       if (!isLoggedIn()) {
         const local = getLocalCourses();
         const topic = local.find((t) => t.id === topicId);
         if (!topic) return { error: "Không tìm thấy chủ đề." };
+        const resolvedTopicLanguage = topicLanguage(topic);
+        const resolvedWordLanguage = wordLanguage || resolvedTopicLanguage;
+        if (resolvedWordLanguage && resolvedWordLanguage !== resolvedTopicLanguage) {
+          return { error: "Từ vựng không khớp ngôn ngữ của chủ đề." };
+        }
         if (
           topic.words.some(
             (w) => w.word?.toLowerCase() === wordData.word?.toLowerCase(),
@@ -258,7 +267,7 @@ export function useCustomCourses() {
             error: `Từ "${wordData.word}" đã tồn tại trong chủ đề này.`,
           };
         }
-        topic.words.push({ id: createLocalId("cuswd"), ...wordData });
+        topic.words.push({ id: createLocalId("cuswd"), ...wordData, language: resolvedWordLanguage || resolvedTopicLanguage });
         saveLocalCourses(local);
         setCustomCourses([...local]);
         return {};
@@ -266,9 +275,14 @@ export function useCustomCourses() {
       try {
         const t = customCourses.find((c) => c.id === String(topicId));
         const serverId = t?._serverId || topicId;
+        const resolvedTopicLanguage = topicLanguage(t);
+        const resolvedWordLanguage = wordLanguage || resolvedTopicLanguage;
+        if (resolvedWordLanguage && resolvedWordLanguage !== resolvedTopicLanguage) {
+          return { error: "Từ vựng không khớp ngôn ngữ của chủ đề." };
+        }
         await axiosClient.post(
           `/courses/custom/topics/${serverId}/words`,
-          wordData,
+          { ...wordData, language: resolvedWordLanguage || resolvedTopicLanguage },
         );
         await loadFromServer();
         return {};

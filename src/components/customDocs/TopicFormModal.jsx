@@ -11,6 +11,12 @@ export default function TopicFormModal({
     toastMessage,
     onToastHide,
 }) {
+    const languageOptions = [
+        { value: 'en', label: 'Tiếng Anh' },
+        { value: 'ja', label: 'Tiếng Nhật' },
+        { value: 'zh', label: 'Tiếng Trung (giản thể)' },
+    ];
+
     const createTopicTitle = (
         <span className="cv-modal-title-with-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
@@ -57,6 +63,27 @@ export default function TopicFormModal({
                                 onToastHide?.();
                             }}
                         />
+                    </div>
+                </div>
+                <div className="cv-form-row">
+                    <div className="cv-form-group" style={{ flex: 1 }}>
+                        <label className="cv-form-label">
+                            Ngôn ngữ <span style={{ color: 'var(--red)' }}>*</span>
+                        </label>
+                        <select
+                            className="cv-form-input cv-form-select"
+                            value={topicForm.lang || 'en'}
+                            onChange={(event) => {
+                                setTopicForm({ ...topicForm, lang: event.target.value });
+                                onToastHide?.();
+                            }}
+                        >
+                            {languageOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
             </div>

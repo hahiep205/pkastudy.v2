@@ -11,6 +11,7 @@ const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
 const LANG_CONFIG = {
     en: {
         label: 'Anh',
+        promptName: 'English',
         systemPrompt: `You generate high-quality English vocabulary for Vietnamese learners.
 
 STRICT OUTPUT RULES:
@@ -42,6 +43,7 @@ PREFERENCE:
     },
     ko: {
         label: 'Hàn',
+        promptName: 'Korean',
         systemPrompt: `You generate high-quality Korean vocabulary for Vietnamese learners.
 
 STRICT OUTPUT RULES:
@@ -68,6 +70,7 @@ QUALITY RULES:
     },
     ja: {
         label: 'Nhật',
+        promptName: 'Japanese',
         systemPrompt: `You generate high-quality Japanese vocabulary for Vietnamese learners.
 
 STRICT OUTPUT RULES:
@@ -93,6 +96,7 @@ QUALITY RULES:
     },
     zh: {
         label: 'Trung',
+        promptName: 'Mandarin Chinese',
         systemPrompt: `You generate high-quality Mandarin Chinese vocabulary for Vietnamese learners.
 
 =====================
@@ -573,7 +577,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang, existin
             const prompt = buildUserPrompt({
                 count,
                 label: langLabel,
-                langName: currentLang.label,
+                langName: currentLang.promptName || currentLang.label,
                 theme: theme.trim(),
                 existingWords
             });

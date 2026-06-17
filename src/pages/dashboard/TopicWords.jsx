@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
@@ -9,6 +9,10 @@ import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import WordModal from '../../components/detailTopic/WordModal';
 import AIGenModal from '../../components/detailTopic/AIGenModal';
+import CustomTopicExcelImportModal from '../../components/detailTopic/CustomTopicExcelImportModal';
+import CustomTopicImageImportModal from '../../components/detailTopic/CustomTopicImageImportModal';
+import CustomTopicFileImportModal from '../../components/detailTopic/CustomTopicFileImportModal';
+import CustomTopicTextImportModal from '../../components/detailTopic/CustomTopicTextImportModal';
 import WordDetailOverlay from '../../components/detailTopic/WordDetailOverlay';
 import TopicPickerModal from '../../components/detailTopic/TopicPickerModal';
 import Flashcard from '../../components/Flashcard';
@@ -70,29 +74,26 @@ const SVG_ICONS = {
   ),
 };
 
-const FILLABLE_WORD_FIELDS = ['transcription', 'wordtype', 'example', 'example_vi'];
-const ALWAYS_REFRESH_WORD_FIELDS = ['wordtype'];
-
 const AI_LANGUAGE_META = {
   en: {
     name: 'English',
-    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in English. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+    systemPrompt: 'You audit and correct a single English vocabulary record for Vietnamese learners. Return only one valid JSON object with exactly these keys: word, mean, transcription, wordtype, example, example_vi. Use the provided word as the headword. Use mean as the primary semantic anchor when it is present; otherwise use wordtype. Verify every field for correctness, naturalness, and consistency. Fix inaccurate or awkward fields. Keep example_vi as a faithful Vietnamese translation of example. Do not add explanations.',
   },
   ko: {
     name: 'Korean',
-    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in Korean. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+    systemPrompt: 'You audit and correct a single Korean vocabulary record for Vietnamese learners. Return only one valid JSON object with exactly these keys: word, mean, transcription, wordtype, example, example_vi. Use the provided word as the headword. Use mean as the primary semantic anchor when it is present; otherwise use wordtype. Verify every field for correctness, naturalness, and consistency. Fix inaccurate or awkward fields. Keep example_vi as a faithful Vietnamese translation of example. Do not add explanations.',
   },
   ja: {
     name: 'Japanese',
-    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in Japanese. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+    systemPrompt: 'You audit and correct a single Japanese vocabulary record for Vietnamese learners. Return only one valid JSON object with exactly these keys: word, mean, transcription, wordtype, example, example_vi. Use the provided word as the headword. Use mean as the primary semantic anchor when it is present; otherwise use wordtype. Verify every field for correctness, naturalness, and consistency. Fix inaccurate or awkward fields. Keep example_vi as a faithful Vietnamese translation of example. Do not add explanations.',
   },
   zh: {
     name: 'Simplified Chinese',
-    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in Simplified Chinese. Keep "example_vi" in Vietnamese. For transcription, use valid pinyin with tone marks. Use concise, accurate, natural content.',
+    systemPrompt: 'You audit and correct a single Simplified Chinese vocabulary record for Vietnamese learners. Return only one valid JSON object with exactly these keys: word, mean, transcription, wordtype, example, example_vi. Use the provided word as the headword. Use mean as the primary semantic anchor when it is present; otherwise use wordtype. Verify every field for correctness, naturalness, and consistency. Fix inaccurate or awkward fields. Keep example_vi as a faithful Vietnamese translation of example. For transcription, use valid pinyin with tone marks. Do not add explanations.',
   },
   fr: {
     name: 'French',
-    systemPrompt: 'You complete missing vocabulary fields for Vietnamese learners. Return only valid JSON. Keep "transcription", "wordtype", and "example" in French. Keep "example_vi" in Vietnamese. Use concise, accurate, natural content.',
+    systemPrompt: 'You audit and correct a single French vocabulary record for Vietnamese learners. Return only one valid JSON object with exactly these keys: word, mean, transcription, wordtype, example, example_vi. Use the provided word as the headword. Use mean as the primary semantic anchor when it is present; otherwise use wordtype. Verify every field for correctness, naturalness, and consistency. Fix inaccurate or awkward fields. Keep example_vi as a faithful Vietnamese translation of example. Do not add explanations.',
   },
 };
 
@@ -101,6 +102,22 @@ function cleanAiText(value) {
     .replace(/\s+/g, ' ')
     .replace(/^[\s"'`]+|[\s"'`]+$/g, '')
     .trim();
+}
+
+function isLikelyEnglishMeaning(value) {
+  const text = cleanAiText(value);
+  if (!text) return false;
+  if (/[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụýỳỷỹỵ]/i.test(text)) {
+    return false;
+  }
+  return /^[a-z0-9\s,'"()\-/:;.!?&]+$/i.test(text);
+}
+
+function limitMeaningToFiveWords(value) {
+  const text = cleanAiText(value);
+  if (!text) return '';
+  const parts = text.split(/\s+/).filter(Boolean);
+  return parts.slice(0, 5).join(' ');
 }
 
 function extractJsonObject(text) {
@@ -116,36 +133,250 @@ function extractJsonObject(text) {
   return cleaned.slice(start, end + 1);
 }
 
-function getMissingWordFields(word) {
-  return FILLABLE_WORD_FIELDS.filter((field) => !cleanAiText(word?.[field]));
+function extractJsonArray(text) {
+  const cleaned = String(text || '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const startArray = cleaned.indexOf('[');
+  const endArray = cleaned.lastIndexOf(']');
+  if (startArray !== -1 && endArray !== -1 && endArray > startArray) {
+    return cleaned.slice(startArray, endArray + 1);
+  }
+
+  const startObject = cleaned.indexOf('{');
+  const endObject = cleaned.lastIndexOf('}');
+  if (startObject === -1 || endObject === -1 || endObject <= startObject) {
+    throw new Error('AI không trả về JSON array hợp lệ');
+  }
+
+  return cleaned.slice(startObject, endObject + 1);
 }
 
-function buildFillWordPrompt(word, missingFields, langName) {
-  const currentValues = FILLABLE_WORD_FIELDS.map((field) => `${field}: ${cleanAiText(word?.[field]) || '(empty)'}`).join('\n');
+function getWordAuditAnchor(word) {
+  return {
+    anchorName: 'word',
+    anchorValue: cleanAiText(word?.word),
+  };
+}
 
-  return `Complete missing fields for this ${langName} vocabulary item.
+function buildAuditWordPrompt(word, langName) {
+  const currentValues = [
+    `word: ${cleanAiText(word?.word) || '(empty)'}`,
+    `mean: ${cleanAiText(word?.mean) || '(empty)'}`,
+    `transcription: ${cleanAiText(word?.transcription) || '(empty)'}`,
+    `wordtype: ${cleanAiText(word?.wordtype) || '(empty)'}`,
+    `example: ${cleanAiText(word?.example) || '(empty)'}`,
+    `example_vi: ${cleanAiText(word?.example_vi) || '(empty)'}`,
+  ].join('\n');
+  const { anchorName, anchorValue } = getWordAuditAnchor(word);
 
-Return ONLY one valid JSON object with EXACTLY these 4 keys:
-transcription, wordtype, example, example_vi
+  return `Audit and correct this ${langName} vocabulary record.
+
+Return ONLY one valid JSON object with EXACTLY these keys:
+word, mean, transcription, wordtype, example, example_vi
 
 Rules:
-- Preserve existing values logically. The app will only use fields that are currently empty.
-- Re-evaluate "wordtype" from the word and Vietnamese meaning, and correct it if the current value is inaccurate.
-- Fill ONLY the missing fields listed below with natural, correct content.
-- If "example" is generated, "example_vi" must be the correct Vietnamese translation of that exact example.
-- If "example" already exists but "example_vi" is missing, translate the existing example.
-- "wordtype" should be specific, for example: noun, verb, adjective, adverb, phrase.
-- "transcription" must be an accurate pronunciation/transcription for the word.
-- Keep output short, accurate, and directly usable.
-- No markdown, no explanation, no extra text.
+- Use the provided word as the headword and semantic anchor.
+- You may correct a bad word spelling only if the correction is obvious and unambiguous from the context.
+- The "mean" field must always be in Vietnamese, even if the input meaning is in English.
+- If the current meaning is English, translate it to concise Vietnamese.
+- The "mean" field must be short and must not exceed 5 Vietnamese words.
+- Check every field for accuracy, naturalness, and internal consistency.
+- Correct wrong or awkward fields even if they are already filled.
+- Use the current values only as hints; if a filled field looks inaccurate or awkward, replace it with a better one.
+- Use the word itself to infer the exact meaning, part of speech, pronunciation, and example.
+- If you are uncertain about a field, keep it coherent and usable rather than omitting it.
+- "wordtype" should be specific, such as noun, verb, adjective, adverb, phrase.
+- "transcription" must match the pronunciation/pronunciation system of the word.
+- "example" must be short, natural, and fit the word sense.
+- "example_vi" must be a faithful Vietnamese translation of "example".
+- Do not add explanations, markdown, or extra text.
 
-Word: ${cleanAiText(word?.word)}
-Vietnamese meaning: ${cleanAiText(word?.mean)}
+Primary anchor: ${anchorName}
+Anchor value: ${anchorValue || '(empty)'}
 Language: ${langName}
-Missing fields: ${missingFields.join(', ')}
 
 Current values:
 ${currentValues}`;
+}
+
+function normalizeAiAuditResult(parsed, fallbackWord, fallbackWordData = {}) {
+  const fallbackWordText = cleanAiText(fallbackWord);
+  const pick = (...values) => values.map(cleanAiText).find(Boolean) || '';
+  const result = {
+    word: pick(parsed?.word, parsed?.headword, parsed?.term) || fallbackWordText,
+    mean: pick(parsed?.mean, parsed?.meaning, parsed?.definition, parsed?.sense) || cleanAiText(fallbackWordData.mean),
+    transcription: pick(parsed?.transcription, parsed?.phonetic, parsed?.pronunciation, parsed?.ipa) || cleanAiText(fallbackWordData.transcription),
+    wordtype: pick(parsed?.wordtype, parsed?.word_type, parsed?.part_of_speech, parsed?.pos, parsed?.type) || cleanAiText(fallbackWordData.wordtype),
+    example: pick(parsed?.example, parsed?.sentence, parsed?.example_sentence) || cleanAiText(fallbackWordData.example),
+    example_vi: pick(parsed?.example_vi, parsed?.exampleVi, parsed?.example_vn, parsed?.translation) || cleanAiText(fallbackWordData.example_vi),
+  };
+
+  if (!result.word) return null;
+
+  return result;
+}
+
+async function translateMeaningToVietnamese({ word, meaning, wordtype, langName }) {
+  const prompt = `Translate the meaning of this ${langName} vocabulary item into concise Vietnamese.
+
+Return ONLY a valid JSON object with exactly this key:
+mean
+
+Rules:
+- "mean" must be Vietnamese, short, natural, and accurate.
+- Do not include English in the returned meaning unless it is a proper noun or fixed term that must stay unchanged.
+- Keep the translation aligned with the word and word type.
+- No explanation, no markdown, no extra text.
+
+Word: ${cleanAiText(word)}
+Current meaning: ${cleanAiText(meaning)}
+Word type: ${cleanAiText(wordtype) || '(empty)'}`;
+
+  const resp = await fetch(AI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${AI_BEARER}`,
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: 'You translate vocabulary meanings into natural Vietnamese. Return only JSON.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 120,
+      temperature: 0,
+      stream: false,
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(await buildAiError(resp));
+  }
+
+  const data = await resp.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  const parsed = JSON.parse(extractJsonObject(text));
+  const translated = limitMeaningToFiveWords(parsed?.mean);
+  return translated || limitMeaningToFiveWords(meaning);
+}
+
+function buildAuditWordsPrompt(words, langName) {
+  const currentValues = words
+    .slice(0, 15)
+    .map((word, index) => [
+      `Item ${index + 1}`,
+      `word: ${cleanAiText(word?.word) || '(empty)'}`,
+      `mean: ${cleanAiText(word?.mean) || '(empty)'}`,
+      `wordtype: ${cleanAiText(word?.wordtype) || '(empty)'}`,
+      `transcription: ${cleanAiText(word?.transcription) || '(empty)'}`,
+      `example: ${cleanAiText(word?.example) || '(empty)'}`,
+      `example_vi: ${cleanAiText(word?.example_vi) || '(empty)'}`,
+    ].join('\n'))
+    .join('\n\n');
+
+  return `Audit and correct these ${langName} vocabulary items extracted from an image.
+
+Return ONLY one valid JSON array with at most 15 items.
+Do not add markdown, code fences, explanations, or extra text.
+Each item must contain exactly these keys:
+word, mean, transcription, wordtype, example, example_vi
+
+Rules:
+- Use the provided word as the headword and semantic anchor.
+- Keep the items in the same order as the input list.
+- Correct obvious OCR mistakes when the intended word is clear.
+- If a field is missing or weak, fill it with the best accurate value.
+- The "mean" field must always be in Vietnamese.
+- The "mean" field must be short and must not exceed 5 Vietnamese words.
+- "wordtype" should be specific, such as noun, verb, adjective, adverb, phrase.
+- "example" must be short, natural, and fit the word sense.
+- "example_vi" must be a faithful Vietnamese translation of "example".
+- If you are uncertain about a field, keep it coherent and usable rather than omitting it.
+
+Current values:
+${currentValues}`;
+}
+
+function normalizeImagePreviewItem(parsed, fallbackWordData = {}) {
+  const pick = (...values) => values.map(cleanAiText).find(Boolean) || '';
+  const result = {
+    word: pick(parsed?.word, parsed?.headword, parsed?.term) || cleanAiText(fallbackWordData.word),
+    mean: pick(parsed?.mean, parsed?.meaning, parsed?.definition, parsed?.sense) || cleanAiText(fallbackWordData.mean),
+    wordtype: pick(parsed?.wordtype, parsed?.word_type, parsed?.part_of_speech, parsed?.pos, parsed?.type) || cleanAiText(fallbackWordData.wordtype),
+  };
+
+  if (!result.word) return null;
+  result.mean = limitMeaningToFiveWords(result.mean);
+  return result;
+}
+
+async function auditWordsWithAI(words, langName) {
+  const resp = await fetch(AI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${AI_BEARER}`,
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You audit and correct vocabulary records for Vietnamese learners in ${langName}. Return only a valid JSON array.`,
+        },
+        { role: 'user', content: buildAuditWordsPrompt(words, langName) },
+      ],
+      max_tokens: 2200,
+      temperature: 0,
+      stream: false,
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(await buildAiError(resp));
+  }
+
+  const data = await resp.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  const parsedText = extractJsonArray(text);
+  const parsed = JSON.parse(parsedText);
+  const parsedList = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed?.items)
+      ? parsed.items
+      : Array.isArray(parsed?.words)
+        ? parsed.words
+        : Array.isArray(parsed?.data)
+          ? parsed.data
+          : [parsed];
+
+  const normalizedWords = await Promise.all(words.map(async (sourceWord, index) => {
+    const matched = parsedList[index] || parsedList.find((item) => normalizeTopicWord(item?.word) === normalizeTopicWord(sourceWord?.word));
+    const normalized = normalizeAiAuditResult(matched || sourceWord, sourceWord?.word, sourceWord);
+
+    if (!normalized) return null;
+
+    if (isLikelyEnglishMeaning(normalized.mean)) {
+      normalized.mean = await translateMeaningToVietnamese({
+        word: normalized.word || sourceWord?.word,
+        meaning: normalized.mean,
+        wordtype: normalized.wordtype,
+        langName,
+      });
+    }
+
+    normalized.mean = limitMeaningToFiveWords(normalized.mean);
+    return normalized;
+  }));
+
+  return normalizedWords.filter(Boolean);
 }
 
 async function buildAiError(resp) {
@@ -226,7 +457,7 @@ function FlappyBirdPicker({ selectedBird, onPickBird, onStart, onBack }) {
             </div>
             <p>{GAME_CARD.description}</p>
           </div>
-          <button type="button" className="btn btn-secondary btn-small" onClick={onBack}>
+            <button type="button" className="btn btn-secondary btn-small" onClick={onBack}>
             Quay lại
           </button>
         </div>
@@ -284,6 +515,10 @@ export default function TopicWords() {
   const [builtInError, setBuiltInError] = useState('');
   const [aiFillingWordId, setAiFillingWordId] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+  const [isExcelImportModalOpen, setExcelImportModalOpen] = useState(false);
+  const [isImageImportModalOpen, setImageImportModalOpen] = useState(false);
+  const [isFileImportModalOpen, setFileImportModalOpen] = useState(false);
+  const [isTextImportModalOpen, setTextImportModalOpen] = useState(false);
 
   const courseId = rawCourseId || 'custom';
   const isCustom = courseId === 'custom';
@@ -441,8 +676,9 @@ const activeWords = !studyWordIds
   };
 
   const handleSaveWord = (wordData) => {
-    if (editingWord) updateWordInTopic(topicId, editingWord.id, wordData);
-    else addWordToTopic(topicId, wordData);
+    const normalizedWordData = { ...wordData, language: topicLang };
+    if (editingWord) updateWordInTopic(topicId, editingWord.id, normalizedWordData);
+    else addWordToTopic(topicId, normalizedWordData);
   };
 
   const handleSaveAIWords = (selectedWords) => {
@@ -462,6 +698,261 @@ const activeWords = !studyWordIds
     addManyWordsToTopic(topicId, dedupedWords);
   };
 
+  const handleImportImageWords = async (selectedWords) => {
+    const existingWordSet = new Set(words.map((word) => normalizeTopicWord(word?.word)).filter(Boolean));
+    const seenImportSet = new Set();
+    const importQueue = [];
+    let skippedCount = 0;
+
+    selectedWords.forEach((item) => {
+      const normalizedWord = normalizeTopicWord(item?.word);
+      if (!normalizedWord) {
+        skippedCount += 1;
+        return;
+      }
+
+      if (existingWordSet.has(normalizedWord) || seenImportSet.has(normalizedWord)) {
+        skippedCount += 1;
+        return;
+      }
+
+      seenImportSet.add(normalizedWord);
+      importQueue.push({
+        word: String(item.word).trim(),
+        mean: String(item.mean ?? '').trim(),
+        transcription: String(item.transcription ?? '').trim(),
+        wordtype: String(item.wordtype ?? '').trim(),
+        example: String(item.example ?? '').trim(),
+        example_vi: String(item.example_vi ?? '').trim(),
+        language: topicLang,
+      });
+    });
+
+    if (importQueue.length === 0) {
+      return {
+        error: 'Không có từ hợp lệ để thêm từ hình ảnh.',
+      };
+    }
+
+    setToastMessage('AI đang bổ sung dữ liệu cho các từ đã chọn...');
+
+    try {
+      const aiMeta = AI_LANGUAGE_META[topicLang] || AI_LANGUAGE_META.en;
+      const auditedWords = await auditWordsWithAI(importQueue, aiMeta.name);
+      const finalQueue = importQueue.map((baseItem, index) => {
+        const auditedItem = auditedWords[index] || auditedWords.find((item) => normalizeTopicWord(item?.word) === normalizeTopicWord(baseItem.word));
+        return {
+          ...baseItem,
+          ...(auditedItem || {}),
+          mean: limitMeaningToFiveWords((auditedItem && auditedItem.mean) || baseItem.mean),
+          language: topicLang,
+        };
+      });
+
+      const result = await addManyWordsToTopic(topicId, finalQueue);
+      const addedCount = Number.isFinite(result?.added) ? result.added : finalQueue.length;
+      const totalSkipped = skippedCount + (Number.isFinite(result?.skipped) ? result.skipped : 0);
+
+      setToastMessage(
+        `Đã thêm ${addedCount} từ từ hình ảnh${totalSkipped > 0 ? `, bỏ qua ${totalSkipped} từ trùng hoặc không hợp lệ` : ''}.`
+      );
+
+      return { added: addedCount, skipped: totalSkipped };
+    } catch (error) {
+      const message = error?.message || 'Không thể xử lý ảnh lúc này.';
+      setToastMessage(message);
+      return { error: message };
+    }
+  };
+
+  const handleImportTextWords = async (selectedWords) => {
+    const existingWordSet = new Set(words.map((word) => normalizeTopicWord(word?.word)).filter(Boolean));
+    const seenImportSet = new Set();
+    const importQueue = [];
+    let skippedCount = 0;
+
+    selectedWords.forEach((item) => {
+      const normalizedWord = normalizeTopicWord(item?.word);
+      if (!normalizedWord) {
+        skippedCount += 1;
+        return;
+      }
+
+      if (existingWordSet.has(normalizedWord) || seenImportSet.has(normalizedWord)) {
+        skippedCount += 1;
+        return;
+      }
+
+      seenImportSet.add(normalizedWord);
+      importQueue.push({
+        word: String(item.word).trim(),
+        mean: String(item.mean ?? '').trim(),
+        transcription: String(item.transcription ?? '').trim(),
+        wordtype: String(item.wordtype ?? '').trim(),
+        example: String(item.example ?? '').trim(),
+        example_vi: String(item.example_vi ?? '').trim(),
+        language: topicLang,
+      });
+    });
+
+    if (importQueue.length === 0) {
+      return {
+        error: 'Không có từ hợp lệ để thêm từ đoạn text.',
+      };
+    }
+
+    setToastMessage('AI đang bổ sung dữ liệu cho các từ đã chọn...');
+
+    try {
+      const aiMeta = AI_LANGUAGE_META[topicLang] || AI_LANGUAGE_META.en;
+      const auditedWords = await auditWordsWithAI(importQueue, aiMeta.name);
+      const finalQueue = importQueue.map((baseItem, index) => {
+        const auditedItem = auditedWords[index] || auditedWords.find((item) => normalizeTopicWord(item?.word) === normalizeTopicWord(baseItem.word));
+        return {
+          ...baseItem,
+          ...(auditedItem || {}),
+          mean: limitMeaningToFiveWords((auditedItem && auditedItem.mean) || baseItem.mean),
+          language: topicLang,
+        };
+      });
+
+      const result = await addManyWordsToTopic(topicId, finalQueue);
+      const addedCount = Number.isFinite(result?.added) ? result.added : finalQueue.length;
+      const totalSkipped = skippedCount + (Number.isFinite(result?.skipped) ? result.skipped : 0);
+
+      setToastMessage(
+        `Đã thêm ${addedCount} từ từ đoạn text${totalSkipped > 0 ? `, bỏ qua ${totalSkipped} từ trùng hoặc không hợp lệ` : ''}.`
+      );
+
+      return { added: addedCount, skipped: totalSkipped };
+    } catch (error) {
+      const message = error?.message || 'Không thể xử lý đoạn text lúc này.';
+      setToastMessage(message);
+      return { error: message };
+    }
+  };
+
+  const handleImportFileWords = async (selectedWords) => {
+    const existingWordSet = new Set(words.map((word) => normalizeTopicWord(word?.word)).filter(Boolean));
+    const seenImportSet = new Set();
+    const importQueue = [];
+    let skippedCount = 0;
+
+    selectedWords.forEach((item) => {
+      const normalizedWord = normalizeTopicWord(item?.word);
+      if (!normalizedWord) {
+        skippedCount += 1;
+        return;
+      }
+
+      if (existingWordSet.has(normalizedWord) || seenImportSet.has(normalizedWord)) {
+        skippedCount += 1;
+        return;
+      }
+
+      seenImportSet.add(normalizedWord);
+      importQueue.push({
+        word: String(item.word).trim(),
+        mean: String(item.mean ?? '').trim(),
+        transcription: String(item.transcription ?? '').trim(),
+        wordtype: String(item.wordtype ?? '').trim(),
+        example: String(item.example ?? '').trim(),
+        example_vi: String(item.example_vi ?? '').trim(),
+        language: topicLang,
+      });
+    });
+
+    if (importQueue.length === 0) {
+      return {
+        error: 'Không có từ hợp lệ để thêm từ file PDF/Word.',
+      };
+    }
+
+    setToastMessage('AI đang bổ sung dữ liệu cho các từ đã chọn...');
+
+    try {
+      const aiMeta = AI_LANGUAGE_META[topicLang] || AI_LANGUAGE_META.en;
+      const auditedWords = await auditWordsWithAI(importQueue, aiMeta.name);
+      const finalQueue = importQueue.map((baseItem, index) => {
+        const auditedItem = auditedWords[index] || auditedWords.find((item) => normalizeTopicWord(item?.word) === normalizeTopicWord(baseItem.word));
+        return {
+          ...baseItem,
+          ...(auditedItem || {}),
+          mean: limitMeaningToFiveWords((auditedItem && auditedItem.mean) || baseItem.mean),
+          language: topicLang,
+        };
+      });
+
+      const result = await addManyWordsToTopic(topicId, finalQueue);
+      const addedCount = Number.isFinite(result?.added) ? result.added : finalQueue.length;
+      const totalSkipped = skippedCount + (Number.isFinite(result?.skipped) ? result.skipped : 0);
+
+      setToastMessage(
+        `Đã thêm ${addedCount} từ từ file PDF/Word${totalSkipped > 0 ? `, bỏ qua ${totalSkipped} từ trùng hoặc không hợp lệ` : ''}.`
+      );
+
+      return { added: addedCount, skipped: totalSkipped };
+    } catch (error) {
+      const message = error?.message || 'Không thể xử lý file lúc này.';
+      setToastMessage(message);
+      return { error: message };
+    }
+  };
+
+  const handleImportExcelWords = async (rows) => {
+    const existingWordSet = new Set(
+      words
+        .map((word) => normalizeTopicWord(word?.word))
+        .filter(Boolean)
+    );
+
+    const seenImportSet = new Set();
+    const importQueue = [];
+    let skippedCount = 0;
+
+    rows.forEach((row) => {
+      const normalizedWord = normalizeTopicWord(row?.word);
+      const normalizedMean = String(row?.mean ?? '').trim();
+
+      if (!normalizedWord || !normalizedMean) {
+        skippedCount += 1;
+        return;
+      }
+
+      if (existingWordSet.has(normalizedWord) || seenImportSet.has(normalizedWord)) {
+        skippedCount += 1;
+        return;
+      }
+
+      seenImportSet.add(normalizedWord);
+      importQueue.push({
+        word: String(row.word).trim(),
+        mean: normalizedMean,
+        transcription: String(row.transcription ?? '').trim(),
+        wordtype: String(row.wordtype ?? '').trim(),
+        example: String(row.example ?? '').trim(),
+        example_vi: String(row.example_vi ?? '').trim(),
+        language: topicLang,
+      });
+    });
+
+    if (importQueue.length === 0) {
+      return {
+        error: 'Không có từ nào hợp lệ để import từ file Excel.',
+      };
+    }
+
+    const result = await addManyWordsToTopic(topicId, importQueue);
+    const addedCount = Number.isFinite(result?.added) ? result.added : importQueue.length;
+    const totalSkipped = skippedCount + (Number.isFinite(result?.skipped) ? result.skipped : 0);
+
+    setToastMessage(
+      `Đã import ${addedCount} từ từ file Excel${totalSkipped > 0 ? `, bỏ qua ${totalSkipped} dòng trùng hoặc không hợp lệ` : ''}.`
+    );
+
+    return { added: addedCount, skipped: totalSkipped };
+  };
+
   const handleDeleteWord = (wordId) => {
     deleteWordFromTopic(topicId, wordId);
     setPendingDeleteWord(null);
@@ -474,16 +965,8 @@ const activeWords = !studyWordIds
     if (aiFillingWordId === wordId) return;
 
     const baseWord = cleanAiText(word.word);
-    const meaning = cleanAiText(word.mean);
-    const missingFields = getMissingWordFields(word);
-
-    if (!baseWord || !meaning) {
-      setToastMessage('Cần có từ vựng và nghĩa tiếng Việt trước khi dùng AI bổ sung dữ liệu.');
-      return;
-    }
-
-    if (missingFields.length === 0) {
-      setToastMessage('Từ này đã đủ dữ liệu rồi.');
+    if (!baseWord) {
+      setToastMessage('Cần có từ vựng trước khi dùng AI kiểm tra dữ liệu.');
       return;
     }
 
@@ -501,10 +984,10 @@ const activeWords = !studyWordIds
           model: AI_MODEL,
           messages: [
             { role: 'system', content: aiMeta.systemPrompt },
-            { role: 'user', content: buildFillWordPrompt(word, missingFields, aiMeta.name) },
+            { role: 'user', content: buildAuditWordPrompt(word, aiMeta.name) },
           ],
           max_tokens: 800,
-          temperature: 0.2,
+          temperature: 0,
           stream: false,
         }),
       });
@@ -517,36 +1000,26 @@ const activeWords = !studyWordIds
       const text = data?.choices?.[0]?.message?.content || '';
       const parsed = JSON.parse(extractJsonObject(text));
 
-      const updates = {
-        word: word.word || '',
-        mean: word.mean || '',
-        transcription: cleanAiText(word.transcription),
-        wordtype: cleanAiText(word.wordtype),
-        example: cleanAiText(word.example),
-        example_vi: cleanAiText(word.example_vi),
-      };
-
-      ALWAYS_REFRESH_WORD_FIELDS.forEach((field) => {
-        const nextValue = cleanAiText(parsed?.[field]);
-        if (nextValue) {
-          updates[field] = nextValue;
-        }
-      });
-
-      missingFields.forEach((field) => {
-        if (ALWAYS_REFRESH_WORD_FIELDS.includes(field)) return;
-        updates[field] = cleanAiText(parsed?.[field]);
-      });
-
-      const stillMissing = missingFields.filter((field) => !updates[field]);
-      if (stillMissing.length > 0) {
-        throw new Error('AI chưa bổ sung đủ dữ liệu hợp lệ cho từ này. Vui lòng thử lại.');
+      const normalized = normalizeAiAuditResult(parsed, baseWord, word);
+      if (!normalized) {
+        throw new Error('AI chưa trả về dữ liệu đủ hợp lệ để kiểm tra và sửa từ này. Vui lòng thử lại.');
       }
 
-      await updateWordInTopic(topicId, word.id, updates);
-      setToastMessage('AI đã bổ sung dữ liệu còn thiếu cho từ vựng.');
+      if (isLikelyEnglishMeaning(normalized.mean)) {
+        normalized.mean = await translateMeaningToVietnamese({
+          word: normalized.word || baseWord,
+          meaning: normalized.mean,
+          wordtype: normalized.wordtype,
+          langName: aiMeta.name,
+        });
+      }
+
+      normalized.mean = limitMeaningToFiveWords(normalized.mean);
+
+      await updateWordInTopic(topicId, word.id, normalized);
+      setToastMessage('AI đã kiểm tra và sửa dữ liệu cho từ vựng.');
     } catch (error) {
-      setToastMessage(error?.message || 'Không thể dùng AI để bổ sung dữ liệu lúc này.');
+      setToastMessage(error?.message || 'Không thể dùng AI để kiểm tra dữ liệu lúc này.');
     } finally {
       setAiFillingWordId(null);
     }
@@ -806,7 +1279,19 @@ const activeWords = !studyWordIds
       {isCustom && !IMMERSIVE_MODES.has(activeMode) && activeMode !== 'flappy-bird-setup' ? (
         <div id="cv-custom-toolbar" className="cv-custom-toolbar">
           <button className="btn btn-primary btn-small" id="cv-add-word-btn" onClick={() => openWordModal(null)}>
-            + Thêm từ vựng
+            Thêm từ vựng thủ công
+          </button>
+          <button className="cv-btn-import-excel" id="cv-import-excel-btn" onClick={() => setExcelImportModalOpen(true)}>
+            Import từ file Excel
+          </button>
+          <button className="cv-btn-import-image" id="cv-import-image-btn" onClick={() => setImageImportModalOpen(true)}>
+            Thêm từ hình ảnh
+          </button>
+          <button className="cv-btn-import-file" id="cv-import-file-btn" onClick={() => setFileImportModalOpen(true)}>
+            Thêm từ file PDF/Word
+          </button>
+          <button className="cv-btn-import-text" id="cv-import-text-btn" onClick={() => setTextImportModalOpen(true)}>
+            Thêm từ đoạn text
           </button>
           <button className="cv-btn-ai" id="cv-ai-gen-btn" onClick={() => setAIModalOpen(true)}>
             AI tạo từ hàng loạt
@@ -948,7 +1433,7 @@ const activeWords = !studyWordIds
                             </button>
                             <button
                               className={`cv-action-btn cv-action-ai${aiFillingWordId === wordKey ? ' is-loading' : ''}`}
-                              title={aiFillingWordId === wordKey ? 'AI đang bổ sung dữ liệu' : 'AI bổ sung dữ liệu còn thiếu'}
+                              title={aiFillingWordId === wordKey ? 'AI đang kiểm tra dữ liệu' : 'AI kiểm tra và sửa dữ liệu'}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 handleFillMissingWordData(word);
@@ -996,6 +1481,36 @@ const activeWords = !studyWordIds
         isOpen={isAIModalOpen}
         onClose={() => setAIModalOpen(false)}
         onSave={handleSaveAIWords}
+        topicLang={topicLang}
+        existingWords={words}
+      />
+
+      <CustomTopicExcelImportModal
+        isOpen={isExcelImportModalOpen}
+        onClose={() => setExcelImportModalOpen(false)}
+        onImport={handleImportExcelWords}
+      />
+
+      <CustomTopicImageImportModal
+        isOpen={isImageImportModalOpen}
+        onClose={() => setImageImportModalOpen(false)}
+        onImport={handleImportImageWords}
+        topicLang={topicLang}
+        existingWords={words}
+      />
+
+      <CustomTopicFileImportModal
+        isOpen={isFileImportModalOpen}
+        onClose={() => setFileImportModalOpen(false)}
+        onImport={handleImportFileWords}
+        topicLang={topicLang}
+        existingWords={words}
+      />
+
+      <CustomTopicTextImportModal
+        isOpen={isTextImportModalOpen}
+        onClose={() => setTextImportModalOpen(false)}
+        onImport={handleImportTextWords}
         topicLang={topicLang}
         existingWords={words}
       />
@@ -1051,3 +1566,5 @@ const activeWords = !studyWordIds
     </main>
   );
 }
+
+
