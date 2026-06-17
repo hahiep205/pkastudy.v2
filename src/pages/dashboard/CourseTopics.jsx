@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import ConfirmActionModal from "../../components/common/ConfirmActionModal";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import TopicFormModal from "../../components/customDocs/TopicFormModal";
+import { useAuth } from "../../contexts/useAuth";
+import { getGuestReadyCourseTopics, isGuestReadyCourseId } from "../../data/guestToeicCourses";
 import axiosClient from "../../utils/axiosClient";
 import { useCourseProgress } from "../../hooks/useCourseProgress";
 import { useCustomCourses } from "../../hooks/useCustomCourses";
+import { isAuthenticatedUser } from "../../utils/userStorage";
 
 export default function CourseTopics() {
   const { courseId } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { remembered } = useCourseProgress();
   const { customCourses, createTopic, updateTopic, deleteTopic } =
@@ -73,6 +77,16 @@ export default function CourseTopics() {
 
   useEffect(() => {
     if (courseId === "custom") return;
+    const useGuestCatalog = isGuestReadyCourseId(courseId);
+
+    if (useGuestCatalog) {
+      const guestCourse = getGuestReadyCourseTopics(courseId);
+      setCourseTitle(guestCourse?.courseTitle || guestCourse?.title || "");
+      setApiTopics(Array.isArray(guestCourse?.topics) ? guestCourse.topics : []);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     axiosClient
@@ -103,7 +117,7 @@ export default function CourseTopics() {
     return () => {
       cancelled = true;
     };
-  }, [courseId]);
+  }, [courseId, user]);
 
   useEffect(() => {
     const revealEls = Array.from(

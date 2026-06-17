@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import TopicFormModal from '../../components/customDocs/TopicFormModal';
+import { useAuth } from '../../contexts/useAuth';
+import { mergeGuestReadyCourses } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
+import { isAuthenticatedUser } from '../../utils/userStorage';
 import { languageLabels } from '../../utils/language';
 
 const CUSTOM_TOPIC_EMOJIS = ['📘', '📗', '📙', '📕', '🗂️', '📝', '📚', '🧠', '🎯', '💡', '🚀', '🌟'];
@@ -16,6 +19,7 @@ function getCustomTopicEmoji(topic) {
 }
 
 export default function Courses() {
+    const { user } = useAuth();
     const location = useLocation();
     const [activeLang, setActiveLang] = useState(() => {
         const params = new URLSearchParams(location.search);
@@ -35,16 +39,18 @@ export default function Courses() {
     useEffect(() => {
         let cancelled = false;
         setLoadingCourses(true);
+        const useGuestCatalog = !isAuthenticatedUser(user);
 
         axiosClient.get('/courses')
             .then((res) => {
                 if (cancelled) return;
                 const data = res.data || res;
-                setCourses(Array.isArray(data) ? data : []);
+                const nextCourses = Array.isArray(data) ? data : [];
+                setCourses(mergeGuestReadyCourses(nextCourses));
             })
             .catch((err) => {
                 console.error('Fetch courses error:', err);
-                if (!cancelled) setCourses([]);
+                if (!cancelled) setCourses(mergeGuestReadyCourses([]));
             })
             .finally(() => {
                 if (!cancelled) setLoadingCourses(false);
@@ -53,7 +59,7 @@ export default function Courses() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [user]);
 
     const builtInTopicCount = useMemo(
         () => courses.reduce((sum, course) => sum + Number(course.topic_count || 0), 0),

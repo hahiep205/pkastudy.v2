@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../contexts/useAuth';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
+import { getGuestReadyCourseTopics, mergeGuestReadyCourses } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
+import { isAuthenticatedUser } from '../../utils/userStorage';
 
 export default function CourseTopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
+  const { user } = useAuth();
   const { customCourses } = useCustomCourses();
   const [search, setSearch] = useState('');
   const [isMultiMode, setIsMultiMode] = useState(false);
@@ -14,20 +18,22 @@ export default function CourseTopicPicker({ dueReviewWords, gameInfo, onSelect, 
 
   useEffect(() => {
     let active = true;
+    const useGuestCatalog = !isAuthenticatedUser(user);
 
     axiosClient.get('/courses')
       .then((courses) => {
         if (!active) return;
-        setApiCourses(Array.isArray(courses) ? courses : []);
+        const nextCourses = Array.isArray(courses) ? courses : [];
+        setApiCourses(mergeGuestReadyCourses(nextCourses));
       })
       .catch(() => {
-        if (active) setApiCourses([]);
+        if (active) setApiCourses(mergeGuestReadyCourses([]));
       });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [user]);
 
   const customTopics = useMemo(
     () => customCourses
@@ -98,6 +104,32 @@ export default function CourseTopicPicker({ dueReviewWords, gameInfo, onSelect, 
     let active = true;
     setLoadingTopicsCourseId(selectedCourseId);
 
+    if (course?.courseKey) {
+      const guestCourse = getGuestReadyCourseTopics(course.courseKey);
+      if (guestCourse) {
+        setTopicsByCourseId((current) => ({
+          ...current,
+          [selectedCourseId]: guestCourse.topics
+            .filter((topic) => (topic.vocabularyCount || topic.words?.length || topic.wordCount || 0) >= 2)
+            .map((topic) => ({
+              id: topic.id,
+              slug: topic.slug,
+              title: topic.title,
+              source: course.title,
+              sourceCourseId: course.courseKey,
+              courseKey: course.courseKey,
+              lang: course.lang || 'en',
+              words: topic.words || null,
+              vocabularyCount: topic.vocabularyCount || topic.wordCount || topic.words?.length || 0,
+            })),
+        }));
+        setLoadingTopicsCourseId(null);
+        return () => {
+          active = false;
+        };
+      }
+    }
+
     axiosClient.get(`/courses/${course.courseKey}/topics`)
       .then((data) => {
         if (!active) return;
@@ -112,6 +144,8 @@ export default function CourseTopicPicker({ dueReviewWords, gameInfo, onSelect, 
               slug: topic.slug,
               title: topic.title,
               source: course.title,
+              sourceCourseId: course.courseKey,
+              courseKey: course.courseKey,
               lang: course.lang || 'en',
               words: topic.words || null,
               vocabularyCount: topic.vocabularyCount || topic.wordCount || topic.words?.length || 0,
@@ -129,7 +163,7 @@ export default function CourseTopicPicker({ dueReviewWords, gameInfo, onSelect, 
     return () => {
       active = false;
     };
-  }, [courseOptions, selectedCourseId, topicsByCourseId]);
+  }, [courseOptions, selectedCourseId, topicsByCourseId, user]);
 
   const currentCourse = useMemo(
     () => courseOptions.find((course) => course.id === selectedCourseId) || null,

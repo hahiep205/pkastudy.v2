@@ -9,8 +9,10 @@ import Typing from '../../components/Typing';
 import Listening from '../../components/Listening';
 import Match from '../../components/Match';
 import Flashcard from '../../components/Flashcard';
+import { useAuth } from '../../contexts/useAuth';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
+import { getGuestReadyCourseTopics, mergeGuestReadyCourses } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { getDashboardUserKey, recordStudyModeCompletion } from '../../utils/dashboardProgress';
 import { recordGamePlay } from '../../utils/userStats';
@@ -24,6 +26,7 @@ import {
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
+import { isAuthenticatedUser } from '../../utils/userStorage';
 import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
 
 const VOCAB_GAMES = [
@@ -377,6 +380,7 @@ function FlappyBirdPicker({ selectedBird, onPickBird, onContinue, onBack }) {
 }
 
 export default function Games() {
+  const { user } = useAuth();
   const location = useLocation();
   const [activeGameId, setActiveGameId] = useState(null);
   const [isSrsScreenOpen, setIsSrsScreenOpen] = useState(false);
@@ -467,11 +471,12 @@ export default function Games() {
 
   useEffect(() => {
     let cancelled = false;
+    const useGuestCatalog = !isAuthenticatedUser(user);
 
     async function loadCatalogSummary() {
       try {
         const courses = await axiosClient.get('/courses');
-        const courseList = Array.isArray(courses) ? courses : [];
+        const courseList = mergeGuestReadyCourses(Array.isArray(courses) ? courses : []);
         const topics = courseList.reduce((sum, course) => sum + Number(course.topic_count || 0), 0);
         const words = courseList.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0);
         const tests = await axiosClient.get('/toeic/tests');
@@ -492,7 +497,7 @@ export default function Games() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (location.hash === '#games-srs-label') {
@@ -537,11 +542,19 @@ export default function Games() {
   const handleTopicSelect = async (topic) => {
     let fullTopic = topic;
     if (!topic.words) {
-      try {
-        const data = await axiosClient.get(`/topics/${encodeURIComponent(topic.slug || topic.id)}/flashcards`);
-        fullTopic = { ...topic, words: Array.isArray(data) ? data : [] };
-      } catch (err) {
-        console.error(err);
+      const guestCourse = getGuestReadyCourseTopics(
+        topic.courseKey || topic.sourceCourseId,
+      );
+      const guestTopic = guestCourse?.topics?.find((item) => item.slug === topic.slug || String(item.id) === String(topic.id));
+      if (guestTopic?.words?.length) {
+        fullTopic = { ...topic, words: guestTopic.words };
+      } else {
+        try {
+          const data = await axiosClient.get(`/topics/${encodeURIComponent(topic.slug || topic.id)}/flashcards`);
+          fullTopic = { ...topic, words: Array.isArray(data) ? data : [] };
+        } catch (err) {
+          console.error(err);
+        }
       }
     }
     setSelectedTopic(fullTopic);

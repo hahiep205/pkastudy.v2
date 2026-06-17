@@ -1,14 +1,67 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../contexts/useAuth";
+import { mergeGuestReadyCourses } from "../../data/guestToeicCourses";
 import { xpToeicFullTest, xpToeicPartComplete } from "../../utils/xpSystem";
 import axiosClient from "../../utils/axiosClient";
 import { mapApiTestToFrontendFormat } from "../../utils/toeicAdapter";
+import {
+  getGuestToeicFullTestVariants,
+  getGuestToeicListeningTests,
+  getGuestToeicPracticeModes,
+  getGuestToeicReadingTests,
+  getGuestToeicTests,
+  isGuestToeicTestId,
+  readGuestToeicHistory,
+  submitGuestToeicAnswers,
+} from "../../utils/guestToeic";
 import { recordToeicFullTestProgress } from "../../utils/dashboardProgress";
+import { getStoredUser, isAuthenticatedUser } from "../../utils/userStorage";
 
 function formatTime(s) {
   return `${Math.floor(s / 60)
     .toString()
     .padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+}
+
+function isGuestToeicMode() {
+  return !isAuthenticatedUser(getStoredUser());
+}
+
+function mergeGuestToeicCatalog(apiTests = [], guestTests = []) {
+  const merged = new Map();
+  guestTests.forEach((test) => {
+    merged.set(test.apiId || test.id, test);
+  });
+  apiTests.forEach((test) => {
+    merged.set(test.apiId || test.id, test);
+  });
+  return Array.from(merged.values());
+}
+
+function mergeGuestPracticeModes(apiModes = [], guestModes = []) {
+  const merged = new Map();
+
+  guestModes.forEach((mode) => {
+    merged.set(mode.id, { ...mode, topics: [...(mode.topics || [])] });
+  });
+
+  apiModes.forEach((mode) => {
+    const existing = merged.get(mode.id);
+    if (!existing) {
+      merged.set(mode.id, { ...mode, topics: [...(mode.topics || [])] });
+      return;
+    }
+
+    const topicMap = new Map();
+    [...existing.topics, ...(mode.topics || [])].forEach((topic) => {
+      const key = topic.id || `${topic.testId}-${topic.partKey}`;
+      topicMap.set(key, topic);
+    });
+    merged.set(mode.id, { ...existing, ...mode, topics: Array.from(topicMap.values()) });
+  });
+
+  return Array.from(merged.values());
 }
 
 const LISTENING_PRACTICE_TYPES = new Set([
@@ -605,37 +658,44 @@ function ListeningTestSession({ test, section, onBack }) {
     return () => clearInterval(timerRef.current);
   }, [phase]);
 
-  const submit = async () => {
-    clearInterval(timerRef.current);
-    setPhase("submitting");
-    setShowSubmitConfirm(false);
+    const submit = async () => {
+      clearInterval(timerRef.current);
+      setPhase("submitting");
+      setShowSubmitConfirm(false);
 
-    try {
-      const payload = {
-        test_id: test.apiId,
-        isPartial: true,
-        answers: Object.keys(answers)
-          .map((k) => {
-            const rawId = parseInt(k.replace("ft-", ""), 10);
-            const selectedIndex = answers[k];
-            let selectedLetter = null;
-            if (selectedIndex >= 0) {
-              selectedLetter = String.fromCharCode(65 + selectedIndex);
-            }
-            return { question_id: rawId, selected: selectedLetter };
-          })
-          .filter((a) => a.selected !== null),
-      };
+      try {
+        const payload = {
+          test_id: test.apiId,
+          isPartial: true,
+          answers: Object.keys(answers)
+            .map((k) => {
+              const selectedIndex = answers[k];
+              let selectedLetter = null;
+              if (selectedIndex >= 0) {
+                selectedLetter = String.fromCharCode(65 + selectedIndex);
+              }
+              return {
+                question_id: isGuestToeicMode()
+                  ? k
+                  : parseInt(k.replace("ft-", ""), 10),
+                selected: selectedLetter,
+              };
+            })
+            .filter((a) => a.selected !== null),
+        };
 
-      const res = await axiosClient.post("/toeic/submit", payload);
-      const data = res;
+        const data = isGuestToeicTestId(test.apiId)
+          ? submitGuestToeicAnswers(payload)
+          : await axiosClient.post("/toeic/submit", payload);
 
-      if (data.correctAnswersMap) {
-        questions.forEach((q) => {
-          const rawId = parseInt(q.id.replace("ft-", ""), 10);
-          q.correctKey = data.correctAnswersMap[rawId];
-        });
-      }
+        if (data.correctAnswersMap) {
+          questions.forEach((q) => {
+            const answerKey = isGuestToeicTestId(test.apiId)
+              ? q.id
+              : parseInt(q.id.replace("ft-", ""), 10);
+            q.correctKey = data.correctAnswersMap[answerKey];
+          });
+        }
 
       setPhase("result");
     } catch (e) {
@@ -1145,37 +1205,44 @@ function ReadingTestSession({ test, section, onBack }) {
     return () => clearInterval(timerRef.current);
   }, [phase]);
 
-  const submit = async () => {
-    clearInterval(timerRef.current);
-    setPhase("submitting");
-    setShowSubmitConfirm(false);
+    const submit = async () => {
+      clearInterval(timerRef.current);
+      setPhase("submitting");
+      setShowSubmitConfirm(false);
 
-    try {
-      const payload = {
-        test_id: test.apiId,
-        isPartial: true,
-        answers: Object.keys(answers)
-          .map((k) => {
-            const rawId = parseInt(k.replace("ft-", ""), 10);
-            const selectedIndex = answers[k];
-            let selectedLetter = null;
-            if (selectedIndex >= 0) {
-              selectedLetter = String.fromCharCode(65 + selectedIndex);
-            }
-            return { question_id: rawId, selected: selectedLetter };
-          })
-          .filter((a) => a.selected !== null),
-      };
+      try {
+        const payload = {
+          test_id: test.apiId,
+          isPartial: true,
+          answers: Object.keys(answers)
+            .map((k) => {
+              const selectedIndex = answers[k];
+              let selectedLetter = null;
+              if (selectedIndex >= 0) {
+                selectedLetter = String.fromCharCode(65 + selectedIndex);
+              }
+              return {
+                question_id: isGuestToeicMode()
+                  ? k
+                  : parseInt(k.replace("ft-", ""), 10),
+                selected: selectedLetter,
+              };
+            })
+            .filter((a) => a.selected !== null),
+        };
 
-      const res = await axiosClient.post("/toeic/submit", payload);
-      const data = res;
+        const data = isGuestToeicTestId(test.apiId)
+          ? submitGuestToeicAnswers(payload)
+          : await axiosClient.post("/toeic/submit", payload);
 
-      if (data.correctAnswersMap) {
-        questions.forEach((q) => {
-          const rawId = parseInt(q.id.replace("ft-", ""), 10);
-          q.correctKey = data.correctAnswersMap[rawId];
-        });
-      }
+        if (data.correctAnswersMap) {
+          questions.forEach((q) => {
+            const answerKey = isGuestToeicTestId(test.apiId)
+              ? q.id
+              : parseInt(q.id.replace("ft-", ""), 10);
+            q.correctKey = data.correctAnswersMap[answerKey];
+          });
+        }
 
       setPhase("result");
     } catch (e) {
@@ -2092,37 +2159,44 @@ function FullTestMode({ onBack, variants }) {
     null;
   const visibleQuestions = activePartGroup?.questions || allQs;
 
-  const submit = async () => {
-    clearInterval(timerRef.current);
-    setPhase("submitting");
-    setShowSubmitConfirm(false);
+    const submit = async () => {
+      clearInterval(timerRef.current);
+      setPhase("submitting");
+      setShowSubmitConfirm(false);
 
-    try {
-      const payload = {
-        test_id: selectedVariant.apiId,
-        answers: Object.keys(answers)
-          .map((k) => {
-            const rawId = parseInt(k.replace("ft-", ""), 10);
-            const selectedIndex = answers[k];
+      try {
+        const payload = {
+          test_id: selectedVariant.apiId,
+          answers: Object.keys(answers)
+            .map((k) => {
+              const selectedIndex = answers[k];
+              let selectedLetter = null;
+              if (selectedIndex >= 0) {
+                selectedLetter = String.fromCharCode(65 + selectedIndex);
+              }
+              return {
+                question_id: isGuestToeicMode()
+                  ? k
+                  : parseInt(k.replace("ft-", ""), 10),
+                selected: selectedLetter,
+              };
+            })
+            .filter((a) => a.selected !== null),
+        };
 
-            let selectedLetter = null;
-            if (selectedIndex >= 0) {
-              selectedLetter = String.fromCharCode(65 + selectedIndex);
-            }
-            return { question_id: rawId, selected: selectedLetter };
-          })
-          .filter((a) => a.selected !== null),
-      };
+        const data = isGuestToeicTestId(selectedVariant.apiId)
+          ? submitGuestToeicAnswers(payload)
+          : await axiosClient.post("/toeic/submit", payload);
 
-      const data = await axiosClient.post("/toeic/submit", payload);
-
-      if (data.correctAnswersMap) {
-        allQs.forEach((q) => {
-          const rawId = parseInt(q.id.replace("ft-", ""), 10);
-          const correctKey = data.correctAnswersMap[rawId];
-          q.correctKey = correctKey;
-          if (correctKey) {
-            q.correct = correctKey.charCodeAt(0) - 65;
+        if (data.correctAnswersMap) {
+          allQs.forEach((q) => {
+            const answerKey = isGuestToeicTestId(selectedVariant.apiId)
+              ? q.id
+              : parseInt(q.id.replace("ft-", ""), 10);
+            const correctKey = data.correctAnswersMap[answerKey];
+            q.correctKey = correctKey;
+            if (correctKey) {
+              q.correct = correctKey.charCodeAt(0) - 65;
           }
         });
       }
@@ -2216,11 +2290,15 @@ function FullTestMode({ onBack, variants }) {
                 className="toeic-start-btn toeic-start-btn-full"
                 onClick={async () => {
                   try {
-                    const res = await axiosClient.get(
-                      `/toeic/tests/${variant.apiId}`,
-                    );
-                    const { normalizedQs } = mapApiTestToFrontendFormat(res);
-                    setActiveQuestions(normalizedQs);
+                    if (isGuestToeicTestId(variant.apiId)) {
+                      setActiveQuestions(variant.questions || []);
+                    } else {
+                      const res = await axiosClient.get(
+                        `/toeic/tests/${variant.apiId}`,
+                      );
+                      const { normalizedQs } = mapApiTestToFrontendFormat(res);
+                      setActiveQuestions(normalizedQs);
+                    }
                     localStorage.removeItem("toeic_fulltest_state");
                     setSelectedVariantId(variant.id);
                     setPhase("running");
@@ -2761,6 +2839,8 @@ const getRecommendedResources = (score) => {
 };
 
 function ToeicDashboard({ onStartTest, onStartPractice }) {
+  const { user } = useAuth();
+  const shouldUseGuestOnly = user?.role === "guest" || !isAuthenticatedUser(user);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState([]);
@@ -2771,26 +2851,35 @@ function ToeicDashboard({ onStartTest, onStartPractice }) {
   const [tempTarget, setTempTarget] = useState(targetScore);
 
   useEffect(() => {
+    if (shouldUseGuestOnly) {
+      setHistory(readGuestToeicHistory());
+      setLoading(false);
+    } else {
     axiosClient.get("/toeic/history")
       .then((res) => {
-        setHistory(res || []);
+        const serverHistory = Array.isArray(res) ? res : [];
+        const guestHistory = readGuestToeicHistory();
+        setHistory([...guestHistory, ...serverHistory]);
         setLoading(false);
       })
       .catch((err) => {
         console.error(err);
+        setHistory(readGuestToeicHistory());
         setLoading(false);
       });
+    }
 
     axiosClient.get("/courses")
       .then((res) => {
         const data = res.data || res;
-        setCourses(Array.isArray(data) ? data : []);
+        const nextCourses = Array.isArray(data) ? data : [];
+        setCourses(mergeGuestReadyCourses(nextCourses));
       })
       .catch((err) => {
         console.error("Fetch courses for TOEIC recommendations error:", err);
-        setCourses([]);
+        setCourses(mergeGuestReadyCourses([]));
       });
-  }, []);
+    }, [shouldUseGuestOnly, user]);
 
   const handleSaveTarget = () => {
     const val = Math.max(10, Math.min(990, tempTarget));
@@ -3220,6 +3309,8 @@ function SaveWordModal({ isOpen, onClose, defaultWord = "" }) {
 }
 
 export default function TOEIC() {
+  const { user } = useAuth();
+  const isGuestMode = user?.role === "guest" || !isAuthenticatedUser(user);
   const [tab, setTab] = useState("dashboard");
   const [vocabModalOpen, setVocabModalOpen] = useState(false);
   const [selectedText, setSelectedText] = useState("");
@@ -3245,12 +3336,30 @@ export default function TOEIC() {
   const [listeningPracticeModes, setListeningPracticeModes] = useState([]);
   const [readingPracticeModes, setReadingPracticeModes] = useState([]);
   const [loadingTests, setLoadingTests] = useState(true);
+  const guestListeningTests = isGuestMode ? getGuestToeicListeningTests() : [];
+  const guestReadingTests = isGuestMode ? getGuestToeicReadingTests() : [];
+  const guestFullTestVariants = isGuestMode ? getGuestToeicFullTestVariants() : [];
 
   useEffect(() => {
+    const guestTests = getGuestToeicTests();
+    const guestModes = getGuestToeicPracticeModes();
+
+    if (isGuestMode) {
+      setApiTests(guestTests);
+      setListeningPracticeModes(
+        guestModes.filter((mode) => mode.type === "listening"),
+      );
+      setReadingPracticeModes(
+        guestModes.filter((mode) => mode.type === "reading"),
+      );
+      setLoadingTests(false);
+      return;
+    }
+
     axiosClient
       .get("/toeic/tests")
       .then((res) => {
-        setApiTests(res || []);
+        setApiTests(mergeGuestToeicCatalog(res || [], guestTests));
         setLoadingTests(false);
       })
       .catch((err) => {
@@ -3262,13 +3371,30 @@ export default function TOEIC() {
       .get("/toeic/practice-modes")
       .then((res) => {
         const modes = res || [];
-        setListeningPracticeModes(modes.filter((m) => m.type === "listening"));
-        setReadingPracticeModes(modes.filter((m) => m.type === "reading"));
+        const mergedModes = mergeGuestPracticeModes(modes, guestModes);
+        setListeningPracticeModes(
+          mergedModes.filter((m) => m.type === "listening"),
+        );
+        setReadingPracticeModes(
+          mergedModes.filter((m) => m.type === "reading"),
+        );
       })
       .catch(console.error);
-  }, []);
+  }, [isGuestMode]);
 
   const handleSelectPracticeTopic = async (topic, setTopicState) => {
+    if (isGuestMode) {
+      setTopicState({
+        ...topic,
+        questions: (topic.questions || []).map((question) => ({
+          ...question,
+          question: question.prompt,
+          text: question.prompt,
+        })),
+      });
+      return;
+    }
+
     try {
       const res = await axiosClient.get(`/toeic/tests/${topic.testId}`);
       const { normalizedQs } = mapApiTestToFrontendFormat(res);
@@ -3302,6 +3428,9 @@ export default function TOEIC() {
       sections: [], // Will be populated on select
     };
   });
+  const RESOLVED_LISTENING_TEST_SETS = isGuestMode
+    ? guestListeningTests
+    : LISTENING_TEST_SETS;
 
   const READING_TEST_SETS = apiTests.map((t) => {
     return {
@@ -3312,6 +3441,9 @@ export default function TOEIC() {
       sections: [], // Will be populated on select
     };
   });
+  const RESOLVED_READING_TEST_SETS = isGuestMode
+    ? guestReadingTests
+    : READING_TEST_SETS;
 
   const FULL_TEST_VARIANTS = apiTests.map((t) => {
     return {
@@ -3322,8 +3454,16 @@ export default function TOEIC() {
       questions: [], // Will be populated on select
     };
   });
+  const RESOLVED_FULL_TEST_VARIANTS = isGuestMode
+    ? guestFullTestVariants
+    : FULL_TEST_VARIANTS;
 
   const handleSelectListeningTest = async (testInfo) => {
+    if (isGuestMode) {
+      setActiveListeningTest(testInfo);
+      return;
+    }
+
     try {
       const res = await axiosClient.get(`/toeic/tests/${testInfo.apiId}`);
       const { listeningSections } = mapApiTestToFrontendFormat(res);
@@ -3334,6 +3474,11 @@ export default function TOEIC() {
   };
 
   const handleSelectReadingTest = async (testInfo) => {
+    if (isGuestMode) {
+      setActiveReadingTest(testInfo);
+      return;
+    }
+
     try {
       const res = await axiosClient.get(`/toeic/tests/${testInfo.apiId}`);
       const { readingSections } = mapApiTestToFrontendFormat(res);
@@ -3367,7 +3512,7 @@ export default function TOEIC() {
     return (
       <main className="dash-main toeic-page" id="page-toeic">
         <FullTestMode
-          variants={FULL_TEST_VARIANTS}
+          variants={RESOLVED_FULL_TEST_VARIANTS}
           onBack={() => handleTabChange("dashboard")}
         />
       </main>
@@ -3512,7 +3657,7 @@ export default function TOEIC() {
             )
           ) : (
             <ListeningTestGrid
-              tests={LISTENING_TEST_SETS}
+              tests={RESOLVED_LISTENING_TEST_SETS}
               onSelect={handleSelectListeningTest}
             />
           )
@@ -3544,7 +3689,7 @@ export default function TOEIC() {
             )
           ) : (
             <ReadingTestGrid
-              tests={READING_TEST_SETS}
+              tests={RESOLVED_READING_TEST_SETS}
               onSelect={handleSelectReadingTest}
             />
           )

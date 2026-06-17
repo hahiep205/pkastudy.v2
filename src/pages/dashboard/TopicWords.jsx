@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
+import { useAuth } from '../../contexts/useAuth';
+import { getGuestReadyCourseTopics, isGuestReadyCourseId } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
@@ -28,6 +30,7 @@ import {
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
+import { isAuthenticatedUser } from '../../utils/userStorage';
 import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
 
 const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
@@ -262,6 +265,7 @@ function FlappyBirdPicker({ selectedBird, onPickBird, onStart, onBack }) {
 export default function TopicWords() {
   const pageRef = useRef(null);
   const { courseId: rawCourseId, topicId } = useParams();
+  const { user } = useAuth();
   const { remembered, toggleWord, replaceRememberedInTopic } = useCourseProgress();
   const { customCourses, addWordToTopic, updateWordInTopic, deleteWordFromTopic, addManyWordsToTopic, createTopic } = useCustomCourses();
 
@@ -321,6 +325,12 @@ export default function TopicWords() {
   const [courseLoading, setCourseLoading] = useState(!isCustom);
   useEffect(() => {
     if (isCustom) return;
+    if (isGuestReadyCourseId(courseId)) {
+      setCourseInfo(getGuestReadyCourseTopics(courseId));
+      setCourseLoading(false);
+      return;
+    }
+
     setCourseLoading(true);
     axiosClient.get(`/courses/${courseId}/topics`)
       .then((res) => {
@@ -335,7 +345,7 @@ export default function TopicWords() {
       .finally(() => {
         setCourseLoading(false);
       });
-  }, [isCustom, courseId]);
+  }, [isCustom, courseId, user]);
 
   const course = isCustom ? null : courseInfo;
   const topic = isCustom
@@ -356,6 +366,13 @@ export default function TopicWords() {
 
   useEffect(() => {
     if (isCustom) {
+      setBuiltInWords([]);
+      setBuiltInStatus('idle');
+      setBuiltInError('');
+      return undefined;
+    }
+
+    if (isGuestReadyCourseId(courseId)) {
       setBuiltInWords([]);
       setBuiltInStatus('idle');
       setBuiltInError('');
@@ -389,7 +406,7 @@ export default function TopicWords() {
 
     loadFlashcards();
     return () => controller.abort();
-  }, [isCustom, topicId, topic]);
+  }, [isCustom, topicId, topic, user, courseId]);
 
   const backUrl = isCustom ? '/dashboard/courses?tab=custom' : `/dashboard/courses/${courseId}`;
 

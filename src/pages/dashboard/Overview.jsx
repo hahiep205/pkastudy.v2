@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../../utils/axiosClient';
+import { mergeGuestReadyCourses } from '../../data/guestToeicCourses';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
 import { useAuth } from '../../contexts/useAuth';
@@ -14,6 +15,7 @@ import {
 import { buildActivityChartData } from '../../utils/userStats';
 import { getLevelInfo, getXpData, syncXpWithServer } from '../../utils/xpSystem';
 import { getDueCount, getSrsForecast, checkSrsDecayWarning } from '../../utils/srsStorage';
+import { isAuthenticatedUser } from '../../utils/userStorage';
 
 export default function Overview() {
     const navigate = useNavigate();
@@ -25,14 +27,17 @@ export default function Overview() {
     const [toeicTests, setToeicTests] = useState([]);
 
     useEffect(() => {
+        const useGuestCatalog = !isAuthenticatedUser(user);
+
         axiosClient.get('/courses')
             .then((res) => {
                 const data = res.data || res;
-                setAllCourses(Array.isArray(data) ? data : []);
+                const nextCourses = Array.isArray(data) ? data : [];
+                setAllCourses(mergeGuestReadyCourses(nextCourses));
             })
             .catch((err) => {
                 console.error("Fetch courses error:", err);
-                setAllCourses([]);
+                setAllCourses(mergeGuestReadyCourses([]));
             });
 
         axiosClient.get('/toeic/tests')
@@ -44,7 +49,7 @@ export default function Overview() {
                 console.error('Fetch TOEIC tests error:', err);
                 setToeicTests([]);
             });
-    }, []);
+    }, [user]);
 
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
 
