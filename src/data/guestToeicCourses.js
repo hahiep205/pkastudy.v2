@@ -157,10 +157,20 @@ export function mergeGuestReadyCourses(courses = []) {
   });
 
   getGuestReadyCourseSummaries().forEach((course) => {
-    mergedMap.set(course.slug, {
-      ...mergedMap.get(course.slug),
-      ...course,
-    });
+    const existingCourse = mergedMap.get(course.slug);
+
+    if (existingCourse) {
+      mergedMap.set(course.slug, {
+        ...course,
+        ...existingCourse,
+        description: existingCourse.description || course.description,
+        topic_count: existingCourse.topic_count ?? existingCourse.topicCount ?? course.topic_count,
+        vocabulary_count: existingCourse.vocabulary_count ?? existingCourse.vocabularyCount ?? course.vocabulary_count,
+      });
+      return;
+    }
+
+    mergedMap.set(course.slug, course);
   });
 
   return Array.from(mergedMap.values()).sort((a, b) => {

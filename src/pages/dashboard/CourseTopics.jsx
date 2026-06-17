@@ -77,15 +77,6 @@ export default function CourseTopics() {
 
   useEffect(() => {
     if (courseId === "custom") return;
-    const useGuestCatalog = isGuestReadyCourseId(courseId);
-
-    if (useGuestCatalog) {
-      const guestCourse = getGuestReadyCourseTopics(courseId);
-      setCourseTitle(guestCourse?.courseTitle || guestCourse?.title || "");
-      setApiTopics(Array.isArray(guestCourse?.topics) ? guestCourse.topics : []);
-      setLoading(false);
-      return;
-    }
 
     let cancelled = false;
     setLoading(true);
@@ -107,8 +98,14 @@ export default function CourseTopics() {
       .catch((err) => {
         console.error("Fetch course topics error:", err);
         if (!cancelled) {
-          setCourseTitle("");
-          setApiTopics([]);
+          if (isGuestReadyCourseId(courseId)) {
+            const guestCourse = getGuestReadyCourseTopics(courseId);
+            setCourseTitle(guestCourse?.courseTitle || guestCourse?.title || "");
+            setApiTopics(Array.isArray(guestCourse?.topics) ? guestCourse.topics : []);
+          } else {
+            setCourseTitle("");
+            setApiTopics([]);
+          }
         }
       })
       .finally(() => {

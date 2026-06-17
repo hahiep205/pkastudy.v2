@@ -325,11 +325,6 @@ export default function TopicWords() {
   const [courseLoading, setCourseLoading] = useState(!isCustom);
   useEffect(() => {
     if (isCustom) return;
-    if (isGuestReadyCourseId(courseId)) {
-      setCourseInfo(getGuestReadyCourseTopics(courseId));
-      setCourseLoading(false);
-      return;
-    }
 
     setCourseLoading(true);
     axiosClient.get(`/courses/${courseId}/topics`)
@@ -340,7 +335,11 @@ export default function TopicWords() {
       })
       .catch((err) => {
         console.error("Fetch course info error:", err);
-        setCourseInfo(null);
+        if (isGuestReadyCourseId(courseId)) {
+          setCourseInfo(getGuestReadyCourseTopics(courseId));
+        } else {
+          setCourseInfo(null);
+        }
       })
       .finally(() => {
         setCourseLoading(false);
@@ -366,13 +365,6 @@ export default function TopicWords() {
 
   useEffect(() => {
     if (isCustom) {
-      setBuiltInWords([]);
-      setBuiltInStatus('idle');
-      setBuiltInError('');
-      return undefined;
-    }
-
-    if (isGuestReadyCourseId(courseId)) {
       setBuiltInWords([]);
       setBuiltInStatus('idle');
       setBuiltInError('');

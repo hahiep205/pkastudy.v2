@@ -17,6 +17,7 @@ import {
 } from "../../utils/guestToeic";
 import { recordToeicFullTestProgress } from "../../utils/dashboardProgress";
 import { getStoredUser, isAuthenticatedUser } from "../../utils/userStorage";
+import { useCustomCourses } from "../../hooks/useCustomCourses";
 
 function formatTime(s) {
   return `${Math.floor(s / 60)
@@ -3120,45 +3121,43 @@ function ToeicDashboard({ onStartTest, onStartPractice }) {
 }
 
 function SaveWordModal({ isOpen, onClose, defaultWord = "" }) {
+  const { customCourses, loading, addWordToTopic } = useCustomCourses();
   const [word, setWord] = useState(defaultWord);
-  const [transcription, setTranscription] = useState("");
   const [wordtype, setWordtype] = useState("n.");
   const [mean, setMean] = useState("");
-  const [example, setExample] = useState("");
-  const [exampleVi, setExampleVi] = useState("");
-  
-  const [topics, setTopics] = useState([]);
   const [selectedTopicId, setSelectedTopicId] = useState("");
-  const [loadingTopics, setLoadingTopics] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      setWord(defaultWord);
-      setTranscription("");
-      setWordtype("n.");
-      setMean("");
-      setExample("");
-      setExampleVi("");
-      
-      setLoadingTopics(true);
-      axiosClient.get("/courses/custom/topics")
-        .then((res) => {
-          const list = res || [];
-          setTopics(list);
-          if (list.length > 0) {
-            setSelectedTopicId(list[0].id.toString());
-          }
-          setLoadingTopics(false);
-        })
-        .catch((err) => {
-          console.error("Failed to load custom topics", err);
-          setLoadingTopics(false);
-        });
-    }
+    if (!isOpen) return;
+    setWord(defaultWord);
+    setWordtype("n.");
+    setMean("");
   }, [isOpen, defaultWord]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (customCourses.length === 0) {
+      setSelectedTopicId("");
+      return;
+    }
+
+    setSelectedTopicId((current) => {
+      if (
+        current &&
+        customCourses.some((topic) => String(topic.id) === String(current))
+      ) {
+        return current;
+      }
+      return String(customCourses[0].id);
+    });
+  }, [customCourses, isOpen]);
+
   if (!isOpen) return null;
+
+  const selectedTopic = customCourses.find(
+    (topic) => String(topic.id) === String(selectedTopicId),
+  );
 
   const handleSave = async () => {
     if (!word.trim()) {
@@ -3170,34 +3169,30 @@ function SaveWordModal({ isOpen, onClose, defaultWord = "" }) {
       return;
     }
 
+    if (!selectedTopicId) {
+      alert("Vui lòng chọn bộ từ vựng cá nhân.");
+      return;
+    }
+
     setSaving(true);
     try {
-      let topicId = selectedTopicId;
-      
-      if (!topicId) {
-        const newTopicRes = await axiosClient.post("/courses/custom/topics", {
-          title: "Từ vựng TOEIC",
-          description: "Các từ vựng được lưu trong quá trình luyện thi TOEIC."
-        });
-        const createdTopic = newTopicRes;
-        topicId = createdTopic.id.toString();
-      }
-
-      await axiosClient.post(`/courses/custom/topics/${topicId}/words`, {
+      const result = await addWordToTopic(selectedTopicId, {
         word: word.trim(),
         mean: mean.trim(),
-        transcription: transcription.trim() || null,
-        wordtype: wordtype || null,
-        example: example.trim() || null,
-        example_vi: exampleVi.trim() || null,
-        language: "en"
+        wordtype: wordtype || "",
+        language: "en",
       });
 
-      alert("Đã lưu từ vựng vào sổ từ thành công!");
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+
+      alert(`Đã thêm "${word.trim()}" vào "${selectedTopic?.title || "bộ từ vựng"}".`);
       onClose();
-    } catch (err) {
-      console.error(err);
-      alert("Không thể lưu từ vựng. Vui lòng thử lại!");
+    } catch (error) {
+      console.error(error);
+      alert("Không thể thêm từ vào bộ từ vựng cá nhân. Vui lòng thử lại.");
     } finally {
       setSaving(false);
     }
@@ -3207,13 +3202,13 @@ function SaveWordModal({ isOpen, onClose, defaultWord = "" }) {
     <div className="toeic-confirm-overlay" style={{ zIndex: 1000 }}>
       <div className="toeic-confirm-modal toeic-vocab-modal" style={{ width: "min(100%, 480px)" }}>
         <div className="toeic-card-header" style={{ marginBottom: "16px" }}>
-          <h3 style={{ margin: 0 }}>🗂️ Lưu vào Sổ từ / Flashcard</h3>
+          <h3 style={{ margin: 0 }}>Thêm vào bộ từ vựng cá nhân</h3>
           <button className="toeic-close-modal-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--text-secondary)" }}>×</button>
         </div>
 
         <div className="toeic-vocab-form">
           <div className="toeic-form-group">
-            <label>Từ mới / Cụm từ <span style={{ color: "#ef4444" }}>*</span></label>
+            <label>Từ / Cụm từ <span style={{ color: "#ef4444" }}>*</span></label>
             <input 
               type="text" 
               placeholder="Ví dụ: contract, establish..." 
@@ -3222,71 +3217,42 @@ function SaveWordModal({ isOpen, onClose, defaultWord = "" }) {
             />
           </div>
 
-          <div className="toeic-form-row">
-            <div className="toeic-form-group">
-              <label>Phiên âm</label>
-              <input 
-                type="text" 
-                placeholder="Ví dụ: /'kɒntrækt/" 
-                value={transcription} 
-                onChange={(e) => setTranscription(e.target.value)} 
-              />
-            </div>
-            <div className="toeic-form-group">
-              <label>Từ loại</label>
-              <select value={wordtype} onChange={(e) => setWordtype(e.target.value)}>
-                <option value="n.">Danh từ (n.)</option>
-                <option value="v.">Động từ (v.)</option>
-                <option value="adj.">Tính từ (adj.)</option>
-                <option value="adv.">Trạng từ (adv.)</option>
-                <option value="prep.">Giới từ (prep.)</option>
-                <option value="phrase">Cụm từ (phrase)</option>
-              </select>
-            </div>
-          </div>
-
           <div className="toeic-form-group">
-            <label>Nghĩa của từ <span style={{ color: "#ef4444" }}>*</span></label>
+            <label>Nghĩa <span style={{ color: "#ef4444" }}>*</span></label>
             <input 
               type="text" 
-              placeholder="Ví dụ: hợp đồng, ký kết..." 
+              placeholder="Ví dụ: hợp đồng, thành lập..." 
               value={mean} 
               onChange={(e) => setMean(e.target.value)} 
             />
           </div>
 
           <div className="toeic-form-group">
-            <label>Ví dụ câu</label>
-            <textarea 
-              placeholder="Ví dụ: They signed a contract yesterday." 
-              value={example} 
-              onChange={(e) => setExample(e.target.value)} 
-              rows={2}
-            />
+            <label>Loại từ</label>
+            <select value={wordtype} onChange={(e) => setWordtype(e.target.value)}>
+              <option value="n.">Danh từ (n.)</option>
+              <option value="v.">Động từ (v.)</option>
+              <option value="adj.">Tính từ (adj.)</option>
+              <option value="adv.">Trạng từ (adv.)</option>
+              <option value="prep.">Giới từ (prep.)</option>
+              <option value="phrase">Cụm từ (phrase)</option>
+            </select>
           </div>
 
           <div className="toeic-form-group">
-            <label>Dịch nghĩa ví dụ</label>
-            <input 
-              type="text" 
-              placeholder="Ví dụ: Họ đã ký một hợp đồng vào hôm qua." 
-              value={exampleVi} 
-              onChange={(e) => setExampleVi(e.target.value)} 
-            />
-          </div>
-
-          <div className="toeic-form-group">
-            <label>Chọn chủ đề lưu từ</label>
-            {loadingTopics ? (
-              <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>Đang tải danh sách chủ đề...</div>
-            ) : topics.length === 0 ? (
+            <label>Bộ từ vựng cá nhân <span style={{ color: "#ef4444" }}>*</span></label>
+            {loading ? (
+              <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>Đang tải danh sách bộ từ vựng...</div>
+            ) : customCourses.length === 0 ? (
               <div style={{ fontSize: "13px", color: "#f59e0b", fontWeight: "600" }}>
-                Chưa có chủ đề cá nhân. Hệ thống sẽ tự động tạo chủ đề "Từ vựng TOEIC" cho bạn.
+                Chưa có bộ từ vựng cá nhân nào. Hãy tạo bộ từ trong mục khóa học cá nhân trước rồi quay lại thêm từ.
               </div>
             ) : (
               <select value={selectedTopicId} onChange={(e) => setSelectedTopicId(e.target.value)}>
-                {topics.map((t) => (
-                  <option key={t.id} value={t.id}>{t.title} ({t.word_count || 0} từ)</option>
+                {customCourses.map((topic) => (
+                  <option key={topic.id} value={topic.id}>
+                    {topic.title} ({topic.words?.length || topic.word_count || 0} từ)
+                  </option>
                 ))}
               </select>
             )}
@@ -3298,9 +3264,9 @@ function SaveWordModal({ isOpen, onClose, defaultWord = "" }) {
           <button 
             className="toeic-nav-btn toeic-nav-next" 
             onClick={handleSave} 
-            disabled={saving}
+            disabled={saving || loading || customCourses.length === 0}
           >
-            {saving ? "Đang lưu..." : "Lưu vào sổ từ"}
+            {saving ? "Đang thêm..." : "Thêm vào bộ từ"}
           </button>
         </div>
       </div>
@@ -3515,6 +3481,7 @@ export default function TOEIC() {
           variants={RESOLVED_FULL_TEST_VARIANTS}
           onBack={() => handleTabChange("dashboard")}
         />
+        {renderFloatingVocabControls()}
       </main>
     );
   }
@@ -3527,6 +3494,7 @@ export default function TOEIC() {
           onBack={() => setActiveListeningTopic(null)}
           backLabel="← Quay lại chọn topic"
         />
+        {renderFloatingVocabControls()}
       </main>
     );
   }
@@ -3539,7 +3507,28 @@ export default function TOEIC() {
           onBack={() => setActiveReadingTopic(null)}
           backLabel="← Quay lại chọn topic"
         />
+        {renderFloatingVocabControls()}
       </main>
+    );
+  }
+
+  function renderFloatingVocabControls() {
+    return (
+      <>
+        <button
+          className="toeic-floating-vocab-btn"
+          onClick={handleOpenVocabModal}
+          title="Lưu từ mới vào bộ từ vựng cá nhân"
+        >
+          📖
+        </button>
+
+        <SaveWordModal
+          isOpen={vocabModalOpen}
+          onClose={() => setVocabModalOpen(false)}
+          defaultWord={selectedText}
+        />
+      </>
     );
   }
 
@@ -3713,20 +3702,7 @@ export default function TOEIC() {
         )}
       </div>
 
-      {/* Floating Vocab Button */}
-      <button 
-        className="toeic-floating-vocab-btn" 
-        onClick={handleOpenVocabModal}
-        title="Lưu từ mới vào sổ từ (Quét chọn từ trên màn hình để lưu nhanh)"
-      >
-        📖
-      </button>
-
-      <SaveWordModal 
-        isOpen={vocabModalOpen} 
-        onClose={() => setVocabModalOpen(false)} 
-        defaultWord={selectedText}
-      />
+      {renderFloatingVocabControls()}
     </main>
   );
 }
