@@ -9,9 +9,11 @@ import {
 } from '../../utils/dashboardProgress';
 import { syncXpWithServer } from '../../utils/xpSystem';
 import axiosClient from '../../utils/axiosClient';
+import { isAuthenticatedUser } from '../../utils/userStorage';
 
 export default function Stats() {
     const { user } = useAuth();
+    const isGuestUser = !isAuthenticatedUser(user);
     const { remembered } = useCourseProgress();
     const { customCourses } = useCustomCourses();
     const [leaderboard, setLeaderboard] = useState([]);
@@ -21,8 +23,10 @@ export default function Stats() {
     const dashboardProgress = useMemo(() => readDashboardProgress(userKey), [userKey]);
 
     useEffect(() => {
-        syncDashboardProgressWithServer(userKey);
-        syncXpWithServer();
+        if (!isGuestUser) {
+            syncDashboardProgressWithServer(userKey);
+            syncXpWithServer();
+        }
 
         axiosClient.get('/progress/leaderboard?limit=5')
             .then((res) => {
@@ -39,7 +43,7 @@ export default function Stats() {
                 console.error('Failed to load courses', err);
                 setCourses([]);
             });
-    }, [userKey]);
+    }, [isGuestUser, userKey]);
 
     const customTotal = useMemo(
         () => customCourses.reduce((sum, topic) => sum + topic.words.length, 0),
@@ -72,13 +76,13 @@ export default function Stats() {
     const personalStats = [
         {
             label: 'Streak',
-            value: `${dashboardProgress.streak} ngày`,
+            value: isGuestUser ? 'Null' : `${dashboardProgress.streak} ngày`,
             icon: '🔥',
             tone: 'orange',
         },
         {
             label: 'Tổng EXP',
-            value: dashboardProgress.totalXp.toLocaleString('vi-VN'),
+            value: isGuestUser ? 'Null' : dashboardProgress.totalXp.toLocaleString('vi-VN'),
             icon: '⚡',
             tone: 'blue',
         },
@@ -95,6 +99,10 @@ export default function Stats() {
             tone: 'purple',
         },
     ];
+
+    const guestTodayTaskValue = isGuestUser
+        ? 'Null'
+        : `${dashboardProgress.tasks.filter((task) => task.isDone).length}/${dashboardProgress.tasks.length} task`;
 
     return (
         <main className="dash-main stats-page stats2-page" id="page-stats">
@@ -144,11 +152,11 @@ export default function Stats() {
                             <div className="stats2-leader-main">
                                 <div className="stats2-leader-copy">
                                     <strong>EXP hôm nay</strong>
-                                    <small>{dashboardProgress.dailyXp} EXP</small>
+                                    <small>{isGuestUser ? 'Null' : `${dashboardProgress.dailyXp} EXP`}</small>
                                 </div>
                             </div>
                             <div className="stats2-history-values">
-                                <span>{dashboardProgress.tasks.filter((task) => task.isDone).length}/{dashboardProgress.tasks.length} task</span>
+                                <span>{guestTodayTaskValue}</span>
                             </div>
                         </article>
                         <article className="stats2-history-item">

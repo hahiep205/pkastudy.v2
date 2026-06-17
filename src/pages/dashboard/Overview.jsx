@@ -10,25 +10,36 @@ import {
     getDashboardUserKey,
     readDashboardProgress,
     subscribeDashboardProgress,
-    syncDashboardProgressWithServer
+    syncDashboardProgressWithServer,
 } from '../../utils/dashboardProgress';
 import { buildActivityChartData } from '../../utils/userStats';
 import { getLevelInfo, getXpData, syncXpWithServer } from '../../utils/xpSystem';
-import { getDueCount, getSrsForecast, checkSrsDecayWarning } from '../../utils/srsStorage';
+import { getDueCount, checkSrsDecayWarning } from '../../utils/srsStorage';
 import { isAuthenticatedUser } from '../../utils/userStorage';
+
+const GUEST_LEVEL_INFO = {
+    badge: 'Null',
+    level: 'Null',
+    title: 'Null',
+    totalXp: 'Null',
+    progress: 0,
+    nextLevel: null,
+    xpForNext: 0,
+    xpInLevel: 0,
+};
 
 export default function Overview() {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const isGuestUser = !isAuthenticatedUser(user);
     const { remembered } = useCourseProgress();
     const { customCourses } = useCustomCourses();
     const canvasRef = useRef(null);
     const [allCourses, setAllCourses] = useState([]);
-    const [toeicTests, setToeicTests] = useState([]);
+    const [stats, setStats] = useState({ streak: 0, words: 0, xp: 0 });
+    const [chartPeriod, setChartPeriod] = useState('week');
 
     useEffect(() => {
-        const useGuestCatalog = !isAuthenticatedUser(user);
-
         axiosClient.get('/courses')
             .then((res) => {
                 const data = res.data || res;
@@ -36,37 +47,23 @@ export default function Overview() {
                 setAllCourses(mergeGuestReadyCourses(nextCourses));
             })
             .catch((err) => {
-                console.error("Fetch courses error:", err);
+                console.error('Fetch courses error:', err);
                 setAllCourses(mergeGuestReadyCourses([]));
-            });
-
-        axiosClient.get('/toeic/tests')
-            .then((res) => {
-                const data = res.data || res;
-                setToeicTests(Array.isArray(data) ? data : []);
-            })
-            .catch((err) => {
-                console.error('Fetch TOEIC tests error:', err);
-                setToeicTests([]);
             });
     }, [user]);
 
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
-
     const [dashboardProgress, setDashboardProgress] = useState(() => readDashboardProgress(userKey));
-    const [stats, setStats] = useState({ streak: 0, words: 0, xp: 0 });
-    const [chartPeriod, setChartPeriod] = useState('week');
-    const levelInfo = getLevelInfo(getXpData().totalXp);
+    const levelInfo = isGuestUser ? GUEST_LEVEL_INFO : getLevelInfo(getXpData().totalXp);
     const srsCount = getDueCount();
     const decayCount = checkSrsDecayWarning();
-    const srsForecast = useMemo(() => getSrsForecast(), []);
 
     useEffect(() => {
-        if (user) {
+        if (!isGuestUser && user) {
             syncDashboardProgressWithServer(userKey);
             syncXpWithServer();
         }
-    }, [userKey, user]);
+    }, [isGuestUser, userKey, user]);
 
     useEffect(() => {
         setDashboardProgress(readDashboardProgress(userKey));
@@ -79,11 +76,6 @@ export default function Overview() {
 
     const builtInWordTotal = useMemo(
         () => allCourses.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0),
-        [allCourses],
-    );
-
-    const builtInTopicTotal = useMemo(
-        () => allCourses.reduce((sum, course) => sum + Number(course.topic_count || 0), 0),
         [allCourses],
     );
 
@@ -130,6 +122,7 @@ export default function Overview() {
 
     const completedTasks = tasksView.filter((task) => task.isDone).length;
     const todayTaskPct = tasksView.length ? Math.round((completedTasks / tasksView.length) * 100) : 0;
+
     const currentChartSnapshot = useMemo(() => ({
         date: dashboardProgress.currentDate,
         dailyXp: dashboardProgress.dailyXp,
@@ -291,7 +284,6 @@ export default function Overview() {
 
     const totalLearn = activeChartData.totalWords;
     const totalReview = activeChartData.totalXp;
-
     const customPct = customTotal > 0 ? Math.round((customDone / customTotal) * 100) : 0;
 
     return (
@@ -323,15 +315,14 @@ export default function Overview() {
                         <div className="welcome-pill-row">
                             <div className="welcome-pill">
                                 <span>Streak</span>
-                                <strong>{stats.streak} ngày</strong>
+                                <strong>{isGuestUser ? 'Null' : `${stats.streak} ngày`}</strong>
                             </div>
                             <div className="welcome-pill">
                                 <span>Tổng EXP</span>
-                                <strong>{stats.xp}</strong>
+                                <strong>{isGuestUser ? 'Null' : stats.xp}</strong>
                             </div>
                         </div>
 
-                        {/* Level Card */}
                         <div className="welcome-focus-card welcome-focus-card-level">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                 <span style={{ fontSize: '1.5rem' }}>{levelInfo.badge}</span>
@@ -343,23 +334,29 @@ export default function Overview() {
                             <div className="welcome-focus-progress">
                                 <div className="welcome-focus-progress-fill" style={{ width: `${Math.round(levelInfo.progress * 100)}%` }} />
                             </div>
-                            {levelInfo.nextLevel && <span className="welcome-focus-note">Còn {levelInfo.xpForNext - levelInfo.xpInLevel} XP đến Level {levelInfo.nextLevel.level}</span>}
+                            {isGuestUser && <span className="welcome-focus-note">Null</span>}
+                            {!isGuestUser && levelInfo.nextLevel && (
+                                <span className="welcome-focus-note">
+                                    Còn {levelInfo.xpForNext - levelInfo.xpInLevel} XP đến Level {levelInfo.nextLevel.level}
+                                </span>
+                            )}
                         </div>
 
-                        {/* Decay Warning */}
                         {decayCount > 0 && (
                             <div className="welcome-focus-card welcome-focus-card-alert">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <span style={{ fontSize: '1.3rem' }}>⚠️</span>
                                     <div>
                                         <strong className="welcome-focus-heading welcome-focus-heading-alert">Báo động đỏ!</strong>
-                                        <p className="welcome-focus-copy">Có <strong>{decayCount}</strong> từ vựng đang phai mờ khỏi ký ức vì bị bỏ quên. <Link to="/dashboard/games" className="welcome-focus-link welcome-focus-link-alert">Cứu ngay!</Link></p>
+                                        <p className="welcome-focus-copy">
+                                            Có <strong>{decayCount}</strong> từ vựng đang phai mờ khỏi ký ức vì bị bỏ quên.
+                                            <Link to="/dashboard/games" className="welcome-focus-link welcome-focus-link-alert"> Cứu ngay!</Link>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* SRS Reminder */}
                         {srsCount > 0 && decayCount === 0 && (
                             <div className="welcome-focus-card welcome-focus-card-srs">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -371,7 +368,6 @@ export default function Overview() {
                                 </div>
                             </div>
                         )}
-
                     </div>
                 </div>
             </section>
@@ -400,7 +396,7 @@ export default function Overview() {
                         </div>
                         <div className="chart-summary-card">
                             <span>{chartPeriod === 'week' ? 'EXP tích lũy 7 ngày' : 'EXP tích lũy 4 tuần'}</span>
-                            <strong>{totalReview}</strong>
+                            <strong>{isGuestUser ? 'Null' : totalReview}</strong>
                         </div>
                     </div>
 
@@ -416,7 +412,7 @@ export default function Overview() {
                             <div className="card-eyebrow">Hôm nay</div>
                             <h2 className="card-title-text">Mục tiêu ngày</h2>
                         </div>
-                        <span className="badge badge-streak">{completedTasks}/{tasksView.length} task hoàn thành</span>
+                        <span className="badge badge-streak">{isGuestUser ? 'Null' : `${completedTasks}/${tasksView.length} task hoàn thành`}</span>
                     </div>
 
                     <div className="today-progress">
@@ -458,9 +454,9 @@ export default function Overview() {
                 <div className="courses-grid-dash">
                     {allCourses.map((course) => {
                         const totalWords = Number(course.vocabulary_count || 0);
-                        const totalTopics = Number(course.topic_count || 0);
                         const pct = totalWords > 0 ? Math.round((builtInDone / totalWords) * 100) : 0;
-                        const langName = course.language === 'en' ? 'Topic' : 'Topic';
+                        const langName = 'Topic';
+
                         return (
                             <div key={course.id} className="course-dash-card reveal revealed" data-course-id={course.id}>
                                 <div className="course-dash-top course-dash-top-english">
@@ -492,7 +488,7 @@ export default function Overview() {
                                 </div>
                                 <div className="course-dash-footer">
                                     <Link
-                                        to={`/dashboard/courses?tab=english`}
+                                        to="/dashboard/courses?tab=english"
                                         className="btn btn-primary btn-small cd-view-btn"
                                     >
                                         Xem ngay

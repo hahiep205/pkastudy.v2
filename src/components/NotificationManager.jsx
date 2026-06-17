@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { getUnseenLevelUp, markLevelUpSeen } from '../utils/xpSystem';
 import { checkStreak } from '../utils/streakSystem';
 import { getDueCount } from '../utils/srsStorage';
+import { useAuth } from '../contexts/useAuth';
+import { isAuthenticatedUser } from '../utils/userStorage';
 
-/* ── Inline styles (no external CSS needed) ── */
 const overlay = { position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', animation: 'fadeIn .3s ease' };
 const card = { background: 'linear-gradient(135deg,#1a1a2e,#16213e)', borderRadius: 20, padding: '40px 32px', textAlign: 'center', maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.1)', animation: 'scaleIn .4s cubic-bezier(.22,1,.36,1)' };
 const badgeStyle = { fontSize: '4rem', display: 'block', marginBottom: 16, animation: 'bounce 1s ease infinite' };
@@ -18,7 +19,6 @@ const streakLostCard = { ...card, background: 'linear-gradient(135deg,#1a1a2e,#2
 
 const toastStyle = { position: 'fixed', bottom: 24, right: 24, zIndex: 9998, background: 'linear-gradient(135deg,#1e293b,#334155)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '14px 20px', color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', animation: 'slideUp .4s ease', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' };
 
-/* ── Keyframes (injected once) ── */
 const keyframesId = 'pka-notif-keyframes';
 function injectKeyframes() {
   if (document.getElementById(keyframesId)) return;
@@ -34,7 +34,6 @@ function injectKeyframes() {
   document.head.appendChild(style);
 }
 
-/* ── Confetti particles ── */
 function Confetti() {
   const particles = useMemo(() => {
     const colors = ['#fbbf24', '#3b82f6', '#ef4444', '#22c55e', '#8b5cf6', '#f97316'];
@@ -46,44 +45,50 @@ function Confetti() {
       size: 6 + Math.random() * 6,
     }));
   }, []);
+
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      {particles.map(p => (
-        <div key={p.id} style={{
-          position: 'absolute', bottom: 0, left: `${p.left}%`,
-          width: p.size, height: p.size, borderRadius: '50%',
-          background: p.color,
-          animation: `confetti 1.5s ease-out ${p.delay}s forwards`,
-        }} />
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: `${p.left}%`,
+            width: p.size,
+            height: p.size,
+            borderRadius: '50%',
+            background: p.color,
+            animation: `confetti 1.5s ease-out ${p.delay}s forwards`,
+          }}
+        />
       ))}
     </div>
   );
 }
 
-/* ── Level Up Modal ── */
 function LevelUpModal({ data, onClose }) {
   if (!data) return null;
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={{ ...card, position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <div style={{ ...card, position: 'relative' }} onClick={(e) => e.stopPropagation()}>
         <Confetti />
         <span style={badgeStyle}>{data.badge}</span>
         <h2 style={titleStyle}>Level Up!</h2>
-        <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 18, margin: '0 0 8px' }}>Level {data.to} – {data.title}</p>
+        <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 18, margin: '0 0 8px' }}>Level {data.to} - {data.title}</p>
         <p style={subtitleStyle}>Bạn đã mở khóa badge mới!</p>
-        <button style={btnStyle} onClick={onClose} onMouseOver={e => e.target.style.transform = 'translateY(-2px)'} onMouseOut={e => e.target.style.transform = 'none'}>
-          Tuyệt vời! 🎉
+        <button style={btnStyle} onClick={onClose} onMouseOver={(e) => { e.target.style.transform = 'translateY(-2px)'; }} onMouseOut={(e) => { e.target.style.transform = 'none'; }}>
+          Tuyệt vời!
         </button>
       </div>
     </div>
   );
 }
 
-/* ── Streak Modal ── */
 function StreakModal({ streak, lost, onClose }) {
   return (
     <div style={streakOverlay} onClick={onClose}>
-      <div style={lost ? streakLostCard : streakCard} onClick={e => e.stopPropagation()}>
+      <div style={lost ? streakLostCard : streakCard} onClick={(e) => e.stopPropagation()}>
         {!lost && <Confetti />}
         <span style={badgeStyle}>{lost ? '💔' : '🔥'}</span>
         <h2 style={titleStyle}>{lost ? 'Streak đã mất!' : `Streak: ${streak} ngày!`}</h2>
@@ -98,7 +103,6 @@ function StreakModal({ streak, lost, onClose }) {
   );
 }
 
-/* ── SRS Toast ── */
 function SrsToast({ count, onClose, onReview }) {
   if (!count) return null;
   return (
@@ -119,7 +123,6 @@ function SrsToast({ count, onClose, onReview }) {
   );
 }
 
-/* ── XP Toast ── */
 export function XpToast({ amount, reason, onDone }) {
   useEffect(() => {
     const timer = setTimeout(() => onDone?.(), 2500);
@@ -135,9 +138,10 @@ export function XpToast({ amount, reason, onDone }) {
   );
 }
 
-/* ── Main Notification Manager ── */
 export default function NotificationManager() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isGuestUser = !isAuthenticatedUser(user);
   const [levelUp, setLevelUp] = useState(null);
   const [streakInfo, setStreakInfo] = useState(null);
   const [srsCount, setSrsCount] = useState(0);
@@ -145,28 +149,34 @@ export default function NotificationManager() {
   useEffect(() => {
     injectKeyframes();
 
-    // Check streak
-    const sResult = checkStreak();
-    if (sResult.isNewDay) {
-      setStreakInfo({ streak: sResult.streak, lost: sResult.streakLost });
+    if (!isGuestUser) {
+      const sResult = checkStreak();
+      if (sResult.isNewDay) {
+        setStreakInfo({ streak: sResult.streak, lost: sResult.streakLost });
+      }
+
+      const lu = getUnseenLevelUp();
+      if (lu) setLevelUp(lu);
     }
 
-    // Check unseen level up
-    const lu = getUnseenLevelUp();
-    if (lu) setLevelUp(lu);
-
-    // Check SRS due — delay slightly so page renders first
     const timer = setTimeout(() => {
       const due = getDueCount();
       if (due > 0) setSrsCount(due);
     }, 1200);
-    return () => clearTimeout(timer);
-  }, []);
 
-  const closeLevelUp = () => { markLevelUpSeen(); setLevelUp(null); };
+    return () => clearTimeout(timer);
+  }, [isGuestUser]);
+
+  const closeLevelUp = () => {
+    markLevelUpSeen();
+    setLevelUp(null);
+  };
   const closeStreak = () => setStreakInfo(null);
   const closeSrs = () => setSrsCount(0);
-  const goReview = () => { setSrsCount(0); navigate('/dashboard/games#games-srs-label'); };
+  const goReview = () => {
+    setSrsCount(0);
+    navigate('/dashboard/games#games-srs-label');
+  };
 
   return (
     <>

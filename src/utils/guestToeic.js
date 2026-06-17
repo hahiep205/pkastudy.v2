@@ -84,7 +84,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       testId: testKey,
       partKey: partLabel,
       title,
-      desc: `Luyen tap ${partLabel} cua ${title}.`,
+      desc: `Luyện tập ${partLabel} của ${title}.`,
       icon: "📚",
       questions,
     });
@@ -95,7 +95,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       id: "part1-picture",
       label: "Part 1",
       title: "Picture Description",
-      desc: "Xem hinh, nghe bon cau mo ta va chon dap an dung nhat.",
+      desc: "Xem hình, nghe bốn câu mô tả và chọn đáp án đúng nhất.",
       icon: "📸",
       type: "listening",
       partKey: "PART 1",
@@ -104,7 +104,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       id: "part2-response",
       label: "Part 2",
       title: "Question-Response",
-      desc: "Nghe cau hoi hoac cau noi ngan roi chon phan hoi phu hop nhat.",
+      desc: "Nghe câu hỏi hoặc câu nói ngắn rồi chọn phản hồi phù hợp nhất.",
       icon: "💬",
       type: "listening",
       partKey: "PART 2",
@@ -113,7 +113,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       id: "part3-conversations",
       label: "Part 3",
       title: "Conversations",
-      desc: "Nghe hoi thoai ngan va tra loi cau hoi trac nghiem.",
+      desc: "Nghe hội thoại ngắn và trả lời câu hỏi trắc nghiệm.",
       icon: "👥",
       type: "listening",
       partKey: "PART 3",
@@ -122,7 +122,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       id: "part4-talks",
       label: "Part 4",
       title: "Talks",
-      desc: "Nghe bai noi ngan va chon dap an dung nhat.",
+      desc: "Nghe bài nói ngắn và chọn đáp án đúng nhất.",
       icon: "📢",
       type: "listening",
       partKey: "PART 4",
@@ -131,7 +131,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       id: "part5-reading",
       label: "Part 5",
       title: "Incomplete Sentences",
-      desc: "Doc cau chua hoan chinh va chon dap an phu hop.",
+      desc: "Đọc câu chưa hoàn chỉnh và chọn đáp án phù hợp.",
       icon: "📝",
       type: "reading",
       partKey: "PART 5",
@@ -140,7 +140,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       id: "part6-reading",
       label: "Part 6",
       title: "Text Completion",
-      desc: "Doc doan van ngan va chon dap an phu hop voi cho trong.",
+      desc: "Đọc đoạn văn ngắn và chọn đáp án phù hợp với chỗ trống.",
       icon: "📄",
       type: "reading",
       partKey: "PART 6",
@@ -149,7 +149,7 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
       id: "part7-reading",
       label: "Part 7",
       title: "Reading Comprehension",
-      desc: "Doc passage va tra loi cau hoi ve noi dung bai doc.",
+      desc: "Đọc passage và trả lời câu hỏi về nội dung bài đọc.",
       icon: "📖",
       type: "reading",
       partKey: "PART 7",
@@ -172,7 +172,9 @@ function createPracticeModes(testKey, title, listeningSections, readingSections)
 function createFullTestQuestions(testKey, listeningSections, readingSections) {
   return [...listeningSections, ...readingSections]
     .flatMap((section) => section.questions || [])
-    .sort((a, b) => Number(a.displayNumber || 0) - Number(b.displayNumber || 0))
+    .sort(
+      (a, b) => Number(a.displayNumber || 0) - Number(b.displayNumber || 0),
+    )
     .map((question) => ({
       id: question.id,
       sourceQuestionId: question.sourceQuestionId,
@@ -223,26 +225,26 @@ function buildGuestToeicTests() {
       apiId: testKey,
       title,
       name: title,
-      desc: "De TOEIC san cho guest user lam ngay khong can login.",
+      desc: "Đề TOEIC sẵn cho guest user làm ngay không cần login.",
       listeningTest: {
         id: `listening-${testKey}`,
         apiId: testKey,
         name: `Listening Test ${index + 1}`,
-        desc: listeningTest?.desc || "Luyen nghe TOEIC cho guest user.",
+        desc: listeningTest?.desc || "Luyện nghe TOEIC cho guest user.",
         sections: listeningSections,
       },
       readingTest: {
         id: `reading-${testKey}`,
         apiId: testKey,
         name: `Reading Test ${index + 1}`,
-        desc: readingTest?.desc || "Luyen doc TOEIC cho guest user.",
+        desc: readingTest?.desc || "Luyện đọc TOEIC cho guest user.",
         sections: readingSections,
       },
       fullTest: {
         id: `fulltest-${testKey}`,
         apiId: testKey,
         name: `TOEIC Test ${index + 1}`,
-        desc: "Mo phong bai thi TOEIC day du Listening va Reading cho guest user.",
+        desc: "Mô phỏng bài thi TOEIC đầy đủ Listening và Reading cho guest user.",
         questions: createFullTestQuestions(
           testKey,
           listeningSections,

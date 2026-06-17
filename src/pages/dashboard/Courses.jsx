@@ -7,7 +7,6 @@ import { mergeGuestReadyCourses } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
-import { isAuthenticatedUser } from '../../utils/userStorage';
 import { languageLabels } from '../../utils/language';
 
 const CUSTOM_TOPIC_EMOJIS = ['📘', '📗', '📙', '📕', '🗂️', '📝', '📚', '🧠', '🎯', '💡', '🚀', '🌟'];
@@ -39,7 +38,6 @@ export default function Courses() {
     useEffect(() => {
         let cancelled = false;
         setLoadingCourses(true);
-        const useGuestCatalog = !isAuthenticatedUser(user);
 
         axiosClient.get('/courses')
             .then((res) => {
@@ -252,12 +250,15 @@ export default function Courses() {
 
                     <div className="doc-list" id="cv-custom-list">
                         {customCourses.length === 0 ? (
-                            <div className="cv-empty-state reveal revealed" style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                            }}>
+                            <div
+                                className="cv-empty-state reveal revealed"
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
                                 <div className="cv-empty-icon"></div>
                                 <h3 className="cv-empty-title" style={{ marginTop: '8px' }}>
                                     Chưa có chủ đề nào
