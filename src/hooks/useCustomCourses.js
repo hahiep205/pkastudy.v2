@@ -11,6 +11,112 @@ import axiosClient from "../utils/axiosClient";
 
 const CUSTOM_KEY = "pka_custom_courses";
 const MIGRATED_KEY = "pka_custom_courses_migrated_v1";
+const DEFAULT_PERSONAL_TOPICS = [
+  {
+  title: "Bộ từ cá nhân 1",
+  description: "bộ từ cá nhân mẫu",
+  lang: "en",
+  words: [
+    {
+      word: "apple",
+      mean: "táo",
+      transcription: "/ˈæp.əl/",
+      wordtype: "noun",
+      example: "I eat an apple every day.",
+      example_vi: "Tôi ăn một quả táo mỗi ngày.",
+      language: "en",
+    },
+    {
+      word: "book",
+      mean: "sách",
+      transcription: "/bʊk/",
+      wordtype: "noun",
+      example: "This book is very helpful.",
+      example_vi: "Cuốn sách này rất hữu ích.",
+      language: "en",
+    },
+    {
+      word: "school",
+      mean: "trường học",
+      transcription: "/skuːl/",
+      wordtype: "noun",
+      example: "She goes to school by bus.",
+      example_vi: "Cô ấy đến trường bằng xe buýt.",
+      language: "en",
+    },
+    {
+      word: "friend",
+      mean: "bạn bè",
+      transcription: "/frend/",
+      wordtype: "noun",
+      example: "He is my best friend.",
+      example_vi: "Anh ấy là bạn thân nhất của tôi.",
+      language: "en",
+    },
+    {
+      word: "water",
+      mean: "nước",
+      transcription: "/ˈwɔː.tər/",
+      wordtype: "noun",
+      example: "Please drink more water.",
+      example_vi: "Hãy uống nhiều nước hơn.",
+      language: "en",
+    },
+  ],
+  },
+  {
+    title: "Bộ từ cá nhân 2",
+    description: "bộ từ cá nhân mẫu",
+    lang: "zh",
+    words: [
+      {
+        word: "你好",
+        mean: "xin chào",
+        transcription: "nǐ hǎo",
+        wordtype: "interjection",
+        example: "你好！",
+        example_vi: "Xin chào!",
+        language: "zh",
+      },
+      {
+        word: "谢谢",
+        mean: "cảm ơn",
+        transcription: "xiè xie",
+        wordtype: "interjection",
+        example: "谢谢你的帮助。",
+        example_vi: "Cảm ơn sự giúp đỡ của bạn.",
+        language: "zh",
+      },
+      {
+        word: "学习",
+        mean: "học tập",
+        transcription: "xué xí",
+        wordtype: "verb",
+        example: "我每天学习中文。",
+        example_vi: "Tôi học tiếng Trung mỗi ngày.",
+        language: "zh",
+      },
+      {
+        word: "朋友",
+        mean: "bạn bè",
+        transcription: "péng yǒu",
+        wordtype: "noun",
+        example: "他是我的朋友。",
+        example_vi: "Anh ấy là bạn của tôi.",
+        language: "zh",
+      },
+      {
+        word: "水",
+        mean: "nước",
+        transcription: "shuǐ",
+        wordtype: "noun",
+        example: "我想喝水。",
+        example_vi: "Tôi muốn uống nước.",
+        language: "zh",
+      },
+    ],
+  },
+];
 
 const getLocalCourses = () => {
   try {
@@ -25,6 +131,47 @@ const saveLocalCourses = (courses) =>
 
 const createLocalId = (prefix) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+const normalizeCourseTitle = (value) =>
+  String(value || "").trim().toLowerCase();
+
+const isDefaultPersonalCourse = (topic, seed) =>
+  normalizeCourseTitle(topic?.title) === normalizeCourseTitle(seed?.title);
+
+const buildDefaultPersonalCourse = (seed) => ({
+  id: createLocalId("custop"),
+  title: seed.title,
+  description: seed.description,
+  lang: seed.lang,
+  words: seed.words.map((word) => ({
+    id: createLocalId("cuswd"),
+    ...word,
+  })),
+});
+
+const ensureDefaultPersonalCourseLocal = () => {
+  const local = getLocalCourses();
+  const missingSeeds = DEFAULT_PERSONAL_TOPICS.filter(
+    (seed) => !local.some((topic) => isDefaultPersonalCourse(topic, seed)),
+  );
+  if (missingSeeds.length === 0) return local;
+  const updated = [...local, ...missingSeeds.map(buildDefaultPersonalCourse)];
+  saveLocalCourses(updated);
+  return updated;
+};
+
+const createDefaultPersonalCourseOnServer = async (seed) => {
+  const createdTopic = await axiosClient.post("/courses/custom/topics", {
+    title: seed.title,
+    description: seed.description,
+    lang: seed.lang,
+  });
+  const topicId = createdTopic?.id || createdTopic?.data?.id;
+  if (!topicId) return;
+  for (const word of seed.words) {
+    await axiosClient.post(`/courses/custom/topics/${topicId}/words`, word);
+  }
+};
 
 function isLoggedIn() {
   try {
@@ -116,6 +263,27 @@ export function useCustomCourses() {
     console.log("[CustomCourses] Migration done!");
   }, []);
 
+  const ensureDefaultPersonalCourseServer = useCallback(
+    async (serverTopics) => {
+      const existingTopics = Array.isArray(serverTopics) ? serverTopics : [];
+      const missingSeeds = DEFAULT_PERSONAL_TOPICS.filter(
+        (seed) => !existingTopics.some((topic) => isDefaultPersonalCourse(topic, seed)),
+      );
+      if (missingSeeds.length === 0) return;
+      try {
+        for (const seed of missingSeeds) {
+          await createDefaultPersonalCourseOnServer(seed);
+        }
+      } catch (err) {
+        console.warn(
+          "[CustomCourses] Default personal course seed failed:",
+          err?.message,
+        );
+      }
+    },
+    [],
+  );
+
   const loadFromServer = useCallback(async () => {
     setLoading(true);
     try {
@@ -126,24 +294,34 @@ export function useCustomCourses() {
 
       const res2 = await axiosClient.get("/courses/custom/topics");
       const topics2 = (Array.isArray(res2) ? res2 : []).map(mapApiTopic);
+      const missingSeeds = DEFAULT_PERSONAL_TOPICS.filter(
+        (seed) => !topics2.some((topic) => isDefaultPersonalCourse(topic, seed)),
+      );
+      if (isMountedRef.current && missingSeeds.length > 0) {
+        await ensureDefaultPersonalCourseServer(topics2);
+        const res3 = await axiosClient.get("/courses/custom/topics");
+        const topics3 = (Array.isArray(res3) ? res3 : []).map(mapApiTopic);
+        if (isMountedRef.current) setCustomCourses(topics3);
+        return;
+      }
       if (isMountedRef.current) setCustomCourses(topics2);
     } catch (e) {
       console.warn(
         "[CustomCourses] API load failed, using localStorage:",
         e?.message,
       );
-      if (isMountedRef.current) setCustomCourses(getLocalCourses());
+      if (isMountedRef.current) setCustomCourses(ensureDefaultPersonalCourseLocal());
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
-  }, [migrateLocalToServer]);
+  }, [ensureDefaultPersonalCourseServer, migrateLocalToServer]);
 
   useEffect(() => {
     isMountedRef.current = true;
     if (isLoggedIn()) {
       loadFromServer();
     } else {
-      setCustomCourses(getLocalCourses());
+      setCustomCourses(ensureDefaultPersonalCourseLocal());
     }
     return () => {
       isMountedRef.current = false;

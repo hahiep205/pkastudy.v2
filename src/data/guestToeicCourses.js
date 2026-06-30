@@ -1,4 +1,10 @@
 import { TOEIC_BASIC_LESSONS_1_TO_50 } from "./toeicBasicLessons";
+import { ENGLISH_A1_BASIC_LESSONS_1_TO_50 } from "./englishA1BasicLessons";
+import { ENGLISH_A2_BASIC_LESSONS_1_TO_50 } from "./englishA2BasicLessons";
+import { ENGLISH_B1_BASIC_LESSONS_1_TO_50 } from "./englishB1BasicLessons";
+import { ENGLISH_B2_BASIC_LESSONS_1_TO_50 } from "./englishB2BasicLessons";
+import { ENGLISH_C1_BASIC_LESSONS_1_TO_50 } from "./englishC1BasicLessons";
+import { ENGLISH_PHRASES_100_LESSONS } from "./englishPhrases100Lessons";
 
 // Synced from server/scripts/seed-additional-courses.js
 const VERY_EASY_TOEIC_TOPICS = [
@@ -96,6 +102,66 @@ const GUEST_TOEIC_COURSE_MAP = {
     lang: "en",
     sortOrder: 2,
     topics: normalizeTopics(TOEIC_BASIC_LESSONS_1_TO_50),
+  },
+  "english-a1-basic": {
+    id: "english-a1-basic",
+    slug: "english-a1-basic",
+    title: "English A1 Basic Vocabulary",
+    description: "Bộ 50 chủ đề từ vựng tiếng Anh A1 cơ bản với 500 từ vựng nền tảng, chia theo các topic quen thuộc để người mới bắt đầu học dễ hơn.",
+    language: "en",
+    lang: "en",
+    sortOrder: 3,
+    topics: normalizeTopics(ENGLISH_A1_BASIC_LESSONS_1_TO_50),
+  },
+  "english-a2-basic": {
+    id: "english-a2-basic",
+    slug: "english-a2-basic",
+    title: "English A2 Basic Vocabulary",
+    description: "Bộ 50 chủ đề từ vựng tiếng Anh A2 với 1500 từ vựng nền tảng, được chia theo nhiều topic quen thuộc và phù hợp hơn cho trình độ A2.",
+    language: "en",
+    lang: "en",
+    sortOrder: 4,
+    topics: normalizeTopics(ENGLISH_A2_BASIC_LESSONS_1_TO_50),
+  },
+  "english-b1-basic": {
+    id: "english-b1-basic",
+    slug: "english-b1-basic",
+    title: "English B1 Intermediate Vocabulary",
+    description: "Bộ 50 chủ đề từ vựng tiếng Anh B1 với 2000 từ vựng, kết hợp nền tảng A2 và nhóm từ mở rộng để phù hợp hơn cho trình độ sơ trung cấp.",
+    language: "en",
+    lang: "en",
+    sortOrder: 5,
+    topics: normalizeTopics(ENGLISH_B1_BASIC_LESSONS_1_TO_50),
+  },
+  "english-b2-basic": {
+    id: "english-b2-basic",
+    slug: "english-b2-basic",
+    title: "English B2 Upper-Intermediate Vocabulary",
+    description: "Bộ 50 chủ đề từ vựng tiếng Anh B2 với 2500 từ vựng, tiếp nối B1 và mở rộng thêm vốn từ học thuật, công việc và đời sống hàng ngày.",
+    language: "en",
+    lang: "en",
+    sortOrder: 6,
+    topics: normalizeTopics(ENGLISH_B2_BASIC_LESSONS_1_TO_50),
+  },
+  "english-c1-basic": {
+    id: "english-c1-basic",
+    slug: "english-c1-basic",
+    title: "English C1 Advanced Vocabulary",
+    description: "Bộ 50 chủ đề từ vựng tiếng Anh C1 với 3000 từ vựng, mở rộng từ B2 với nhiều từ học thuật và diễn đạt nâng cao hơn.",
+    language: "en",
+    lang: "en",
+    sortOrder: 7,
+    topics: normalizeTopics(ENGLISH_C1_BASIC_LESSONS_1_TO_50),
+  },
+  "english-phrases-basic": {
+    id: "english-phrases-basic",
+    slug: "english-phrases-basic",
+    title: "100 Cụm từ thông dụng nhất",
+    description: "Bộ 10 chủ đề với 100 cụm từ tiếng Anh thông dụng nhất, giúp người học ghi nhớ các mẫu diễn đạt dùng thường xuyên trong giao tiếp.",
+    language: "en",
+    lang: "en",
+    sortOrder: 8,
+    topics: normalizeTopics(ENGLISH_PHRASES_100_LESSONS),
   },
 };
 

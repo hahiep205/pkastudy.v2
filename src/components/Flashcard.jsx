@@ -261,10 +261,6 @@ export default function Flashcard({
                             <span className="flashcard-nav-icon">{ARROW_LEFT_ICON}</span>
                             <span>TRƯỚC</span>
                         </button>
-                        {!hasFlippedOnce && (
-                            <span className="flashcard-flip-hint-badge">Lật thẻ trước khi tiếp tục</span>
-                        )}
-
                         {isLastCard ? (
                             <button type="button" className={`btn btn-primary flashcard-action-btn flashcard-action-btn-compact${!hasFlippedOnce ? ' flashcard-btn-locked' : ''}`} onClick={handleComplete} disabled={!hasFlippedOnce}>
                                 <span>Hoàn thành</span>

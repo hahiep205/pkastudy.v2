@@ -42,7 +42,11 @@ function getDefault() {
 
 export function getXpData() {
   const data = getStorage();
-  return { ...getDefault(), ...data };
+  const merged = { ...getDefault(), ...data };
+  if (!data || Object.keys(data).length === 0) {
+    saveStorage(merged);
+  }
+  return merged;
 }
 
 export function getLevelInfo(totalXp) {

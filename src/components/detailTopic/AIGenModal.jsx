@@ -78,7 +78,8 @@ STRICT OUTPUT RULES:
 - Each item must contain exactly these fields: word, transcription, mean, wordtype, example, example_vi.
 
 LANGUAGE RULES:
-- "word", "transcription", "wordtype", and "example" MUST be in Japanese.
+- "word" and "example" MUST be in Japanese.
+- "transcription" MUST be in Romaji using standard Hepburn romanization.
 - "mean" and "example_vi" MUST be in Vietnamese.
 - NEVER use Vietnamese in the "example" field.
 - NEVER mix languages inside a single field.
@@ -92,6 +93,7 @@ MEAN RULE:
 QUALITY RULES:
 - Use natural modern Japanese with correct kanji and kana.
 - Use dictionary form for verbs/adjectives.
+- Do not output kana/kanji in "transcription"; use Romaji only.
 - "example" must be a short, natural, correct Japanese sentence.`
     },
     zh: {
@@ -329,7 +331,7 @@ function buildUserPrompt({ count, label, langName, theme, existingWords }) {
         )
     );
 
-    return `Tạo ${count} từ vựng tiếng ${label} về chủ đề "${theme}".
+  return `Tạo ${count} từ vựng tiếng ${label} về chủ đề "${theme}".
 
 YÊU CẦU BẮT BUỘC (PHẢI TUÂN THỦ 100%):
 - Trả về CHỈ một JSON array hợp lệ.
@@ -360,6 +362,7 @@ HARD CONSTRAINT:
 
 PHIÊN ÂM:
 - "transcription" phải là IPA hoặc phiên âm chuẩn
+- Nếu là tiếng Nhật → dùng Romaji theo chuẩn Hepburn
 - KHÔNG để trống
 - KHÔNG sai chuẩn
 

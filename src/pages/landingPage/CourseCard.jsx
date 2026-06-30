@@ -15,13 +15,6 @@ export default function CourseCard({ delay = 0, banner, bannerLabel, name, nameI
                         {nameIcon && nameIcon}
                         {name}
                     </h3>
-                    <div className="lp-course-meta">
-                        {tags.map((tag, i) => (
-                            <span key={i} className={`lp-course-tag lp-course-tag--${tag.color}`}>
-                                {tag.label}
-                            </span>
-                        ))}
-                    </div>
                     <p className="lp-course-desc">{desc}</p>
                     <div className="lp-course-progress-bar">
                         <div className="lp-course-progress-fill" style={{ '--fill-width': fillWidth }}></div>

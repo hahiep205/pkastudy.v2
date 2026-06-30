@@ -247,13 +247,6 @@ main#cv-words-view {
     min-width: 0;
 }
 
-.doc-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 5px;
-}
-
 .doc-type-badge {
     font-size: 10px;
     font-weight: 800;
@@ -261,27 +254,6 @@ main#cv-words-view {
     letter-spacing: .8px;
     padding: 3px 8px;
     border-radius: 6px;
-}
-
-.type-pdf {
-    background: rgba(255, 75, 75, .12);
-    color: var(--red);
-}
-
-.type-video {
-    background: rgba(255, 150, 0, .12);
-    color: var(--orange);
-}
-
-.type-quiz {
-    background: rgba(28, 176, 246, .12);
-    color: var(--blue);
-}
-
-.doc-level {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--gray-light);
 }
 
 .doc-name {
@@ -304,23 +276,6 @@ main#cv-words-view {
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
-
-.doc-tags {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.doc-tag {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--blue);
-    background: rgba(28, 176, 246, .08);
-    border: 1px solid rgba(28, 176, 246, .15);
-    padding: 2px 8px;
-    border-radius: 20px;
-}
-
 
 .doc-action {
     flex-shrink: 0;
@@ -345,21 +300,6 @@ body.app-dark-mode #page-courses .lang-tab-btn.active {
 
 body.app-dark-mode #page-courses .doc-name {
     color: #e2e8f0;
-}
-
-body.app-dark-mode #page-courses .doc-level {
-    color: #cbd5e1;
-}
-
-body.app-dark-mode #page-courses .doc-type-badge.type-pdf {
-    background: rgba(248, 113, 113, .14);
-    color: #fca5a5;
-}
-
-body.app-dark-mode #page-courses .doc-tag {
-    background: rgba(56, 189, 248, .12);
-    border-color: rgba(125, 211, 252, .18);
-    color: #bae6fd;
 }
 
 body.app-dark-mode #page-courses .doc-icon-blue {

@@ -85,7 +85,7 @@ const AI_LANGUAGE_META = {
   },
   ja: {
     name: 'Japanese',
-    systemPrompt: 'You audit and correct a single Japanese vocabulary record for Vietnamese learners. Return only one valid JSON object with exactly these keys: word, mean, transcription, wordtype, example, example_vi. Use the provided word as the headword. Use mean as the primary semantic anchor when it is present; otherwise use wordtype. Verify every field for correctness, naturalness, and consistency. Fix inaccurate or awkward fields. Keep example_vi as a faithful Vietnamese translation of example. Do not add explanations.',
+    systemPrompt: 'You audit and correct a single Japanese vocabulary record for Vietnamese learners. Return only one valid JSON object with exactly these keys: word, mean, transcription, wordtype, example, example_vi. Use the provided word as the headword. Use mean as the primary semantic anchor when it is present; otherwise use wordtype. Verify every field for correctness, naturalness, and consistency. Fix inaccurate or awkward fields. Keep example_vi as a faithful Vietnamese translation of example. The transcription field must be written in Romaji using standard Hepburn romanization. Do not add explanations.',
   },
   zh: {
     name: 'Simplified Chinese',
@@ -190,6 +190,8 @@ Rules:
 - If you are uncertain about a field, keep it coherent and usable rather than omitting it.
 - "wordtype" should be specific, such as noun, verb, adjective, adverb, phrase.
 - "transcription" must match the pronunciation/pronunciation system of the word.
+- If the language is Japanese, "transcription" must be written in Romaji using standard Hepburn romanization.
+- If the language is Chinese, "transcription" must be standard pinyin with tone marks.
 - "example" must be short, natural, and fit the word sense.
 - "example_vi" must be a faithful Vietnamese translation of "example".
 - Do not add explanations, markdown, or extra text.
@@ -298,6 +300,8 @@ Rules:
 - "wordtype" should be specific, such as noun, verb, adjective, adverb, phrase.
 - "example" must be short, natural, and fit the word sense.
 - "example_vi" must be a faithful Vietnamese translation of "example".
+- If the language is Japanese, write "transcription" in Romaji using standard Hepburn romanization.
+- If the language is Chinese, write "transcription" in standard pinyin with tone marks.
 - If you are uncertain about a field, keep it coherent and usable rather than omitting it.
 
 Current values:

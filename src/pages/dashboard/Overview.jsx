@@ -17,17 +17,6 @@ import { getLevelInfo, getXpData, syncXpWithServer } from '../../utils/xpSystem'
 import { getDueCount, checkSrsDecayWarning } from '../../utils/srsStorage';
 import { isAuthenticatedUser } from '../../utils/userStorage';
 
-const GUEST_LEVEL_INFO = {
-    badge: 'Null',
-    level: 'Null',
-    title: 'Null',
-    totalXp: 'Null',
-    progress: 0,
-    nextLevel: null,
-    xpForNext: 0,
-    xpInLevel: 0,
-};
-
 export default function Overview() {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -54,7 +43,7 @@ export default function Overview() {
 
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
     const [dashboardProgress, setDashboardProgress] = useState(() => readDashboardProgress(userKey));
-    const levelInfo = isGuestUser ? GUEST_LEVEL_INFO : getLevelInfo(getXpData().totalXp);
+    const levelInfo = getLevelInfo(getXpData().totalXp);
     const srsCount = getDueCount();
     const decayCount = checkSrsDecayWarning();
 
@@ -315,11 +304,11 @@ export default function Overview() {
                         <div className="welcome-pill-row">
                             <div className="welcome-pill">
                                 <span>Streak</span>
-                                <strong>{isGuestUser ? 'Null' : `${stats.streak} ngày`}</strong>
+                                <strong>{`${stats.streak} ngày`}</strong>
                             </div>
                             <div className="welcome-pill">
                                 <span>Tổng EXP</span>
-                                <strong>{isGuestUser ? 'Null' : stats.xp}</strong>
+                                <strong>{stats.xp}</strong>
                             </div>
                         </div>
 
@@ -334,11 +323,13 @@ export default function Overview() {
                             <div className="welcome-focus-progress">
                                 <div className="welcome-focus-progress-fill" style={{ width: `${Math.round(levelInfo.progress * 100)}%` }} />
                             </div>
-                            {isGuestUser && <span className="welcome-focus-note">Null</span>}
-                            {!isGuestUser && levelInfo.nextLevel && (
+                            {levelInfo.nextLevel && (
                                 <span className="welcome-focus-note">
                                     Còn {levelInfo.xpForNext - levelInfo.xpInLevel} XP đến Level {levelInfo.nextLevel.level}
                                 </span>
+                            )}
+                            {!levelInfo.nextLevel && (
+                                <span className="welcome-focus-note">Đã đạt cấp cao nhất</span>
                             )}
                         </div>
 
@@ -396,7 +387,7 @@ export default function Overview() {
                         </div>
                         <div className="chart-summary-card">
                             <span>{chartPeriod === 'week' ? 'EXP tích lũy 7 ngày' : 'EXP tích lũy 4 tuần'}</span>
-                            <strong>{isGuestUser ? 'Null' : totalReview}</strong>
+                            <strong>{totalReview}</strong>
                         </div>
                     </div>
 
@@ -412,7 +403,7 @@ export default function Overview() {
                             <div className="card-eyebrow">Hôm nay</div>
                             <h2 className="card-title-text">Mục tiêu ngày</h2>
                         </div>
-                        <span className="badge badge-streak">{isGuestUser ? 'Null' : `${completedTasks}/${tasksView.length} task hoàn thành`}</span>
+                        <span className="badge badge-streak">{`${completedTasks}/${tasksView.length} task hoàn thành`}</span>
                     </div>
 
                     <div className="today-progress">
@@ -465,10 +456,6 @@ export default function Overview() {
                                 <div className="course-dash-body">
                                     <h3 className="course-dash-name">{course.title}</h3>
                                     <p className="course-dash-desc">{course.description || ''}</p>
-                                    <div className="course-dash-meta">
-                                        <span className="cd-meta-topics">{course.topic_count || 0} chủ đề</span>
-                                        <span>Level A1</span>
-                                    </div>
                                     <div className="course-progress-section">
                                         <div className="course-progress-header">
                                             <span>Tiến độ</span>

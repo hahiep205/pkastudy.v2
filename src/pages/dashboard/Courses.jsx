@@ -74,12 +74,6 @@ export default function Courses() {
             id: course.id,
             title: course.title,
             description: course.description || 'Bộ tài liệu học tập',
-            tags: [
-                `${course.topic_count || 0} lessons`,
-                `${course.vocabulary_count || 0} words`,
-                'TOEIC',
-            ],
-            badge: 'TOEIC',
             courseId: course.slug || course.id,
             topicCount: Number(course.topic_count || 0),
             vocabularyCount: Number(course.vocabulary_count || 0),
@@ -205,24 +199,12 @@ export default function Courses() {
                                         </svg>
                                     </div>
                                     <div className="doc-info">
-                                        <div className="doc-meta-row">
-                                            <span className="doc-type-badge type-pdf">{course.badge}</span>
-                                            <span className="doc-level">{course.topicCount} lessons</span>
-                                            <span className="doc-level">{course.vocabularyCount} words</span>
-                                        </div>
                                         <h3 className="doc-name">
                                             {index + 1}. {course.title}
                                         </h3>
                                         <p className="doc-desc">
                                             {course.description}
                                         </p>
-                                        <div className="doc-tags">
-                                            {course.tags.map((tag) => (
-                                                <span className="doc-tag" key={`${course.id}-${tag}`}>
-                                                    {tag}
-                                                </span>
-                                            ))}
-                                        </div>
                                     </div>
                                     <div className="doc-action">
                                         <Link to={`/dashboard/courses/${course.courseId}`} className="btn btn-primary btn-small">
