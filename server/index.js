@@ -17,19 +17,32 @@ const port = process.env.PORT || 4000;
 async function startServer() {
   try {
     if (hasSupabaseAdmin) {
-      await ensureSupabaseAuthUser({
-        email: DEFAULT_ADMIN_EMAIL,
-        password: DEFAULT_ADMIN_PASSWORD,
-        name: 'Admin',
-      });
-      await ensureSupabaseAuthUser({
-        email: DEFAULT_DEMO_EMAIL,
-        password: DEFAULT_DEMO_PASSWORD,
-        name: 'User Test',
-      });
+      try {
+        await ensureSupabaseAuthUser({
+          email: DEFAULT_ADMIN_EMAIL,
+          password: DEFAULT_ADMIN_PASSWORD,
+          name: 'Admin',
+        });
+        await ensureSupabaseAuthUser({
+          email: DEFAULT_DEMO_EMAIL,
+          password: DEFAULT_DEMO_PASSWORD,
+          name: 'User Test',
+        });
+      } catch (bootstrapError) {
+        console.warn('Supabase bootstrap skipped, continuing server startup:', bootstrapError.message);
+      }
     }
-    await ensureDefaultAdminUser();
-    await ensureDefaultDemoUser();
+    try {
+      await ensureDefaultAdminUser();
+    } catch (adminBootstrapError) {
+      console.warn('Default admin bootstrap skipped:', adminBootstrapError.message);
+    }
+
+    try {
+      await ensureDefaultDemoUser();
+    } catch (demoBootstrapError) {
+      console.warn('Default demo bootstrap skipped:', demoBootstrapError.message);
+    }
     app.listen(port, () => {
       console.log(`Server running at http://localhost:${port}`);
       console.log(`Default admin ready: ${DEFAULT_ADMIN_LOGIN_ALIAS} / ${DEFAULT_ADMIN_PASSWORD}`);

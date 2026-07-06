@@ -131,6 +131,53 @@ async function deleteSupabaseAuthUserById(userId) {
   return true;
 }
 
+function base64Url(buffer) {
+  return Buffer.from(buffer)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function buildGoogleOAuthUrl({ redirectTo, codeChallenge, state }) {
+  const url = new URL(`${supabaseUrl}/auth/v1/authorize`);
+  url.searchParams.set('provider', 'google');
+  url.searchParams.set('redirect_to', redirectTo);
+  url.searchParams.set('code_challenge', codeChallenge);
+  url.searchParams.set('code_challenge_method', 's256');
+  url.searchParams.set('state', state);
+  return url.toString();
+}
+
+function createPkceCodeVerifier() {
+  return base64Url(require('crypto').randomBytes(32));
+}
+
+async function exchangeSupabaseOAuthCode({ code, codeVerifier }) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase auth client is not configured.');
+  }
+
+  const storageKey = 'pkastudy-oauth';
+  const storageValue = `${codeVerifier}/pkce`;
+  const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      flowType: 'pkce',
+      storageKey,
+      storage: {
+        getItem: async (key) => (key === `${storageKey}-code-verifier` ? storageValue : null),
+        setItem: async () => undefined,
+        removeItem: async () => undefined,
+      },
+    },
+  });
+
+  return tempClient.auth.exchangeCodeForSession(code);
+}
+
 module.exports = {
   supabasePublic,
   supabaseAdmin,
@@ -138,10 +185,15 @@ module.exports = {
   hasSupabaseAdmin,
   useSupabaseDb,
   allowSupabaseDbFallback,
+  supabaseUrl,
+  supabaseAnonKey,
   getSupabaseIssuer,
   getSupabaseJwksUrl,
   ensureSupabaseAuthUser,
   createSupabaseAuthUser,
   findSupabaseAuthUserByEmail,
   deleteSupabaseAuthUserById,
+  buildGoogleOAuthUrl,
+  createPkceCodeVerifier,
+  exchangeSupabaseOAuthCode,
 };

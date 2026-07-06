@@ -36,8 +36,36 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         let active = true;
 
+        const syncFromToken = async (accessToken) => {
+            if (!accessToken) return false;
+            try {
+                const result = await axiosClient.post('/auth/session', {
+                    accessToken,
+                });
+
+                if (active && result?.user) {
+                    applyUser({
+                        ...result.user,
+                        token: result.token || accessToken,
+                    });
+                    return true;
+                }
+            } catch {
+                return false;
+            }
+            return false;
+        };
+
         const syncSession = async (session) => {
             if (!session?.access_token) {
+                const storedToken = localStorage.getItem('token');
+                if (storedToken) {
+                    const synced = await syncFromToken(storedToken);
+                    if (!synced && active) {
+                        clearUser();
+                    }
+                    return;
+                }
                 if (active) {
                     clearUser();
                 }
@@ -45,15 +73,9 @@ export function AuthProvider({ children }) {
             }
 
             try {
-                const result = await axiosClient.post('/auth/session', {
-                    accessToken: session.access_token,
-                });
-
-                if (active && result?.user) {
-                    applyUser({
-                        ...result.user,
-                        token: result.token || session.access_token,
-                    });
+                const synced = await syncFromToken(session.access_token);
+                if (!synced && active) {
+                    clearUser();
                 }
             } catch {
                 if (active) {

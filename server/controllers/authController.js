@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const crypto = require('crypto');
 const {
   getUserByEmail,
   getUserByLoginIdentifier,
@@ -13,6 +14,9 @@ const {
   ensureSupabaseAuthUser,
   supabaseAdmin,
   supabasePublic,
+  buildGoogleOAuthUrl,
+  createPkceCodeVerifier,
+  exchangeSupabaseOAuthCode,
 } = require('../supabase');
 
 const registerSchema = Joi.object({
@@ -34,6 +38,15 @@ const loginSchema = Joi.object({
 
 const accessTokenSchema = Joi.object({
   accessToken: Joi.string().required(),
+});
+
+const googleStartSchema = Joi.object({
+  redirectTo: Joi.string().uri({ scheme: ['http', 'https'] }).optional(),
+});
+
+const googleCompleteSchema = Joi.object({
+  code: Joi.string().required(),
+  state: Joi.string().required(),
 });
 
 const pendingVerificationCodes = new Map();
@@ -333,6 +346,116 @@ async function googleLogin(req, res, next) {
   }
 }
 
+async function startGoogleLogin(req, res, next) {
+  try {
+    const { error, value } = googleStartSchema.validate(req.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.details.map((detail) => detail.message),
+      });
+    }
+
+    const redirectTo = value.redirectTo || `${req.protocol}://${req.get('host')}/login`;
+    const codeVerifier = createPkceCodeVerifier();
+    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+    const state = crypto.randomBytes(16).toString('hex');
+
+    const cookieOptions = [
+      'HttpOnly',
+      process.env.NODE_ENV === 'production' ? 'SameSite=None' : 'SameSite=Lax',
+      'Path=/',
+      'Max-Age=300',
+    ];
+    if (process.env.NODE_ENV === 'production' || req.secure) {
+      cookieOptions.push('Secure');
+    }
+
+    res.setHeader('Set-Cookie', [
+      `pkastudy_oauth_verifier=${encodeURIComponent(codeVerifier)}; ${cookieOptions.join('; ')}`,
+      `pkastudy_oauth_state=${encodeURIComponent(state)}; ${cookieOptions.join('; ')}`,
+    ]);
+
+    return res.redirect(buildGoogleOAuthUrl({
+      redirectTo,
+      codeChallenge,
+      state,
+    }));
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function completeGoogleLogin(req, res, next) {
+  try {
+    const { error, value } = googleCompleteSchema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.details.map((detail) => detail.message),
+      });
+    }
+
+    const cookies = (req.headers.cookie || '')
+      .split(';')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .reduce((accumulator, entry) => {
+        const index = entry.indexOf('=');
+        if (index > 0) {
+          const key = entry.slice(0, index);
+          const val = entry.slice(index + 1);
+          accumulator[key] = val;
+        }
+        return accumulator;
+      }, {});
+
+    const cookieState = cookies.pkastudy_oauth_state ? decodeURIComponent(cookies.pkastudy_oauth_state) : '';
+    const codeVerifier = cookies.pkastudy_oauth_verifier ? decodeURIComponent(cookies.pkastudy_oauth_verifier) : '';
+
+    if (!cookieState || cookieState !== value.state) {
+      return res.status(400).json({ error: 'OAuth state mismatch' });
+    }
+
+    if (!codeVerifier) {
+      return res.status(400).json({ error: 'OAuth verifier missing' });
+    }
+
+    const { data, error: exchangeError } = await exchangeSupabaseOAuthCode({
+      code: value.code,
+      codeVerifier,
+    });
+
+    if (exchangeError || !data?.session?.access_token) {
+      return res.status(400).json({ error: exchangeError?.message || 'Google login failed' });
+    }
+
+    const authUser = data.user;
+    const user = await createUserFromAuthIdentity({
+      authUserId: authUser.id,
+      email: authUser.email,
+      name: authUser.user_metadata?.name || authUser.user_metadata?.full_name || authUser.email,
+    });
+
+    res.setHeader('Set-Cookie', [
+      'pkastudy_oauth_verifier=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+      'pkastudy_oauth_state=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+    ]);
+
+    return res.json(buildAuthPayload(user, data.session.access_token));
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function getCurrentSession(req, res) {
   return res.json(buildAuthPayload(req.user, req.auth?.accessToken || null));
 }
@@ -342,6 +465,8 @@ module.exports = {
   register,
   login,
   googleLogin,
+  startGoogleLogin,
+  completeGoogleLogin,
   exchangeSession,
   getCurrentSession,
 };

@@ -25,5 +25,3 @@ server/uploads
 *.sln
 *.sw?
 
-.env
-server/.env

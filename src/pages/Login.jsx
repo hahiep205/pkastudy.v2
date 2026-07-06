@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import axiosClient from '../utils/axiosClient';
-import { supabase } from '../supabase';
 import '../assets/css/login-styles.css';
 
 export default function Login() {
@@ -17,11 +16,80 @@ export default function Login() {
         navigate(nextUser?.role === 'admin' ? '/manager' : '/dashboard');
     };
 
+    const resolveApiBaseUrl = () => {
+        const configuredBaseUrl = axiosClient.defaults.baseURL?.trim().replace(/\/$/, '');
+        if (configuredBaseUrl) {
+            return configuredBaseUrl;
+        }
+
+        if (typeof window !== 'undefined') {
+            if (window.location.port === '5173') {
+                return 'http://localhost:4000/api';
+            }
+
+            return `${window.location.origin}/api`;
+        }
+
+        return 'http://localhost:4000/api';
+    };
+
     useEffect(() => {
         if (user?.token) {
             navigateAfterLogin(user);
         }
     }, [user, navigate]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const state = params.get('state');
+
+        if (!code || !state) return;
+
+        let active = true;
+        const completeGoogleLogin = async () => {
+            setLoading(true);
+            setErrorMessage('');
+
+            try {
+                const result = await axiosClient.post('/auth/google/complete', {
+                    code,
+                    state,
+                });
+
+                if (!active || !result?.user || !result?.token) {
+                    throw new Error('Phan hoi dang nhap khong hop le.');
+                }
+
+                login({
+                    id: result.user.id,
+                    name: result.user.name,
+                    email: result.user.email,
+                    role: result.user.role,
+                    status: result.user.status,
+                    token: result.token,
+                });
+
+                window.history.replaceState({}, '', '/login');
+                navigateAfterLogin(result.user);
+            } catch (error) {
+                if (active) {
+                    setErrorMessage(error.response?.data?.error || error.message || 'Dang nhap Google that bai');
+                    window.history.replaceState({}, '', '/login');
+                }
+            } finally {
+                if (active) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        void completeGoogleLogin();
+
+        return () => {
+            active = false;
+        };
+    }, [login, navigate]);
 
     const handleEmailLogin = async () => {
         setErrorMessage('');
@@ -33,17 +101,9 @@ export default function Login() {
 
         setLoading(true);
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const result = await axiosClient.post('/auth/login', {
                 email: email.trim(),
                 password,
-            });
-
-            if (error || !data?.session?.access_token) {
-                throw error || new Error('Dang nhap that bai.');
-            }
-
-            const result = await axiosClient.post('/auth/session', {
-                accessToken: data.session.access_token,
             });
 
             if (!result?.user || !result?.token) {
@@ -68,25 +128,9 @@ export default function Login() {
 
     const handleGoogleLogin = async () => {
         setErrorMessage('');
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: `${window.location.origin}/login`,
-                    queryParams: {
-                        prompt: 'select_account',
-                    },
-                },
-            });
-
-            if (error) {
-                throw error;
-            }
-        } catch (error) {
-            setErrorMessage(error.response?.data?.error || error.message || 'Dang nhap Google that bai');
-            setLoading(false);
-        }
+        const baseUrl = resolveApiBaseUrl();
+        const redirectTo = `${window.location.origin}/login`;
+        window.location.href = `${baseUrl.replace(/\/$/, '')}/auth/google/start?redirectTo=${encodeURIComponent(redirectTo)}`;
     };
 
     return (
