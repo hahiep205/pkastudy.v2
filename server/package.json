@@ -13,6 +13,8 @@
     "supabase:ensure-storage": "node scripts/ensure-supabase-storage.js",
     "supabase:verify-schema": "node scripts/verify-supabase-schema.js",
     "supabase:verify-data": "node scripts/verify-supabase-data.js",
+    "supabase:verify-phase-1-5": "node scripts/verify-phase-1-5.js",
+    "supabase:verify-phase-6-10": "node scripts/verify-phase-6-10.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

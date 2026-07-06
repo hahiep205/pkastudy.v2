@@ -44,7 +44,7 @@ async function startServer() {
       console.warn('Default demo bootstrap skipped:', demoBootstrapError.message);
     }
     app.listen(port, () => {
-      console.log(`Server running at http://localhost:${port}`);
+      console.log(`Server running on port ${port}`);
       console.log(`Default admin ready: ${DEFAULT_ADMIN_LOGIN_ALIAS} / ${DEFAULT_ADMIN_PASSWORD}`);
       console.log(`Default demo user ready: ${DEFAULT_DEMO_LOGIN_ALIAS} / ${DEFAULT_DEMO_PASSWORD}`);
     });

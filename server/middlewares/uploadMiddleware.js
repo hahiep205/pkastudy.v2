@@ -4,7 +4,7 @@ const fs = require('fs');
 const { useSupabaseStorage } = require('../lib/supabaseStorage');
 
 const uploadDir = path.join(__dirname, '../uploads/toeic');
-if (!fs.existsSync(uploadDir)) {
+if (!useSupabaseStorage && !fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 

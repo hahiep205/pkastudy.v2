@@ -1,5 +1,4 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
-const pool = require('../db');
 const { supabaseAdmin } = require('../supabase');
 
 const TABLE_MAPPINGS = [
@@ -18,7 +17,18 @@ const TABLE_MAPPINGS = [
   { mysql: 'Vocab_Activity_Logs', supabase: 'vocab_activity_logs', optional: true },
 ];
 
+const shouldCompareWithMysql = process.env.VERIFY_WITH_MYSQL === 'true';
+let mysqlPool = null;
+
+function getMysqlPool() {
+  if (!mysqlPool) {
+    mysqlPool = require('../db');
+  }
+  return mysqlPool;
+}
+
 async function mysqlTableExists(tableName) {
+  const pool = getMysqlPool();
   const [rows] = await pool.query(
     `SELECT 1
      FROM information_schema.TABLES
@@ -31,6 +41,7 @@ async function mysqlTableExists(tableName) {
 }
 
 async function getMysqlCount(tableName) {
+  const pool = getMysqlPool();
   const [rows] = await pool.query(`SELECT COUNT(*) AS total FROM \`${tableName}\``);
   return Number(rows[0]?.total || 0);
 }
@@ -49,6 +60,12 @@ async function main() {
   let hasMismatch = false;
 
   for (const mapping of TABLE_MAPPINGS) {
+    const supabaseCount = await getSupabaseCount(mapping.supabase);
+    if (!shouldCompareWithMysql) {
+      process.stdout.write(`OK ${mapping.supabase} | supabase=${supabaseCount}\n`);
+      continue;
+    }
+
     const exists = await mysqlTableExists(mapping.mysql);
     if (!exists) {
       if (!mapping.optional) {
@@ -61,7 +78,6 @@ async function main() {
     }
 
     const mysqlCount = await getMysqlCount(mapping.mysql);
-    const supabaseCount = await getSupabaseCount(mapping.supabase);
     const match = mysqlCount === supabaseCount;
     if (!match) {
       hasMismatch = true;
@@ -72,7 +88,9 @@ async function main() {
     );
   }
 
-  await pool.end();
+  if (mysqlPool) {
+    await mysqlPool.end();
+  }
 
   if (hasMismatch) {
     process.exitCode = 1;
@@ -84,6 +102,8 @@ async function main() {
 
 main().catch(async (error) => {
   console.error(error);
-  await pool.end().catch(() => undefined);
+  if (mysqlPool) {
+    await mysqlPool.end().catch(() => undefined);
+  }
   process.exit(1);
 });

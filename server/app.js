@@ -11,16 +11,53 @@ const srsRoutes = require('./routes/srsRoutes');
 const toeicRoutes = require('./routes/toeicRoutes');
 const wordProgressRoutes = require('./routes/wordProgressRoutes');
 const supportRoutes = require('./routes/supportRoutes');
+const { useSupabaseStorage } = require('./lib/supabaseStorage');
 const { notFoundHandler, globalErrorHandler } = require('./middlewares/errorHandler');
 
 const BODY_SIZE_LIMIT = '25mb';
 
 const app = express();
 
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+function isLocalOrigin(origin) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|::1)(:\d+)?$/i.test(origin || '');
+}
+
+function isAllowedOrigin(origin) {
+  if (!origin) {
+    return true;
+  }
+
+  const allowedOrigins = [
+    process.env.CLIENT_ORIGIN,
+    process.env.FRONTEND_ORIGIN,
+  ].filter(Boolean);
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  if (isLocalOrigin(origin)) {
+    return true;
+  }
+
+  return /^https:\/\/.*\.vercel\.app$/i.test(origin) || /^https:\/\/.*\.vercel\.app\/?$/i.test(origin);
+}
+
+app.use(cors({
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(null, false);
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: BODY_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: BODY_SIZE_LIMIT }));
-app.use('/uploads/toeic', express.static(path.join(__dirname, 'uploads/toeic')));
+if (!useSupabaseStorage) {
+  app.use('/uploads/toeic', express.static(path.join(__dirname, 'uploads/toeic')));
+}
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);

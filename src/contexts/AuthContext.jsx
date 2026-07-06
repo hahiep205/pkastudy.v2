@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import axiosClient from '../utils/axiosClient';
 import { supabase } from '../supabase';
 import { AuthContext, getInitialUser, guestUser, normalizeUser } from './auth-context';
 
@@ -39,21 +38,40 @@ export function AuthProvider({ children }) {
         const syncFromToken = async (accessToken) => {
             if (!accessToken) return false;
             try {
-                const result = await axiosClient.post('/auth/session', {
-                    accessToken,
-                });
+                const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+                const authUser = userData?.user;
+                if (userError || !authUser?.id) {
+                    return false;
+                }
 
-                if (active && result?.user) {
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('id, legacy_user_id, email, name, role, status')
+                    .eq('id', authUser.id)
+                    .maybeSingle();
+
+                if (profileError) {
+                    return false;
+                }
+
+                if (active) {
                     applyUser({
-                        ...result.user,
-                        token: result.token || accessToken,
+                        id: profile?.legacy_user_id ?? null,
+                        profileId: authUser.id,
+                        authUserId: authUser.id,
+                        email: profile?.email || authUser.email,
+                        name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || authUser.email,
+                        role: profile?.role || 'user',
+                        status: profile?.status || 'active',
+                        token: accessToken,
                     });
                     return true;
                 }
+
+                return Boolean(profile);
             } catch {
                 return false;
             }
-            return false;
         };
 
         const syncSession = async (session) => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
-import axiosClient from '../utils/axiosClient';
+import { supabase } from '../supabase';
 import '../assets/css/login-styles.css';
 
 export default function Login() {
@@ -16,80 +16,44 @@ export default function Login() {
         navigate(nextUser?.role === 'admin' ? '/manager' : '/dashboard');
     };
 
-    const resolveApiBaseUrl = () => {
-        const configuredBaseUrl = axiosClient.defaults.baseURL?.trim().replace(/\/$/, '');
-        if (configuredBaseUrl) {
-            return configuredBaseUrl;
-        }
-
-        if (typeof window !== 'undefined') {
-            if (window.location.port === '5173') {
-                return 'http://localhost:4000/api';
-            }
-
-            return `${window.location.origin}/api`;
-        }
-
-        return 'http://localhost:4000/api';
-    };
-
     useEffect(() => {
         if (user?.token) {
             navigateAfterLogin(user);
         }
     }, [user, navigate]);
 
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get('code');
-        const state = params.get('state');
+    const hydrateUserFromSession = async (session) => {
+        if (!session?.access_token) {
+            throw new Error('Phan hoi dang nhap khong hop le.');
+        }
 
-        if (!code || !state) return;
+        const { data: userData, error: userError } = await supabase.auth.getUser(session.access_token);
+        const authUser = userData?.user;
+        if (userError || !authUser?.id) {
+            throw new Error(userError?.message || 'Khong the xac minh tai khoan Supabase.');
+        }
 
-        let active = true;
-        const completeGoogleLogin = async () => {
-            setLoading(true);
-            setErrorMessage('');
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, legacy_user_id, email, name, role, status')
+            .eq('id', authUser.id)
+            .maybeSingle();
 
-            try {
-                const result = await axiosClient.post('/auth/google/complete', {
-                    code,
-                    state,
-                });
+        if (profileError) {
+            throw new Error(profileError.message || 'Khong the tai ho so dang nhap.');
+        }
 
-                if (!active || !result?.user || !result?.token) {
-                    throw new Error('Phan hoi dang nhap khong hop le.');
-                }
-
-                login({
-                    id: result.user.id,
-                    name: result.user.name,
-                    email: result.user.email,
-                    role: result.user.role,
-                    status: result.user.status,
-                    token: result.token,
-                });
-
-                window.history.replaceState({}, '', '/login');
-                navigateAfterLogin(result.user);
-            } catch (error) {
-                if (active) {
-                    setErrorMessage(error.response?.data?.error || error.message || 'Dang nhap Google that bai');
-                    window.history.replaceState({}, '', '/login');
-                }
-            } finally {
-                if (active) {
-                    setLoading(false);
-                }
-            }
+        return {
+            id: profile?.legacy_user_id ?? null,
+            profileId: authUser.id,
+            authUserId: authUser.id,
+            name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || authUser.email,
+            email: profile?.email || authUser.email,
+            role: profile?.role || 'user',
+            status: profile?.status || 'active',
+            token: session.access_token,
         };
-
-        void completeGoogleLogin();
-
-        return () => {
-            active = false;
-        };
-    }, [login, navigate]);
+    };
 
     const handleEmailLogin = async () => {
         setErrorMessage('');
@@ -101,24 +65,18 @@ export default function Login() {
 
         setLoading(true);
         try {
-            const result = await axiosClient.post('/auth/login', {
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email: email.trim(),
                 password,
             });
 
-            if (!result?.user || !result?.token) {
-                throw new Error('Phan hoi dang nhap khong hop le.');
+            if (error) {
+                throw error;
             }
 
-            login({
-                id: result.user.id,
-                name: result.user.name,
-                email: result.user.email,
-                role: result.user.role,
-                status: result.user.status,
-                token: result.token,
-            });
-            navigateAfterLogin(result.user);
+            const nextUser = await hydrateUserFromSession(data.session);
+            login(nextUser);
+            navigateAfterLogin(nextUser);
         } catch (error) {
             setErrorMessage(error.response?.data?.error || error.message || 'Dang nhap that bai');
         } finally {
@@ -128,9 +86,22 @@ export default function Login() {
 
     const handleGoogleLogin = async () => {
         setErrorMessage('');
-        const baseUrl = resolveApiBaseUrl();
-        const redirectTo = `${window.location.origin}/login`;
-        window.location.href = `${baseUrl.replace(/\/$/, '')}/auth/google/start?redirectTo=${encodeURIComponent(redirectTo)}`;
+        try {
+            setLoading(true);
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/login`,
+                },
+            });
+
+            if (error) {
+                throw error;
+            }
+        } catch (error) {
+            setErrorMessage(error.message || 'Dang nhap Google that bai');
+            setLoading(false);
+        }
     };
 
     return (

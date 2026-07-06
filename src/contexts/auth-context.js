@@ -2,6 +2,8 @@ import { createContext } from 'react';
 
 export const guestUser = {
     id: null,
+    profileId: null,
+    authUserId: null,
     name: 'Guest User',
     email: null,
     role: 'guest',
@@ -18,6 +20,8 @@ export function normalizeUser(user) {
 
     return {
         id: user.id ?? null,
+        profileId: user.profileId ?? null,
+        authUserId: user.authUserId ?? null,
         name: user.name || guestUser.name,
         email: user.email || null,
         role: user.role || 'user',
