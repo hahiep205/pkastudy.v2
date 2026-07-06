@@ -1,8 +1,10 @@
 const { getTestsList, getTestDetails, submitTest, getPracticeModes: getPracticeModesService, getTestHistory: getTestHistoryService } = require('../services/toeicService');
+const { setPublicCache } = require('../lib/httpCache');
 
 async function getTests(req, res, next) {
   try {
     const tests = await getTestsList();
+    setPublicCache(res, 300, 600);
     res.json({ data: tests });
   } catch (error) {
     next(error);
@@ -12,6 +14,7 @@ async function getTests(req, res, next) {
 async function getPracticeModes(req, res, next) {
   try {
     const modes = await getPracticeModesService();
+    setPublicCache(res, 300, 600);
     res.json({ data: modes });
   } catch (error) {
     next(error);
@@ -26,7 +29,8 @@ async function getTest(req, res, next) {
     if (!test) {
       return res.status(404).json({ error: 'Test not found' });
     }
-    
+
+    setPublicCache(res, 600, 1200);
     res.json({ data: test });
   } catch (error) {
     next(error);

@@ -5,6 +5,8 @@ const {
   updateAdminFlashcardEntry,
   deleteAdminFlashcardEntry,
 } = require('../services/adminFlashcardService');
+const { invalidateCourseCache } = require('../services/coursesService');
+const { invalidateTopicCache } = require('../services/topicsService');
 
 async function getFlashcardsByTopic(req, res, next) {
   try {
@@ -27,6 +29,8 @@ async function getFlashcard(req, res, next) {
 async function createFlashcard(req, res, next) {
   try {
     const data = await createAdminFlashcardEntry(req.params.topicId, req.body);
+    invalidateCourseCache();
+    invalidateTopicCache();
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -36,6 +40,8 @@ async function createFlashcard(req, res, next) {
 async function updateFlashcard(req, res, next) {
   try {
     const data = await updateAdminFlashcardEntry(req.params.flashcardId, req.body);
+    invalidateCourseCache();
+    invalidateTopicCache();
     res.json({ data });
   } catch (error) {
     next(error);
@@ -45,6 +51,8 @@ async function updateFlashcard(req, res, next) {
 async function deleteFlashcard(req, res, next) {
   try {
     const data = await deleteAdminFlashcardEntry(req.params.flashcardId);
+    invalidateCourseCache();
+    invalidateTopicCache();
     res.json({ data });
   } catch (error) {
     next(error);

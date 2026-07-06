@@ -16,6 +16,7 @@ const {
   updateAdminToeicQuestionEntry,
   deleteAdminToeicQuestionEntry,
 } = require('../services/adminToeicService');
+const { invalidateToeicCache } = require('../services/toeicService');
 
 async function getToeicTests(req, res, next) {
   try {
@@ -38,6 +39,7 @@ async function getToeicTest(req, res, next) {
 async function createToeicTest(req, res, next) {
   try {
     const data = await createAdminToeicTestEntry(req.body);
+    invalidateToeicCache();
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -56,6 +58,7 @@ async function exportToeicTest(req, res, next) {
 async function importToeicTest(req, res, next) {
   try {
     const data = await importAdminToeicTestEntry(req.body);
+    invalidateToeicCache();
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -65,6 +68,7 @@ async function importToeicTest(req, res, next) {
 async function updateToeicTest(req, res, next) {
   try {
     const data = await updateAdminToeicTestEntry(req.params.testId, req.body);
+    invalidateToeicCache();
     res.json({ data });
   } catch (error) {
     next(error);
@@ -74,6 +78,7 @@ async function updateToeicTest(req, res, next) {
 async function deleteToeicTest(req, res, next) {
   try {
     const data = await deleteAdminToeicTestEntry(req.params.testId);
+    invalidateToeicCache();
     res.json({ data });
   } catch (error) {
     next(error);
@@ -92,6 +97,7 @@ async function getToeicGroups(req, res, next) {
 async function createToeicGroup(req, res, next) {
   try {
     const data = await createAdminToeicGroupEntry(req.params.testId, req.body);
+    invalidateToeicCache();
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -101,6 +107,7 @@ async function createToeicGroup(req, res, next) {
 async function updateToeicGroup(req, res, next) {
   try {
     const data = await updateAdminToeicGroupEntry(req.params.groupId, req.body);
+    invalidateToeicCache();
     res.json({ data });
   } catch (error) {
     next(error);
@@ -110,6 +117,7 @@ async function updateToeicGroup(req, res, next) {
 async function deleteToeicGroup(req, res, next) {
   try {
     const data = await deleteAdminToeicGroupEntry(req.params.groupId);
+    invalidateToeicCache();
     res.json({ data });
   } catch (error) {
     next(error);
@@ -137,6 +145,7 @@ async function getToeicQuestion(req, res, next) {
 async function createToeicQuestion(req, res, next) {
   try {
     const data = await createAdminToeicQuestionEntry(req.params.testId, req.body);
+    invalidateToeicCache();
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -146,6 +155,7 @@ async function createToeicQuestion(req, res, next) {
 async function updateToeicQuestion(req, res, next) {
   try {
     const data = await updateAdminToeicQuestionEntry(req.params.questionId, req.body);
+    invalidateToeicCache();
     res.json({ data });
   } catch (error) {
     next(error);
@@ -155,6 +165,7 @@ async function updateToeicQuestion(req, res, next) {
 async function deleteToeicQuestion(req, res, next) {
   try {
     const data = await deleteAdminToeicQuestionEntry(req.params.questionId);
+    invalidateToeicCache();
     res.json({ data });
   } catch (error) {
     next(error);

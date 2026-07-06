@@ -7,6 +7,8 @@ const {
   updateAdminCourseEntry,
   deleteAdminCourseEntry,
 } = require('../services/adminCourseService');
+const { invalidateCourseCache } = require('../services/coursesService');
+const { invalidateTopicCache } = require('../services/topicsService');
 
 async function getCourses(req, res, next) {
   try {
@@ -38,6 +40,8 @@ async function exportCourse(req, res, next) {
 async function importCourse(req, res, next) {
   try {
     const data = await importAdminCourseEntry(req.body);
+    invalidateCourseCache();
+    invalidateTopicCache();
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -47,6 +51,7 @@ async function importCourse(req, res, next) {
 async function createCourse(req, res, next) {
   try {
     const data = await createAdminCourseEntry(req.body);
+    invalidateCourseCache();
     res.status(201).json({ data });
   } catch (error) {
     next(error);
@@ -56,6 +61,7 @@ async function createCourse(req, res, next) {
 async function updateCourse(req, res, next) {
   try {
     const data = await updateAdminCourseEntry(req.params.courseId, req.body);
+    invalidateCourseCache();
     res.json({ data });
   } catch (error) {
     next(error);
@@ -65,6 +71,8 @@ async function updateCourse(req, res, next) {
 async function deleteCourse(req, res, next) {
   try {
     const data = await deleteAdminCourseEntry(req.params.courseId);
+    invalidateCourseCache();
+    invalidateTopicCache();
     res.json({ data });
   } catch (error) {
     next(error);

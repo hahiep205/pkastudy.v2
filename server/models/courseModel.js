@@ -1,91 +1,81 @@
-const pool = require('../db');
 const { CUSTOM_TOPICS_COURSE_SLUG } = require('./customCoursesModel');
+const { ensureSupabaseEnabled, unwrapList, unwrapSingle, fetchTopicsWithVocabularyCounts } = require('../lib/supabaseData');
 
 async function getAllCourses() {
-  const [rows] = await pool.query(
-    `SELECT
-      c.id,
-      c.slug,
-      c.title,
-      c.description,
-      c.thumbnail_url AS thumbnailUrl,
-      c.language,
-      c.sort_order AS sortOrder,
-      c.created_at AS createdAt,
-      c.updated_at AS updatedAt,
-      COUNT(DISTINCT t.id) AS topic_count,
-      COUNT(f.id) AS vocabulary_count
-    FROM Courses c
-    LEFT JOIN Topics t ON t.course_id = c.id
-    LEFT JOIN Flashcards f ON f.topic_id = t.id
-    WHERE c.slug <> ?
-    GROUP BY
-      c.id,
-      c.slug,
-      c.title,
-      c.description,
-      c.thumbnail_url,
-      c.language,
-      c.sort_order,
-      c.created_at,
-      c.updated_at
-    ORDER BY c.sort_order ASC, c.id ASC`,
-    [CUSTOM_TOPICS_COURSE_SLUG]
-  );
+  const admin = ensureSupabaseEnabled();
+  const courses = unwrapList(await admin
+    .from('courses')
+    .select('id, slug, title, description, thumbnail_url, language, sort_order, created_at, updated_at')
+    .neq('slug', CUSTOM_TOPICS_COURSE_SLUG)
+    .order('sort_order', { ascending: true })
+    .order('id', { ascending: true }));
 
-  return rows;
+  const topics = unwrapList(await admin
+    .from('topics')
+    .select('id, course_id')
+    .is('owner_user_id', null)
+    .in('course_id', courses.map((course) => course.id)));
+
+  const flashcards = topics.length
+    ? unwrapList(await admin.from('flashcards').select('id, topic_id').in('topic_id', topics.map((topic) => topic.id)))
+    : [];
+
+  const topicCountByCourseId = new Map();
+  const topicCourseMap = new Map();
+  topics.forEach((topic) => {
+    topicCountByCourseId.set(topic.course_id, (topicCountByCourseId.get(topic.course_id) || 0) + 1);
+    topicCourseMap.set(topic.id, topic.course_id);
+  });
+
+  const vocabCountByCourseId = new Map();
+  flashcards.forEach((flashcard) => {
+    const courseId = topicCourseMap.get(flashcard.topic_id);
+    if (courseId) {
+      vocabCountByCourseId.set(courseId, (vocabCountByCourseId.get(courseId) || 0) + 1);
+    }
+  });
+
+  return courses.map((course) => ({
+    id: course.id,
+    slug: course.slug,
+    title: course.title,
+    description: course.description,
+    thumbnailUrl: course.thumbnail_url,
+    language: course.language,
+    sortOrder: course.sort_order,
+    createdAt: course.created_at,
+    updatedAt: course.updated_at,
+    topic_count: topicCountByCourseId.get(course.id) || 0,
+    vocabulary_count: vocabCountByCourseId.get(course.id) || 0,
+  }));
 }
 
 async function getCourseBySlug(slug) {
-  const [rows] = await pool.query(
-    `SELECT
-      id,
-      slug,
-      title,
-      description,
-      thumbnail_url AS thumbnailUrl,
-      language,
-      sort_order AS sortOrder,
-      created_at AS createdAt,
-      updated_at AS updatedAt
-    FROM Courses
-    WHERE slug = ?
-    LIMIT 1`,
-    [slug]
-  );
+  const admin = ensureSupabaseEnabled();
+  const course = unwrapSingle(await admin
+    .from('courses')
+    .select('id, slug, title, description, thumbnail_url, language, sort_order, created_at, updated_at')
+    .eq('slug', slug)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] || null;
+  return course
+    ? {
+      id: course.id,
+      slug: course.slug,
+      title: course.title,
+      description: course.description,
+      thumbnailUrl: course.thumbnail_url,
+      language: course.language,
+      sortOrder: course.sort_order,
+      createdAt: course.created_at,
+      updatedAt: course.updated_at,
+    }
+    : null;
 }
 
 async function getTopicsByCourseId(courseId) {
-  const [rows] = await pool.query(
-    `SELECT
-      t.id,
-      t.slug,
-      t.course_id AS courseId,
-      t.title,
-      t.description,
-      t.sort_order AS sortOrder,
-      COUNT(f.id) AS vocabularyCount,
-      t.created_at AS createdAt,
-      t.updated_at AS updatedAt
-    FROM Topics t
-    LEFT JOIN Flashcards f ON f.topic_id = t.id
-    WHERE t.course_id = ?
-    GROUP BY
-      t.id,
-      t.slug,
-      t.course_id,
-      t.title,
-      t.description,
-      t.sort_order,
-      t.created_at,
-      t.updated_at
-    ORDER BY t.sort_order ASC, t.id ASC`,
-    [courseId]
-  );
-
-  return rows;
+  return fetchTopicsWithVocabularyCounts(courseId);
 }
 
 module.exports = {

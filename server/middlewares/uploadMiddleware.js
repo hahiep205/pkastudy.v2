@@ -1,13 +1,14 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { useSupabaseStorage } = require('../lib/supabaseStorage');
 
 const uploadDir = path.join(__dirname, '../uploads/toeic');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
   destination: uploadDir,
   filename: (req, file, cb) => {
     const timestamp = Date.now();
@@ -16,6 +17,8 @@ const storage = multer.diskStorage({
     cb(null, `${timestamp}-${random}${ext}`);
   },
 });
+
+const memoryStorage = multer.memoryStorage();
 
 const allowedMimeTypes = [
   'image/jpeg',
@@ -40,7 +43,7 @@ function fileFilter(req, file, cb) {
 }
 
 const upload = multer({
-  storage,
+  storage: useSupabaseStorage ? memoryStorage : diskStorage,
   fileFilter,
   limits: {
     fileSize: 30 * 1024 * 1024,

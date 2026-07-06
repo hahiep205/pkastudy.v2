@@ -1,46 +1,51 @@
-const pool = require('../db');
+const { ensureSupabaseEnabled, unwrapList, resolveProfileId } = require('../lib/supabaseData');
 
-/**
- * Get all "remembered" flashcard IDs for a user.
- * Returns an object like { 12: true, 34: true } (only remembered ones).
- */
 async function getWordProgressByUser(userId) {
-  const [rows] = await pool.query(
-    'SELECT flashcard_id FROM User_Word_Progress WHERE user_id = ? AND is_remembered = 1',
-    [userId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const profileId = await resolveProfileId(userId);
+  const rows = unwrapList(await admin
+    .from('user_word_progress')
+    .select('flashcard_id')
+    .eq('user_id', profileId)
+    .eq('is_remembered', true));
+
   const result = {};
-  rows.forEach(row => { result[row.flashcard_id] = true; });
+  rows.forEach((row) => {
+    result[row.flashcard_id] = true;
+  });
   return result;
 }
 
-/**
- * Batch upsert: receive array of { flashcard_id, is_remembered }
- * Efficiently update multiple words at once.
- */
 async function batchUpdateWordProgress(userId, updates) {
   if (!updates || updates.length === 0) return;
 
-  // Build bulk INSERT ... ON DUPLICATE KEY UPDATE
-  const values = updates.map(u => [userId, u.flashcard_id, u.is_remembered ? 1 : 0]);
-  await pool.query(
-    `INSERT INTO User_Word_Progress (user_id, flashcard_id, is_remembered)
-     VALUES ?
-     ON DUPLICATE KEY UPDATE is_remembered = VALUES(is_remembered), updated_at = NOW()`,
-    [values]
-  );
+  const admin = ensureSupabaseEnabled();
+  const profileId = await resolveProfileId(userId);
+  await admin
+    .from('user_word_progress')
+    .upsert(
+      updates.map((item) => ({
+        user_id: profileId,
+        flashcard_id: item.flashcard_id,
+        is_remembered: Boolean(item.is_remembered),
+      })),
+      { onConflict: 'user_id,flashcard_id' },
+    );
 }
 
-/**
- * Toggle a single word's remembered state.
- */
 async function toggleWordProgress(userId, flashcardId, isRemembered) {
-  await pool.query(
-    `INSERT INTO User_Word_Progress (user_id, flashcard_id, is_remembered)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE is_remembered = ?, updated_at = NOW()`,
-    [userId, flashcardId, isRemembered ? 1 : 0, isRemembered ? 1 : 0]
-  );
+  const admin = ensureSupabaseEnabled();
+  const profileId = await resolveProfileId(userId);
+  await admin
+    .from('user_word_progress')
+    .upsert(
+      {
+        user_id: profileId,
+        flashcard_id: flashcardId,
+        is_remembered: Boolean(isRemembered),
+      },
+      { onConflict: 'user_id,flashcard_id' },
+    );
 }
 
 module.exports = {

@@ -1,180 +1,135 @@
-const pool = require('../db');
+const { ensureSupabaseEnabled, unwrapList, resolveProfileId } = require('../lib/supabaseData');
+
+async function getReviewsSupabase(userId, onlyDue) {
+  const admin = ensureSupabaseEnabled();
+  const profileId = await resolveProfileId(userId);
+  let query = admin
+    .from('srs_reviews')
+    .select('id, user_id, flashcard_id, interval_days, ef, repetition, next_review_date, last_reviewed_at, created_at, updated_at')
+    .eq('user_id', profileId)
+    .order('next_review_date', { ascending: true })
+    .order('id', { ascending: true });
+
+  if (onlyDue) {
+    query = query.lte('next_review_date', new Date().toISOString().slice(0, 10));
+  }
+
+  const reviews = unwrapList(await query);
+  if (!reviews.length) return [];
+
+  const flashcards = unwrapList(await admin
+    .from('flashcards')
+    .select('id, external_id, topic_id, word, transcription, meaning, word_type, example, example_vi, language, created_at, updated_at')
+    .in('id', reviews.map((review) => review.flashcard_id)));
+
+  const flashcardMap = new Map(flashcards.map((flashcard) => [flashcard.id, flashcard]));
+  return reviews.map((review) => {
+    const flashcard = flashcardMap.get(review.flashcard_id);
+    return {
+      reviewId: review.id,
+      userId: review.user_id,
+      flashcardId: review.flashcard_id,
+      interval: review.interval_days,
+      ef: Number(review.ef),
+      repetition: review.repetition,
+      nextReviewDate: review.next_review_date,
+      lastReviewedAt: review.last_reviewed_at,
+      reviewCreatedAt: review.created_at,
+      reviewUpdatedAt: review.updated_at,
+      flashcardDbId: flashcard?.id,
+      id: flashcard?.external_id || String(flashcard?.id),
+      topicId: flashcard?.topic_id,
+      word: flashcard?.word,
+      transcription: flashcard?.transcription,
+      mean: flashcard?.meaning,
+      wordtype: flashcard?.word_type,
+      example: flashcard?.example,
+      example_vi: flashcard?.example_vi,
+      language: flashcard?.language,
+      flashcardCreatedAt: flashcard?.created_at,
+      flashcardUpdatedAt: flashcard?.updated_at,
+    };
+  });
+}
 
 async function getDueReviewsByUserId(userId) {
-  const [rows] = await pool.query(
-    `SELECT
-      r.id AS reviewId,
-      r.user_id AS userId,
-      r.flashcard_id AS flashcardId,
-      r.interval_days AS \`interval\`,
-      r.ef,
-      r.repetition,
-      r.next_review_date AS nextReviewDate,
-      r.last_reviewed_at AS lastReviewedAt,
-      r.created_at AS reviewCreatedAt,
-      r.updated_at AS reviewUpdatedAt,
-      f.id AS flashcardDbId,
-      COALESCE(f.external_id, CAST(f.id AS CHAR)) AS id,
-      f.topic_id AS topicId,
-      f.word,
-      f.transcription,
-      f.meaning AS mean,
-      f.word_type AS wordtype,
-      f.example,
-      f.example_vi AS example_vi,
-      f.language,
-      f.created_at AS flashcardCreatedAt,
-      f.updated_at AS flashcardUpdatedAt
-    FROM SRS_Reviews r
-    JOIN Flashcards f ON f.id = r.flashcard_id
-    WHERE r.user_id = ?
-      AND r.next_review_date <= CURDATE()
-    ORDER BY r.next_review_date ASC, r.id ASC`,
-    [userId]
-  );
-
-  return rows;
+  return getReviewsSupabase(userId, true);
 }
 
 async function getReviewQueueByUserId(userId) {
-  const [rows] = await pool.query(
-    `SELECT
-      r.id AS reviewId,
-      r.user_id AS userId,
-      r.flashcard_id AS flashcardId,
-      r.interval_days AS \`interval\`,
-      r.ef,
-      r.repetition,
-      r.next_review_date AS nextReviewDate,
-      r.last_reviewed_at AS lastReviewedAt,
-      r.created_at AS reviewCreatedAt,
-      r.updated_at AS reviewUpdatedAt,
-      f.id AS flashcardDbId,
-      COALESCE(f.external_id, CAST(f.id AS CHAR)) AS id,
-      f.topic_id AS topicId,
-      f.word,
-      f.transcription,
-      f.meaning AS mean,
-      f.word_type AS wordtype,
-      f.example,
-      f.example_vi AS example_vi,
-      f.language,
-      f.created_at AS flashcardCreatedAt,
-      f.updated_at AS flashcardUpdatedAt
-    FROM SRS_Reviews r
-    JOIN Flashcards f ON f.id = r.flashcard_id
-    WHERE r.user_id = ?
-    ORDER BY r.next_review_date ASC, r.id ASC`,
-    [userId]
-  );
-
-  return rows;
+  return getReviewsSupabase(userId, false);
 }
 
-async function getFlashcardsByIds(flashcardIds, db = pool) {
+async function getFlashcardsByIds(flashcardIds) {
   if (!flashcardIds.length) return [];
 
-  const [rows] = await db.query(
-    `SELECT
-      f.id,
-      f.topic_id AS topicId,
-      COALESCE(f.external_id, CAST(f.id AS CHAR)) AS publicId,
-      f.word,
-      f.transcription,
-      f.meaning AS mean,
-      f.word_type AS wordtype,
-      f.example,
-      f.example_vi AS example_vi,
-      f.language
-    FROM Flashcards f
-    WHERE f.id IN (?)`,
-    [flashcardIds]
-  );
+  const admin = ensureSupabaseEnabled();
+  const rows = unwrapList(await admin
+    .from('flashcards')
+    .select('id, topic_id, external_id, word, transcription, meaning, word_type, example, example_vi, language')
+    .in('id', flashcardIds));
 
-  return rows;
+  return rows.map((row) => ({
+    id: row.id,
+    topicId: row.topic_id,
+    publicId: row.external_id || String(row.id),
+    word: row.word,
+    transcription: row.transcription,
+    mean: row.meaning,
+    wordtype: row.word_type,
+    example: row.example,
+    example_vi: row.example_vi,
+    language: row.language,
+  }));
 }
 
-async function getReviewsByUserIdAndFlashcardIds(userId, flashcardIds, db = pool) {
-  if (!flashcardIds.length) return [];
+async function enqueueImmediateReviewsRpc(userId, flashcardIds) {
+  const admin = ensureSupabaseEnabled();
+  const profileId = await resolveProfileId(userId);
+  const result = await admin.rpc('enqueue_immediate_reviews', {
+    p_user_id: profileId,
+    p_flashcard_ids: flashcardIds,
+  });
 
-  const [rows] = await db.query(
-    `SELECT
-      r.id AS reviewId,
-      r.flashcard_id AS flashcardId,
-      r.interval_days AS \`interval\`,
-      r.ef,
-      r.repetition,
-      r.next_review_date AS nextReviewDate,
-      r.last_reviewed_at AS lastReviewedAt
-    FROM SRS_Reviews r
-    WHERE r.user_id = ?
-      AND r.flashcard_id IN (?)`,
-    [userId, flashcardIds]
-  );
-
-  return rows;
+  return unwrapList(result).map((row) => ({
+    id: row.id,
+    topicId: row.topic_id,
+    publicId: row.public_id,
+    word: row.word,
+    transcription: row.transcription,
+    mean: row.mean,
+    wordtype: row.wordtype,
+    example: row.example,
+    example_vi: row.example_vi,
+    language: row.language,
+  }));
 }
 
-async function getReviewsByUserIdAndFlashcardIdsForUpdate(userId, flashcardIds, db = pool) {
-  if (!flashcardIds.length) return [];
+async function submitSrsReviewBatchRpc(userId, reviewItems) {
+  const admin = ensureSupabaseEnabled();
+  const profileId = await resolveProfileId(userId);
+  const result = await admin.rpc('submit_srs_review_batch', {
+    p_user_id: profileId,
+    p_reviews: reviewItems,
+  });
 
-  const [rows] = await db.query(
-    `SELECT
-      r.id AS reviewId,
-      r.flashcard_id AS flashcardId,
-      r.interval_days AS \`interval\`,
-      r.ef,
-      r.repetition,
-      r.next_review_date AS nextReviewDate,
-      r.last_reviewed_at AS lastReviewedAt
-    FROM SRS_Reviews r
-    WHERE r.user_id = ?
-      AND r.flashcard_id IN (?)
-    FOR UPDATE`,
-    [userId, flashcardIds]
-  );
-
-  return rows;
-}
-
-async function upsertReviews(reviewRows, db = pool) {
-  if (!reviewRows.length) return;
-
-  const values = reviewRows.map((row) => [
-    row.userId,
-    row.flashcardId,
-    row.interval,
-    row.ef,
-    row.repetition,
-    row.nextReviewDate,
-    row.lastReviewedAt,
-  ]);
-
-  await db.query(
-    `INSERT INTO SRS_Reviews (
-      user_id,
-      flashcard_id,
-      interval_days,
-      ef,
-      repetition,
-      next_review_date,
-      last_reviewed_at
-    ) VALUES ?
-    ON DUPLICATE KEY UPDATE
-      interval_days = VALUES(interval_days),
-      ef = VALUES(ef),
-      repetition = VALUES(repetition),
-      next_review_date = VALUES(next_review_date),
-      last_reviewed_at = VALUES(last_reviewed_at)`,
-    [values]
-  );
+  return unwrapList(result).map((row) => ({
+    flashcardId: row.flashcard_id,
+    interval: row.interval_days,
+    ef: Number(row.ef),
+    repetition: row.repetition,
+    nextReviewDate: row.next_review_date,
+    word: row.word,
+    mean: row.mean,
+    transcription: row.transcription,
+    wordtype: row.wordtype,
+  }));
 }
 
 module.exports = {
   getDueReviewsByUserId,
   getReviewQueueByUserId,
   getFlashcardsByIds,
-  getReviewsByUserIdAndFlashcardIds,
-  getReviewsByUserIdAndFlashcardIdsForUpdate,
-  upsertReviews,
+  enqueueImmediateReviewsRpc,
+  submitSrsReviewBatchRpc,
 };

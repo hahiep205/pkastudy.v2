@@ -1,0 +1,147 @@
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const { createClient } = require('@supabase/supabase-js');
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  '';
+const supabaseServiceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  '';
+const supabaseJwksUrl = process.env.SUPABASE_JWKS_URL || '';
+const shouldUseSupabaseDb = process.env.USE_SUPABASE_DB === 'true';
+const allowSupabaseDbFallback = process.env.SUPABASE_DB_FALLBACK !== 'false';
+
+const isSupabaseConfigured = Boolean(supabaseUrl && (supabaseAnonKey || supabaseServiceRoleKey));
+const hasSupabaseAdmin = Boolean(supabaseUrl && supabaseServiceRoleKey);
+const useSupabaseDb = shouldUseSupabaseDb && hasSupabaseAdmin;
+
+const supabasePublic = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  })
+  : null;
+
+const supabaseAdmin = hasSupabaseAdmin
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  })
+  : null;
+
+function getSupabaseIssuer() {
+  return `${supabaseUrl}/auth/v1`;
+}
+
+function getSupabaseJwksUrl() {
+  return supabaseJwksUrl || `${getSupabaseIssuer()}/.well-known/jwks.json`;
+}
+
+async function findSupabaseAuthUserByEmail(email) {
+  if (!supabaseAdmin || !email) return null;
+
+  let page = 1;
+  const perPage = 200;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+
+    const users = data?.users || [];
+    const matched = users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
+    if (matched) return matched;
+    if (users.length < perPage) return null;
+    page += 1;
+  }
+}
+
+async function ensureSupabaseAuthUser({ email, password, name }) {
+  if (!supabaseAdmin) {
+    return null;
+  }
+
+  const existing = await findSupabaseAuthUserByEmail(email);
+  if (existing) {
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+      user_metadata: {
+        ...(existing.user_metadata || {}),
+        name: name || existing.user_metadata?.name || null,
+        full_name: name || existing.user_metadata?.full_name || null,
+      },
+    });
+    if (error) throw error;
+    return data.user;
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      name: name || null,
+      full_name: name || null,
+    },
+  });
+
+  if (error) throw error;
+  return data.user;
+}
+
+async function createSupabaseAuthUser({ email, password, name }) {
+  if (!supabaseAdmin) {
+    throw new Error('Supabase admin client is not configured.');
+  }
+
+  const existing = await findSupabaseAuthUserByEmail(email);
+  if (existing) {
+    const error = new Error('Email already in use');
+    error.status = 400;
+    throw error;
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      name: name || null,
+      full_name: name || null,
+    },
+  });
+
+  if (error) throw error;
+  return data.user;
+}
+
+async function deleteSupabaseAuthUserById(userId) {
+  if (!supabaseAdmin || !userId) return false;
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (error) throw error;
+  return true;
+}
+
+module.exports = {
+  supabasePublic,
+  supabaseAdmin,
+  isSupabaseConfigured,
+  hasSupabaseAdmin,
+  useSupabaseDb,
+  allowSupabaseDbFallback,
+  getSupabaseIssuer,
+  getSupabaseJwksUrl,
+  ensureSupabaseAuthUser,
+  createSupabaseAuthUser,
+  findSupabaseAuthUserByEmail,
+  deleteSupabaseAuthUserById,
+};

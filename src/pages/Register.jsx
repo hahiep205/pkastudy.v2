@@ -26,7 +26,7 @@ export default function Register() {
 
         setSendingCode(true);
         try {
-            const res = await axiosClient.post('/auth/send-verification', { email });
+            const res = await axiosClient.post('/auth/send-code', { email });
             setCodeSent(true);
             setSendCodeMessage(res.message || 'Đã gửi mã xác thực. Vui lòng kiểm tra email.');
         } catch (error) {
@@ -53,7 +53,7 @@ export default function Register() {
                 name,
                 email,
                 password,
-                verificationCode
+                code: verificationCode
             });
             navigate('/login');
         } catch (error) {

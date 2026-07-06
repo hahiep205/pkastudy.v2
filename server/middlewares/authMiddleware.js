@@ -1,6 +1,36 @@
 require('dotenv').config();
-const jwt = require('jsonwebtoken');
-const { getUserAuthById } = require('../models/userModel');
+const { getUserByEmail, createUserFromAuthIdentity } = require('../models/userModel');
+const { getSupabaseIssuer, getSupabaseJwksUrl } = require('../supabase');
+
+let joseModulePromise = null;
+let jwksResolverPromise = null;
+
+function getJoseModule() {
+  if (!joseModulePromise) {
+    joseModulePromise = import('jose');
+  }
+  return joseModulePromise;
+}
+
+async function getJwksResolver() {
+  if (!jwksResolverPromise) {
+    const { createRemoteJWKSet } = await getJoseModule();
+    jwksResolverPromise = createRemoteJWKSet(new URL(getSupabaseJwksUrl()));
+  }
+  return jwksResolverPromise;
+}
+
+async function verifySupabaseToken(token) {
+  const { jwtVerify } = await getJoseModule();
+  const jwks = await getJwksResolver();
+
+  const { payload } = await jwtVerify(token, jwks, {
+    issuer: getSupabaseIssuer(),
+    audience: 'authenticated',
+  });
+
+  return payload;
+}
 
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -15,8 +45,20 @@ async function authMiddleware(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_jwt_secret');
-    const user = await getUserAuthById(decoded.id);
+    const decoded = await verifySupabaseToken(token);
+    const email = typeof decoded.email === 'string' ? decoded.email : '';
+    if (!email) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    let user = await getUserByEmail(email);
+    if (!user) {
+      user = await createUserFromAuthIdentity({
+        authUserId: decoded.sub || null,
+        email,
+        name: decoded.user_metadata?.name || decoded.user_metadata?.full_name || email,
+      });
+    }
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -29,7 +71,13 @@ async function authMiddleware(req, res, next) {
     req.userRole = user.role;
     req.userStatus = user.status;
     req.user = user;
-    next();
+    req.auth = {
+      supabaseUserId: decoded.sub || null,
+      email,
+      claims: decoded,
+      accessToken: token,
+    };
+    return next();
   } catch (err) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

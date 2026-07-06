@@ -1,106 +1,120 @@
-const { getTests, getTestById, getTestGroupsByTestId, getQuestionsByTestId, insertTestRecord, getTestHistoryByUserId } = require('../models/toeicModel');
+const {
+  getTests,
+  getTestById,
+  getTestGroupsByTestId,
+  getQuestionsByTestId,
+  insertTestRecord,
+  getTestHistoryByUserId,
+} = require('../models/toeicModel');
 const { addXpService } = require('./progressService');
 const { getListeningScaledScore, getReadingScaledScore } = require('../utils/toeicScoreMapping');
+const { getOrSet, deleteByPrefix } = require('../lib/ttlCache');
+
+const TOEIC_CACHE_PREFIX = 'toeic:';
+const TOEIC_TESTS_TTL_MS = 5 * 60 * 1000;
+const TOEIC_TEST_DETAILS_TTL_MS = 10 * 60 * 1000;
+const TOEIC_PRACTICE_MODES_TTL_MS = 5 * 60 * 1000;
 
 const PRACTICE_MODE_METADATA = [
   {
-    id: "part1-picture",
-    label: "Part 1",
-    title: "Picture Description",
-    desc: "Xem hình, nghe bốn câu mô tả và chọn đáp án A/B/C/D đúng nhất với bức ảnh.",
-    icon: "📸",
-    type: "listening"
+    id: 'part1-picture',
+    label: 'Part 1',
+    title: 'Picture Description',
+    desc: 'Xem hình, nghe bốn câu mô tả và chọn đáp án A/B/C/D đúng nhất với bức ảnh.',
+    icon: '📸',
+    type: 'listening',
   },
   {
-    id: "part2-response",
-    label: "Part 2",
-    title: "Question-Response",
-    desc: "Nghe một câu hỏi hoặc câu nói ngắn, rồi chọn phản hồi A/B/C phù hợp nhất.",
-    icon: "💬",
-    type: "listening"
+    id: 'part2-response',
+    label: 'Part 2',
+    title: 'Question-Response',
+    desc: 'Nghe một câu hỏi hoặc câu nói ngắn, rồi chọn phản hồi A/B/C phù hợp nhất.',
+    icon: '💬',
+    type: 'listening',
   },
   {
-    id: "part3-conversations",
-    label: "Part 3",
-    title: "Conversations",
-    desc: "Nghe đoạn hội thoại ngắn và trả lời câu hỏi trắc nghiệm A/B/C/D về nội dung vừa nghe.",
-    icon: "👥",
-    type: "listening"
+    id: 'part3-conversations',
+    label: 'Part 3',
+    title: 'Conversations',
+    desc: 'Nghe đoạn hội thoại ngắn và trả lời câu hỏi trắc nghiệm A/B/C/D về nội dung vừa nghe.',
+    icon: '👥',
+    type: 'listening',
   },
   {
-    id: "part4-talks",
-    label: "Part 4",
-    title: "Talks",
-    desc: "Nghe bài nói hoặc thông báo ngắn của một người và chọn đáp án A/B/C/D đúng nhất.",
-    icon: "📢",
-    type: "listening"
+    id: 'part4-talks',
+    label: 'Part 4',
+    title: 'Talks',
+    desc: 'Nghe bài nói hoặc thông báo ngắn của một người và chọn đáp án A/B/C/D đúng nhất.',
+    icon: '📢',
+    type: 'listening',
   },
   {
-    id: "part5-reading",
-    label: "Part 5",
-    title: "Incomplete Sentences",
-    desc: "Đọc câu chưa hoàn chỉnh và chọn đáp án A/B/C/D phù hợp nhất để điền vào chỗ trống.",
-    icon: "📝",
-    type: "reading"
+    id: 'part5-reading',
+    label: 'Part 5',
+    title: 'Incomplete Sentences',
+    desc: 'Đọc câu chưa hoàn chỉnh và chọn đáp án A/B/C/D phù hợp nhất để điền vào chỗ trống.',
+    icon: '📝',
+    type: 'reading',
   },
   {
-    id: "part6-reading",
-    label: "Part 6",
-    title: "Text Completion",
-    desc: "Đọc đoạn văn ngắn và chọn đáp án A/B/C/D phù hợp nhất với từng chỗ trống.",
-    icon: "📄",
-    type: "reading"
+    id: 'part6-reading',
+    label: 'Part 6',
+    title: 'Text Completion',
+    desc: 'Đọc đoạn văn ngắn và chọn đáp án A/B/C/D phù hợp nhất với từng chỗ trống.',
+    icon: '📄',
+    type: 'reading',
   },
   {
-    id: "part7-reading",
-    label: "Part 7",
-    title: "Reading Comprehension",
-    desc: "Đọc passage và trả lời câu hỏi A/B/C/D về ý chính, chi tiết và suy luận.",
-    icon: "📖",
-    type: "reading"
-  }
+    id: 'part7-reading',
+    label: 'Part 7',
+    title: 'Reading Comprehension',
+    desc: 'Đọc passage và trả lời câu hỏi A/B/C/D về ý chính, chi tiết và suy luận.',
+    icon: '📖',
+    type: 'reading',
+  },
 ];
+
 async function getTestsList() {
-  return await getTests();
+  return getOrSet(`${TOEIC_CACHE_PREFIX}tests:list`, TOEIC_TESTS_TTL_MS, () => getTests());
 }
 
 async function getTestDetails(testId) {
-  const test = await getTestById(testId);
-  if (!test) return null;
+  return getOrSet(`${TOEIC_CACHE_PREFIX}tests:${testId}:details`, TOEIC_TEST_DETAILS_TTL_MS, async () => {
+    const test = await getTestById(testId);
+    if (!test) return null;
 
-  const groups = await getTestGroupsByTestId(testId);
-  const questions = await getQuestionsByTestId(testId);
-  
-  // Remove correct_answer
-  const safeQuestions = questions.map(q => {
-    const { correct_answer, ...safeQ } = q;
-    return safeQ;
+    const groups = await getTestGroupsByTestId(testId);
+    const questions = await getQuestionsByTestId(testId);
+
+    const safeQuestions = questions.map((question) => {
+      const { correct_answer, ...safeQuestion } = question;
+      return safeQuestion;
+    });
+
+    const groupedQuestions = [];
+    const singleQuestions = [];
+
+    const groupMap = new Map();
+    groups.forEach((group) => {
+      groupMap.set(group.id, { ...group, questions: [] });
+    });
+
+    safeQuestions.forEach((question) => {
+      if (question.group_id && groupMap.has(question.group_id)) {
+        groupMap.get(question.group_id).questions.push(question);
+      } else {
+        singleQuestions.push(question);
+      }
+    });
+
+    groupMap.forEach((group) => groupedQuestions.push(group));
+
+    return {
+      ...test,
+      groups: groupedQuestions,
+      single_questions: singleQuestions,
+    };
   });
-
-  // Grouping logic
-  const groupedQuestions = [];
-  const singleQuestions = [];
-
-  const groupMap = new Map();
-  groups.forEach(g => {
-    groupMap.set(g.id, { ...g, questions: [] });
-  });
-
-  safeQuestions.forEach(q => {
-    if (q.group_id && groupMap.has(q.group_id)) {
-      groupMap.get(q.group_id).questions.push(q);
-    } else {
-      singleQuestions.push(q);
-    }
-  });
-
-  groupMap.forEach(g => groupedQuestions.push(g));
-
-  return {
-    ...test,
-    groups: groupedQuestions,
-    single_questions: singleQuestions,
-  };
 }
 
 async function submitTest(userId, testId, userAnswers, isPartial = false) {
@@ -108,17 +122,17 @@ async function submitTest(userId, testId, userAnswers, isPartial = false) {
   if (!test) throw new Error('Test not found');
 
   const questions = await getQuestionsByTestId(testId);
-  
+
   let readingCorrect = 0;
   let listeningCorrect = 0;
 
   const correctAnswersMap = {};
 
-  questions.forEach(q => {
-    correctAnswersMap[q.id] = q.correct_answer;
-    const userAnswer = userAnswers.find(ans => ans.question_id === q.id);
-    if (userAnswer && userAnswer.selected === q.correct_answer) {
-      if (q.part >= 1 && q.part <= 4) {
+  questions.forEach((question) => {
+    correctAnswersMap[question.id] = question.correct_answer;
+    const userAnswer = userAnswers.find((answer) => answer.question_id === question.id);
+    if (userAnswer && userAnswer.selected === question.correct_answer) {
+      if (question.part >= 1 && question.part <= 4) {
         listeningCorrect++;
       } else {
         readingCorrect++;
@@ -126,7 +140,6 @@ async function submitTest(userId, testId, userAnswers, isPartial = false) {
     }
   });
 
-  // Calculate Scale Score using the realistic TOEIC mapping
   const listeningScore = getListeningScaledScore(listeningCorrect);
   const readingScore = getReadingScaledScore(readingCorrect);
   const totalScore = readingScore + listeningScore;
@@ -134,7 +147,6 @@ async function submitTest(userId, testId, userAnswers, isPartial = false) {
   let xpResult = null;
   if (!isPartial) {
     await insertTestRecord(userId, testId, readingScore, listeningScore, totalScore);
-    // Award 50 XP for completing a full test
     xpResult = await addXpService(userId, 50);
   }
 
@@ -147,38 +159,40 @@ async function submitTest(userId, testId, userAnswers, isPartial = false) {
     xpAwarded: isPartial ? 0 : 50,
     newLevel: xpResult ? xpResult.newLevel : null,
     levelUp: xpResult ? xpResult.levelUp : false,
-    correctAnswersMap
+    correctAnswersMap,
   };
 }
 
 async function getPracticeModes() {
-  const tests = await getTestsList();
-  
-  const modes = PRACTICE_MODE_METADATA.map(mode => {
-    return {
+  return getOrSet(`${TOEIC_CACHE_PREFIX}practice-modes`, TOEIC_PRACTICE_MODES_TTL_MS, async () => {
+    const tests = await getTestsList();
+
+    return PRACTICE_MODE_METADATA.map((mode) => ({
       id: mode.id,
       label: mode.label,
       title: mode.title,
       desc: mode.desc,
       icon: mode.icon,
       type: mode.type,
-      topics: tests.map(test => ({
+      topics: tests.map((test) => ({
         id: `practice-${test.id}-${mode.id}`,
         testId: test.id,
         partKey: mode.label.toUpperCase(),
         title: test.title || test.name,
         desc: `Luyện tập ${mode.label} của ${test.title || test.name}.`,
-        icon: "📚",
+        icon: '📚',
         practiceType: mode.id,
-      }))
-    };
+      })),
+    }));
   });
-  
-  return modes;
 }
 
 async function getTestHistory(userId) {
-  return await getTestHistoryByUserId(userId);
+  return getTestHistoryByUserId(userId);
+}
+
+function invalidateToeicCache() {
+  deleteByPrefix(TOEIC_CACHE_PREFIX);
 }
 
 module.exports = {
@@ -187,4 +201,5 @@ module.exports = {
   submitTest,
   getPracticeModes,
   getTestHistory,
+  invalidateToeicCache,
 };

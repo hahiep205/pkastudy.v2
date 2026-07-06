@@ -1,13 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
-import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
 import axiosClient from '../utils/axiosClient';
+import { supabase } from '../supabase';
 import '../assets/css/login-styles.css';
 
 export default function Login() {
-    const { login } = useAuth();
+    const { user, login } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -18,21 +17,39 @@ export default function Login() {
         navigate(nextUser?.role === 'admin' ? '/manager' : '/dashboard');
     };
 
+    useEffect(() => {
+        if (user?.token) {
+            navigateAfterLogin(user);
+        }
+    }, [user, navigate]);
+
     const handleEmailLogin = async () => {
         setErrorMessage('');
 
         if (!email.trim() || !password.trim()) {
-            setErrorMessage('Vui lòng nhập đầy đủ email và mật khẩu.');
+            setErrorMessage('Vui long nhap day du email va mat khau.');
             return;
         }
 
         setLoading(true);
         try {
-            const result = await axiosClient.post('/auth/login', { email, password });
-            
-            if (!result?.user || !result?.token) {
-                throw new Error('Phản hồi đăng nhập không hợp lệ.');
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password,
+            });
+
+            if (error || !data?.session?.access_token) {
+                throw error || new Error('Dang nhap that bai.');
             }
+
+            const result = await axiosClient.post('/auth/session', {
+                accessToken: data.session.access_token,
+            });
+
+            if (!result?.user || !result?.token) {
+                throw new Error('Phan hoi dang nhap khong hop le.');
+            }
+
             login({
                 id: result.user.id,
                 name: result.user.name,
@@ -43,7 +60,7 @@ export default function Login() {
             });
             navigateAfterLogin(result.user);
         } catch (error) {
-            setErrorMessage(error.response?.data?.error || error.message || 'Đăng nhập thất bại');
+            setErrorMessage(error.response?.data?.error || error.message || 'Dang nhap that bai');
         } finally {
             setLoading(false);
         }
@@ -53,26 +70,21 @@ export default function Login() {
         setErrorMessage('');
         setLoading(true);
         try {
-            const result = await signInWithPopup(auth, googleProvider);
-            const idToken = await result.user.getIdToken();
-
-            const data = await axiosClient.post('/auth/google', { idToken });
-            
-            if (!data?.user || !data?.token) {
-                throw new Error('Phản hồi đăng nhập Google không hợp lệ.');
-            }
-            login({
-                id: data.user.id,
-                name: data.user.name,
-                email: data.user.email,
-                role: data.user.role,
-                status: data.user.status,
-                token: data.token,
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/login`,
+                    queryParams: {
+                        prompt: 'select_account',
+                    },
+                },
             });
-            navigateAfterLogin(data.user);
+
+            if (error) {
+                throw error;
+            }
         } catch (error) {
-            setErrorMessage(error.response?.data?.error || error.message || 'Đăng nhập Google thất bại');
-        } finally {
+            setErrorMessage(error.response?.data?.error || error.message || 'Dang nhap Google that bai');
             setLoading(false);
         }
     };
@@ -80,25 +92,23 @@ export default function Login() {
     return (
         <main className="auth-wrapper">
             <div className="auth-container">
-                {/* Phần bên trái: Sidebar (Đồng bộ với Register) */}
                 <div className="auth-sidebar">
                     <div className="auth-sidebar-content">
-                        <h2 className="sidebar-title">Mừng bạn<br />Quay trở lại!</h2>
-                        <p className="sidebar-subtitle">Tiếp tục hành trình chinh phục ngôn ngữ cùng Pkastudy.</p>
+                        <h2 className="sidebar-title">Mung ban<br />Quay tro lai!</h2>
+                        <p className="sidebar-subtitle">Tiep tuc hanh trinh chinh phuc ngon ngu cung Pkastudy.</p>
 
                         <ul className="modern-benefits-list">
-                            <li><span className="b-icon">✓</span> Đồng bộ tiến trình học</li>
-                            <li><span className="b-icon">✓</span> Mở khóa bài học mới</li>
-                            <li><span className="b-icon">✓</span> Chat cùng trợ lý AI</li>
+                            <li><span className="b-icon">+</span> Dong bo tien trinh hoc</li>
+                            <li><span className="b-icon">+</span> Mo khoa bai hoc moi</li>
+                            <li><span className="b-icon">+</span> Chat cung tro ly AI</li>
                         </ul>
                     </div>
                 </div>
 
-                {/* Phần bên phải: Form đăng nhập */}
                 <div className="auth-main">
                     <div className="auth-form-header">
-                        <h1 className="be-vietnam-pro-extrabold">Đăng nhập</h1>
-                        <p>Nhập thông tin tài khoản của bạn để tiếp tục.</p>
+                        <h1 className="be-vietnam-pro-extrabold">Dang nhap</h1>
+                        <p>Nhap thong tin tai khoan cua ban de tiep tuc.</p>
                     </div>
 
                     <form className="modern-form" onSubmit={(e) => e.preventDefault()}>
@@ -111,7 +121,7 @@ export default function Login() {
                                 placeholder=" "
                                 required
                             />
-                            <label htmlFor="login-email">Email của bạn</label>
+                            <label htmlFor="login-email">Email cua ban</label>
                         </div>
 
                         <div className="form-floating">
@@ -123,7 +133,7 @@ export default function Login() {
                                 placeholder=" "
                                 required
                             />
-                            <label htmlFor="login-password">Mật khẩu</label>
+                            <label htmlFor="login-password">Mat khau</label>
                         </div>
 
                         {errorMessage && <div className="alert-box error">{errorMessage}</div>}
@@ -132,9 +142,9 @@ export default function Login() {
                             <label className="checkbox-container">
                                 <input type="checkbox" />
                                 <span className="checkmark"></span>
-                                Ghi nhớ đăng nhập
+                                Ghi nho dang nhap
                             </label>
-                            <a href="#" className="text-link-small">Quên mật khẩu?</a>
+                            <a href="#" className="text-link-small">Quen mat khau?</a>
                         </div>
 
                         <button
@@ -143,11 +153,11 @@ export default function Login() {
                             onClick={handleEmailLogin}
                             disabled={loading}
                         >
-                            {loading ? <span className="spinner"></span> : 'Đăng nhập ngay'}
+                            {loading ? <span className="spinner"></span> : 'Dang nhap ngay'}
                         </button>
 
                         <div className="auth-divider">
-                            <span>hoặc</span>
+                            <span>hoac</span>
                         </div>
 
                         <button
@@ -162,14 +172,14 @@ export default function Login() {
                                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                             </svg>
-                            Đăng nhập với Google
+                            Dang nhap voi Google
                         </button>
                     </form>
 
                     <div className="auth-form-footer">
-                        <p>Chưa có tài khoản? <Link to="/register" className="text-link-bold">Đăng ký miễn phí</Link></p>
+                        <p>Chua co tai khoan? <Link to="/register" className="text-link-bold">Dang ky mien phi</Link></p>
                         <p className="legal-text">
-                            Pkastudy - Nền tảng học ngoại ngữ ứng dụng AI thông minh.
+                            Pkastudy - Nen tang hoc ngoai ngu ung dung AI thong minh.
                         </p>
                     </div>
                 </div>

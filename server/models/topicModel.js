@@ -1,44 +1,47 @@
-const pool = require('../db');
+const { ensureSupabaseEnabled, unwrapList, unwrapSingle } = require('../lib/supabaseData');
 
 async function getTopicBySlug(slug) {
-  const [rows] = await pool.query(
-    `SELECT
-      t.id,
-      t.slug,
-      t.course_id AS courseId,
-      t.title,
-      t.description,
-      t.sort_order AS sortOrder,
-      t.created_at AS createdAt,
-      t.updated_at AS updatedAt
-    FROM Topics t
-    WHERE t.slug = ?
-    LIMIT 1`,
-    [slug]
-  );
+  const admin = ensureSupabaseEnabled();
+  const topic = unwrapSingle(await admin
+    .from('topics')
+    .select('id, slug, course_id, title, description, sort_order, created_at, updated_at')
+    .eq('slug', slug)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] || null;
+  return topic
+    ? {
+      id: topic.id,
+      slug: topic.slug,
+      courseId: topic.course_id,
+      title: topic.title,
+      description: topic.description,
+      sortOrder: topic.sort_order,
+      createdAt: topic.created_at,
+      updatedAt: topic.updated_at,
+    }
+    : null;
 }
 
 async function getFlashcardsByTopicId(topicId) {
-  const [rows] = await pool.query(
-    `SELECT
-      f.id AS flashcardId,
-      COALESCE(f.external_id, CAST(f.id AS CHAR)) AS id,
-      f.word,
-      f.transcription,
-      f.meaning AS mean,
-      f.word_type AS wordtype,
-      f.example,
-      f.example_vi AS example_vi,
-      f.language
-    FROM Flashcards f
-    WHERE f.topic_id = ?
-    ORDER BY f.id ASC`,
-    [topicId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const rows = unwrapList(await admin
+    .from('flashcards')
+    .select('id, external_id, word, transcription, meaning, word_type, example, example_vi, language')
+    .eq('topic_id', topicId)
+    .order('id', { ascending: true }));
 
-  return rows;
+  return rows.map((row) => ({
+    flashcardId: row.id,
+    id: row.external_id || String(row.id),
+    word: row.word,
+    transcription: row.transcription,
+    mean: row.meaning,
+    wordtype: row.word_type,
+    example: row.example,
+    example_vi: row.example_vi,
+    language: row.language,
+  }));
 }
 
 module.exports = {

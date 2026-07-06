@@ -1,126 +1,109 @@
-const pool = require('../db');
+const { ensureSupabaseEnabled, unwrapList, unwrapSingle } = require('../lib/supabaseData');
 
 function mapAdminFlashcardRow(row) {
   return {
     id: row.id,
-    topicId: row.topicId,
+    topicId: row.topic_id,
     word: row.word,
     transcription: row.transcription,
     meaning: row.meaning,
-    wordType: row.wordType,
+    wordType: row.word_type,
     example: row.example,
-    exampleVi: row.exampleVi,
+    exampleVi: row.example_vi,
     language: row.language || 'en',
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
 async function listAdminFlashcardsByTopic({ topicId, search }) {
-  const whereClauses = ['f.topic_id = ?', 'COALESCE(t.is_custom, 0) = 0'];
-  const params = [topicId];
+  const admin = ensureSupabaseEnabled();
+  let query = admin
+    .from('flashcards')
+    .select('id, topic_id, word, transcription, meaning, word_type, example, example_vi, language, created_at, updated_at')
+    .eq('topic_id', topicId)
+    .order('word', { ascending: true })
+    .order('id', { ascending: true });
 
   if (search) {
     const keyword = `%${search}%`;
-    whereClauses.push('(f.word LIKE ? OR f.meaning LIKE ? OR COALESCE(f.word_type, \'\') LIKE ?)');
-    params.push(keyword, keyword, keyword);
+    query = query.or(`word.ilike.${keyword},meaning.ilike.${keyword},word_type.ilike.${keyword}`);
   }
 
-  const [rows] = await pool.query(
-    `SELECT
-      f.id,
-      f.topic_id AS topicId,
-      f.word,
-      f.transcription,
-      f.meaning,
-      f.word_type AS wordType,
-      f.example,
-      f.example_vi AS exampleVi,
-      f.language,
-      f.created_at AS createdAt,
-      f.updated_at AS updatedAt
-    FROM Flashcards f
-    INNER JOIN Topics t ON t.id = f.topic_id
-    WHERE ${whereClauses.join(' AND ')}
-    ORDER BY f.word ASC, f.id ASC`,
-    params
-  );
-
-  return rows.map(mapAdminFlashcardRow);
+  return unwrapList(await query).map(mapAdminFlashcardRow);
 }
 
 async function getAdminFlashcardById(flashcardId) {
-  const [rows] = await pool.query(
-    `SELECT
-      f.id,
-      f.topic_id AS topicId,
-      f.word,
-      f.transcription,
-      f.meaning,
-      f.word_type AS wordType,
-      f.example,
-      f.example_vi AS exampleVi,
-      f.language,
-      f.created_at AS createdAt,
-      f.updated_at AS updatedAt
-    FROM Flashcards f
-    INNER JOIN Topics t ON t.id = f.topic_id
-    WHERE f.id = ?
-      AND COALESCE(t.is_custom, 0) = 0
-    LIMIT 1`,
-    [flashcardId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('flashcards')
+    .select('id, topic_id, word, transcription, meaning, word_type, example, example_vi, language, created_at, updated_at')
+    .eq('id', flashcardId)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] ? mapAdminFlashcardRow(rows[0]) : null;
+  return row ? mapAdminFlashcardRow(row) : null;
 }
 
 async function getAdminFlashcardByTopicAndWord(topicId, word) {
-  const [rows] = await pool.query(
-    `SELECT f.id, f.topic_id AS topicId, f.word
-     FROM Flashcards f
-     INNER JOIN Topics t ON t.id = f.topic_id
-     WHERE f.topic_id = ?
-       AND LOWER(f.word) = LOWER(?)
-       AND COALESCE(t.is_custom, 0) = 0
-     LIMIT 1`,
-    [topicId, word]
-  );
+  const admin = ensureSupabaseEnabled();
+  const rows = unwrapList(await admin
+    .from('flashcards')
+    .select('id, topic_id, word')
+    .eq('topic_id', topicId));
 
-  return rows[0] || null;
+  const matched = rows.find((row) => String(row.word).toLowerCase() === String(word).toLowerCase());
+  return matched ? { id: matched.id, topicId: matched.topic_id, word: matched.word } : null;
 }
 
 async function createAdminFlashcard({ topicId, word, transcription, meaning, wordType, example, exampleVi, language }) {
-  const [result] = await pool.query(
-    `INSERT INTO Flashcards (topic_id, word, transcription, meaning, word_type, example, example_vi, language)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [topicId, word, transcription, meaning, wordType, example, exampleVi, language]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('flashcards')
+    .insert({
+      topic_id: topicId,
+      word,
+      transcription,
+      meaning,
+      word_type: wordType,
+      example,
+      example_vi: exampleVi,
+      language,
+    })
+    .select('id')
+    .single());
 
-  return getAdminFlashcardById(result.insertId);
+  return getAdminFlashcardById(row.id);
 }
 
 async function updateAdminFlashcard(flashcardId, { word, transcription, meaning, wordType, example, exampleVi, language }) {
-  const [result] = await pool.query(
-    `UPDATE Flashcards
-     SET word = ?, transcription = ?, meaning = ?, word_type = ?, example = ?, example_vi = ?, language = ?
-     WHERE id = ?`,
-    [word, transcription, meaning, wordType, example, exampleVi, language, flashcardId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('flashcards')
+    .update({
+      word,
+      transcription,
+      meaning,
+      word_type: wordType,
+      example,
+      example_vi: exampleVi,
+      language,
+    })
+    .eq('id', flashcardId)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 async function deleteAdminFlashcard(flashcardId) {
-  const [result] = await pool.query(
-    `DELETE f
-     FROM Flashcards f
-     INNER JOIN Topics t ON t.id = f.topic_id
-     WHERE f.id = ?
-       AND COALESCE(t.is_custom, 0) = 0`,
-    [flashcardId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('flashcards')
+    .delete()
+    .eq('id', flashcardId)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 module.exports = {

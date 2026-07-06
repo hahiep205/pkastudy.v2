@@ -1,232 +1,210 @@
-const pool = require('../db');
 const { CUSTOM_TOPICS_COURSE_SLUG } = require('./customCoursesModel');
+const { ensureSupabaseEnabled, unwrapList, unwrapSingle, fetchTopicsWithVocabularyCounts } = require('../lib/supabaseData');
 
-async function listAdminCourses({ limit, offset, search }) {
-  const whereClauses = ['c.slug <> ?'];
-  const whereParams = [CUSTOM_TOPICS_COURSE_SLUG];
-
-  if (search) {
-    whereClauses.push('(c.title LIKE ? OR c.slug LIKE ?)');
-    const keyword = `%${search}%`;
-    whereParams.push(keyword, keyword);
-  }
-
-  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-  const [countRows] = await pool.query(
-    `SELECT COUNT(*) AS total
-     FROM Courses c
-     ${whereSql}`,
-    whereParams
-  );
-
-  const [rows] = await pool.query(
-    `SELECT
-      c.id,
-      c.slug,
-      c.title,
-      c.description,
-      c.thumbnail_url AS thumbnailUrl,
-      c.language,
-      c.sort_order AS sortOrder,
-      c.created_at AS createdAt,
-      c.updated_at AS updatedAt,
-      COUNT(DISTINCT t.id) AS topicCount,
-      COUNT(f.id) AS vocabularyCount
-    FROM Courses c
-    LEFT JOIN Topics t ON t.course_id = c.id
-    LEFT JOIN Flashcards f ON f.topic_id = t.id
-    ${whereSql}
-    GROUP BY
-      c.id,
-      c.slug,
-      c.title,
-      c.description,
-      c.thumbnail_url,
-      c.language,
-      c.sort_order,
-      c.created_at,
-      c.updated_at
-    ORDER BY c.sort_order ASC, c.id ASC
-    LIMIT ? OFFSET ?`,
-    [...whereParams, limit, offset]
-  );
-
-  return {
-    items: rows.map(mapAdminCourseRow),
-    total: Number(countRows[0]?.total || 0),
-  };
-}
-
-function mapAdminCourseRow(row) {
+function mapAdminCourseRow(row, topicCount = 0, vocabularyCount = 0) {
   return {
     id: row.id,
     slug: row.slug,
     title: row.title,
     description: row.description,
-    thumbnailUrl: row.thumbnailUrl || null,
+    thumbnailUrl: row.thumbnail_url || null,
     language: row.language,
-    sortOrder: Number(row.sortOrder || 0),
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    topicCount: Number(row.topicCount || 0),
-    vocabularyCount: Number(row.vocabularyCount || 0),
+    sortOrder: Number(row.sort_order || 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    topicCount: Number(topicCount || 0),
+    vocabularyCount: Number(vocabularyCount || 0),
+  };
+}
+
+async function getCourseMetrics(courseIds) {
+  const admin = ensureSupabaseEnabled();
+  if (!courseIds.length) {
+    return new Map();
+  }
+
+  const topics = unwrapList(await admin
+    .from('topics')
+    .select('id, course_id')
+    .in('course_id', courseIds)
+    .is('owner_user_id', null));
+
+  const flashcards = topics.length
+    ? unwrapList(await admin.from('flashcards').select('id, topic_id').in('topic_id', topics.map((topic) => topic.id)))
+    : [];
+
+  const topicCountByCourseId = new Map();
+  const topicCourseMap = new Map();
+  topics.forEach((topic) => {
+    topicCountByCourseId.set(topic.course_id, (topicCountByCourseId.get(topic.course_id) || 0) + 1);
+    topicCourseMap.set(topic.id, topic.course_id);
+  });
+
+  const vocabCountByCourseId = new Map();
+  flashcards.forEach((flashcard) => {
+    const courseId = topicCourseMap.get(flashcard.topic_id);
+    if (courseId) {
+      vocabCountByCourseId.set(courseId, (vocabCountByCourseId.get(courseId) || 0) + 1);
+    }
+  });
+
+  return new Map(courseIds.map((courseId) => [courseId, {
+    topicCount: topicCountByCourseId.get(courseId) || 0,
+    vocabularyCount: vocabCountByCourseId.get(courseId) || 0,
+  }]));
+}
+
+async function listAdminCourses({ limit, offset, search }) {
+  const admin = ensureSupabaseEnabled();
+  let countQuery = admin
+    .from('courses')
+    .select('*', { count: 'exact', head: true })
+    .neq('slug', CUSTOM_TOPICS_COURSE_SLUG);
+
+  let query = admin
+    .from('courses')
+    .select('id, slug, title, description, thumbnail_url, language, sort_order, created_at, updated_at')
+    .neq('slug', CUSTOM_TOPICS_COURSE_SLUG)
+    .order('sort_order', { ascending: true })
+    .order('id', { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (search) {
+    const keyword = `%${search}%`;
+    countQuery = countQuery.or(`title.ilike.${keyword},slug.ilike.${keyword}`);
+    query = query.or(`title.ilike.${keyword},slug.ilike.${keyword}`);
+  }
+
+  const countResult = await countQuery;
+  const rows = unwrapList(await query);
+  const metrics = await getCourseMetrics(rows.map((row) => row.id));
+
+  return {
+    items: rows.map((row) => {
+      const metric = metrics.get(row.id) || {};
+      return mapAdminCourseRow(row, metric.topicCount, metric.vocabularyCount);
+    }),
+    total: Number(countResult.count || 0),
   };
 }
 
 async function getAdminCourseById(courseId) {
-  const [rows] = await pool.query(
-    `SELECT
-      c.id,
-      c.slug,
-      c.title,
-      c.description,
-      c.thumbnail_url AS thumbnailUrl,
-      c.language,
-      c.sort_order AS sortOrder,
-      c.created_at AS createdAt,
-      c.updated_at AS updatedAt,
-      COUNT(DISTINCT t.id) AS topicCount,
-      COUNT(f.id) AS vocabularyCount
-    FROM Courses c
-    LEFT JOIN Topics t ON t.course_id = c.id
-    LEFT JOIN Flashcards f ON f.topic_id = t.id
-    WHERE c.id = ?
-    GROUP BY
-      c.id,
-      c.slug,
-      c.title,
-      c.description,
-      c.thumbnail_url,
-      c.language,
-      c.sort_order,
-      c.created_at,
-      c.updated_at
-    LIMIT 1`,
-    [courseId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('courses')
+    .select('id, slug, title, description, thumbnail_url, language, sort_order, created_at, updated_at')
+    .eq('id', courseId)
+    .neq('slug', CUSTOM_TOPICS_COURSE_SLUG)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] ? mapAdminCourseRow(rows[0]) : null;
-}
-
-function mapAdminCourseExportTopicRow(row) {
-  return {
-    id: row.id,
-    courseId: row.courseId,
-    slug: row.slug,
-    title: row.title,
-    description: row.description,
-    sortOrder: Number(row.sortOrder || 0),
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-function mapAdminCourseExportFlashcardRow(row) {
-  return {
-    id: row.id,
-    topicId: row.topicId,
-    word: row.word,
-    transcription: row.transcription,
-    meaning: row.meaning,
-    wordType: row.wordType,
-    example: row.example,
-    exampleVi: row.exampleVi,
-    language: row.language || 'en',
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
+  if (!row) return null;
+  const metrics = await getCourseMetrics([row.id]);
+  const metric = metrics.get(row.id) || {};
+  return mapAdminCourseRow(row, metric.topicCount, metric.vocabularyCount);
 }
 
 async function getAdminCourseExportById(courseId) {
+  const admin = ensureSupabaseEnabled();
   const course = await getAdminCourseById(courseId);
   if (!course) return null;
 
-  const [topicRows] = await pool.query(
-    `SELECT
-      t.id,
-      t.course_id AS courseId,
-      t.slug,
-      t.title,
-      t.description,
-      t.sort_order AS sortOrder,
-      t.created_at AS createdAt,
-      t.updated_at AS updatedAt
-    FROM Topics t
-    WHERE t.course_id = ?
-      AND COALESCE(t.is_custom, 0) = 0
-    ORDER BY t.sort_order ASC, t.id ASC`,
-    [courseId]
-  );
-
-  const [flashcardRows] = await pool.query(
-    `SELECT
-      f.id,
-      f.topic_id AS topicId,
-      f.word,
-      f.transcription,
-      f.meaning,
-      f.word_type AS wordType,
-      f.example,
-      f.example_vi AS exampleVi,
-      f.language,
-      f.created_at AS createdAt,
-      f.updated_at AS updatedAt
-    FROM Flashcards f
-    INNER JOIN Topics t ON t.id = f.topic_id
-    WHERE t.course_id = ?
-      AND COALESCE(t.is_custom, 0) = 0
-    ORDER BY t.sort_order ASC, t.id ASC, f.word ASC, f.id ASC`,
-    [courseId]
-  );
+  const topics = await fetchTopicsWithVocabularyCounts(courseId);
+  const topicIds = topics.map((topic) => topic.id);
+  const flashcards = topicIds.length
+    ? unwrapList(await admin
+      .from('flashcards')
+      .select('id, topic_id, word, transcription, meaning, word_type, example, example_vi, language, created_at, updated_at')
+      .in('topic_id', topicIds)
+      .order('word', { ascending: true })
+      .order('id', { ascending: true }))
+    : [];
 
   return {
     ...course,
-    topics: topicRows.map(mapAdminCourseExportTopicRow),
-    flashcards: flashcardRows.map(mapAdminCourseExportFlashcardRow),
+    topics: topics.map((topic) => ({
+      id: topic.id,
+      courseId: topic.courseId,
+      slug: topic.slug,
+      title: topic.title,
+      description: topic.description,
+      sortOrder: Number(topic.sortOrder || 0),
+      createdAt: topic.createdAt,
+      updatedAt: topic.updatedAt,
+    })),
+    flashcards: flashcards.map((row) => ({
+      id: row.id,
+      topicId: row.topic_id,
+      word: row.word,
+      transcription: row.transcription,
+      meaning: row.meaning,
+      wordType: row.word_type,
+      example: row.example,
+      exampleVi: row.example_vi,
+      language: row.language || 'en',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    })),
   };
 }
 
 async function getAdminCourseBySlug(slug) {
-  const [rows] = await pool.query(
-    `SELECT id, slug
-     FROM Courses
-     WHERE slug = ?
-     LIMIT 1`,
-    [slug]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('courses')
+    .select('id, slug')
+    .eq('slug', slug)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] || null;
+  return row || null;
 }
 
 async function createAdminCourse({ slug, title, description, thumbnailUrl, language, sortOrder }) {
-  const [result] = await pool.query(
-    `INSERT INTO Courses (slug, title, description, thumbnail_url, language, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [slug, title, description, thumbnailUrl, language, sortOrder]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('courses')
+    .insert({
+      slug,
+      title,
+      description,
+      thumbnail_url: thumbnailUrl,
+      language,
+      sort_order: sortOrder,
+    })
+    .select('id')
+    .single());
 
-  return getAdminCourseById(result.insertId);
+  return getAdminCourseById(row.id);
 }
 
 async function updateAdminCourse(courseId, { slug, title, description, thumbnailUrl, language, sortOrder }) {
-  const [result] = await pool.query(
-    `UPDATE Courses
-     SET slug = ?, title = ?, description = ?, thumbnail_url = ?, language = ?, sort_order = ?
-     WHERE id = ?`,
-    [slug, title, description, thumbnailUrl, language, sortOrder, courseId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('courses')
+    .update({
+      slug,
+      title,
+      description,
+      thumbnail_url: thumbnailUrl,
+      language,
+      sort_order: sortOrder,
+    })
+    .eq('id', courseId)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 async function deleteAdminCourse(courseId) {
-  const [result] = await pool.query(
-    'DELETE FROM Courses WHERE id = ?',
-    [courseId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('courses')
+    .delete()
+    .eq('id', courseId)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 module.exports = {

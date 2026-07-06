@@ -1,364 +1,286 @@
-const pool = require('../db');
-let explanationColumnExistsPromise = null;
+const { ensureSupabaseEnabled, unwrapList, unwrapSingle } = require('../lib/supabaseData');
 
-async function hasToeicQuestionExplanationColumn() {
-  if (!explanationColumnExistsPromise) {
-    explanationColumnExistsPromise = pool.query(
-      `SELECT 1
-       FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE()
-         AND TABLE_NAME = 'Toeic_Questions'
-         AND COLUMN_NAME = 'explanation'
-       LIMIT 1`,
-    ).then(([rows]) => rows.length > 0)
-      .catch(() => false);
-  }
-
-  return explanationColumnExistsPromise;
-}
-
-async function getQuestionSelectExplanationSql() {
-  return (await hasToeicQuestionExplanationColumn())
-    ? 'q.explanation AS explanation,'
-    : 'NULL AS explanation,';
-}
-
-async function getQuestionInsertConfig() {
-  const hasExplanation = await hasToeicQuestionExplanationColumn();
-
-  if (hasExplanation) {
-    return {
-      columns: 'test_id, group_id, question_number, part, question_text, options, correct_answer, explanation, audio_url, image_url',
-      placeholders: '?, ?, ?, ?, ?, ?, ?, ?, ?, ?',
-      buildParams: ({ testId, groupId, questionNumber, part, questionText, options, correctAnswer, explanation, audioUrl, imageUrl }) => (
-        [testId, groupId, questionNumber, part, questionText, JSON.stringify(options), correctAnswer, explanation, audioUrl, imageUrl]
-      ),
-    };
-  }
-
-  return {
-    columns: 'test_id, group_id, question_number, part, question_text, options, correct_answer, audio_url, image_url',
-    placeholders: '?, ?, ?, ?, ?, ?, ?, ?, ?',
-    buildParams: ({ testId, groupId, questionNumber, part, questionText, options, correctAnswer, audioUrl, imageUrl }) => (
-      [testId, groupId, questionNumber, part, questionText, JSON.stringify(options), correctAnswer, audioUrl, imageUrl]
-    ),
-  };
-}
-
-async function getQuestionUpdateConfig() {
-  const hasExplanation = await hasToeicQuestionExplanationColumn();
-
-  if (hasExplanation) {
-    return {
-      setSql: 'group_id = ?, question_number = ?, part = ?, question_text = ?, options = ?, correct_answer = ?, explanation = ?, audio_url = ?, image_url = ?',
-      buildParams: ({ groupId, questionNumber, part, questionText, options, correctAnswer, explanation, audioUrl, imageUrl, questionId }) => (
-        [groupId, questionNumber, part, questionText, JSON.stringify(options), correctAnswer, explanation, audioUrl, imageUrl, questionId]
-      ),
-    };
-  }
-
-  return {
-    setSql: 'group_id = ?, question_number = ?, part = ?, question_text = ?, options = ?, correct_answer = ?, audio_url = ?, image_url = ?',
-    buildParams: ({ groupId, questionNumber, part, questionText, options, correctAnswer, audioUrl, imageUrl, questionId }) => (
-      [groupId, questionNumber, part, questionText, JSON.stringify(options), correctAnswer, audioUrl, imageUrl, questionId]
-    ),
-  };
-}
-
-function mapToeicTestRow(row) {
+function mapToeicTestRow(row, metrics = {}) {
   return {
     id: row.id,
     title: row.title,
     description: row.description || null,
-    createdAt: row.createdAt,
-    questionCount: Number(row.questionCount || 0),
-    groupCount: Number(row.groupCount || 0),
-    partsUsed: Number(row.partsUsed || 0),
+    createdAt: row.created_at,
+    questionCount: Number(metrics.questionCount || 0),
+    groupCount: Number(metrics.groupCount || 0),
+    partsUsed: Number(metrics.partsUsed || 0),
   };
 }
 
-function mapToeicGroupRow(row) {
+function mapToeicGroupRow(row, questionCount = 0) {
   return {
     id: row.id,
-    testId: row.testId,
+    testId: row.test_id,
     part: Number(row.part),
-    audioUrl: row.audioUrl || null,
-    imageUrl: row.imageUrl || null,
-    passageText: row.passageText || null,
-    questionCount: Number(row.questionCount || 0),
+    audioUrl: row.audio_url || null,
+    imageUrl: row.image_url || null,
+    passageText: row.passage_text || null,
+    questionCount: Number(questionCount || 0),
   };
 }
 
 function mapToeicQuestionRow(row) {
-  let options = row.options;
-  if (typeof options === 'string') {
-    try {
-      options = JSON.parse(options);
-    } catch {
-      options = {};
-    }
-  }
-
   return {
     id: row.id,
-    testId: row.testId,
-    groupId: row.groupId || null,
-    questionNumber: Number(row.questionNumber),
+    testId: row.test_id,
+    groupId: row.group_id || null,
+    questionNumber: Number(row.question_number),
     part: Number(row.part),
-    questionText: row.questionText || null,
-    options: options || {},
-    correctAnswer: row.correctAnswer,
+    questionText: row.question_text || null,
+    options: row.options || {},
+    correctAnswer: row.correct_answer,
     explanation: row.explanation || null,
-    audioUrl: row.audioUrl || null,
-    imageUrl: row.imageUrl || null,
+    audioUrl: row.audio_url || null,
+    imageUrl: row.image_url || null,
   };
 }
 
+async function getQuestionInsertConfig() {
+  return {
+    columns: 'test_id, group_id, question_number, part, question_text, options, correct_answer, explanation, audio_url, image_url',
+    placeholders: '',
+    buildParams: (payload) => payload,
+  };
+}
+
+async function getToeicMetrics(testIds) {
+  const admin = ensureSupabaseEnabled();
+  if (!testIds.length) return new Map();
+
+  const questions = unwrapList(await admin
+    .from('toeic_questions')
+    .select('id, test_id, part')
+    .in('test_id', testIds));
+  const groups = unwrapList(await admin
+    .from('toeic_question_groups')
+    .select('id, test_id')
+    .in('test_id', testIds));
+
+  const metrics = new Map(testIds.map((id) => [id, { questionCount: 0, groupCount: 0, parts: new Set() }]));
+  groups.forEach((group) => {
+    const entry = metrics.get(group.test_id);
+    if (entry) {
+      entry.groupCount += 1;
+    }
+  });
+  questions.forEach((question) => {
+    const entry = metrics.get(question.test_id);
+    if (entry) {
+      entry.questionCount += 1;
+      entry.parts.add(Number(question.part));
+    }
+  });
+
+  return new Map([...metrics.entries()].map(([testId, entry]) => [testId, {
+    questionCount: entry.questionCount,
+    groupCount: entry.groupCount,
+    partsUsed: entry.parts.size,
+  }]));
+}
+
 async function listAdminToeicTests({ limit, offset, search }) {
-  const whereClauses = [];
-  const params = [];
+  const admin = ensureSupabaseEnabled();
+  let countQuery = admin.from('toeic_tests').select('*', { count: 'exact', head: true });
+  let query = admin
+    .from('toeic_tests')
+    .select('id, title, description, created_at')
+    .order('id', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (search) {
-    whereClauses.push('(t.title LIKE ? OR t.description LIKE ?)');
     const keyword = `%${search}%`;
-    params.push(keyword, keyword);
+    countQuery = countQuery.or(`title.ilike.${keyword},description.ilike.${keyword}`);
+    query = query.or(`title.ilike.${keyword},description.ilike.${keyword}`);
   }
 
-  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-  const [countRows] = await pool.query(
-    `SELECT COUNT(*) AS total
-     FROM Toeic_Tests t
-     ${whereSql}`,
-    params,
-  );
-
-  const [rows] = await pool.query(
-    `SELECT
-      t.id,
-      t.title,
-      t.description,
-      t.created_at AS createdAt,
-      COUNT(DISTINCT q.id) AS questionCount,
-      COUNT(DISTINCT g.id) AS groupCount,
-      COUNT(DISTINCT q.part) AS partsUsed
-    FROM Toeic_Tests t
-    LEFT JOIN Toeic_Questions q ON q.test_id = t.id
-    LEFT JOIN Toeic_Question_Groups g ON g.test_id = t.id
-    ${whereSql}
-    GROUP BY t.id
-    ORDER BY t.id ASC
-    LIMIT ? OFFSET ?`,
-    [...params, limit, offset],
-  );
+  const countResult = await countQuery;
+  const rows = unwrapList(await query);
+  const metrics = await getToeicMetrics(rows.map((row) => row.id));
 
   return {
-    items: rows.map(mapToeicTestRow),
-    total: Number(countRows[0]?.total || 0),
+    items: rows.map((row) => mapToeicTestRow(row, metrics.get(row.id))),
+    total: Number(countResult.count || 0),
   };
 }
 
 async function getAdminToeicTestById(testId) {
-  const [rows] = await pool.query(
-    `SELECT
-      t.id,
-      t.title,
-      t.description,
-      t.created_at AS createdAt,
-      COUNT(DISTINCT q.id) AS questionCount,
-      COUNT(DISTINCT g.id) AS groupCount,
-      COUNT(DISTINCT q.part) AS partsUsed
-    FROM Toeic_Tests t
-    LEFT JOIN Toeic_Questions q ON q.test_id = t.id
-    LEFT JOIN Toeic_Question_Groups g ON g.test_id = t.id
-    WHERE t.id = ?
-    GROUP BY t.id
-    LIMIT 1`,
-    [testId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('toeic_tests')
+    .select('id, title, description, created_at')
+    .eq('id', testId)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] ? mapToeicTestRow(rows[0]) : null;
+  if (!row) return null;
+  const metrics = await getToeicMetrics([row.id]);
+  return mapToeicTestRow(row, metrics.get(row.id));
 }
 
 async function createAdminToeicTest({ title, description }) {
-  const [result] = await pool.query(
-    'INSERT INTO Toeic_Tests (title, description) VALUES (?, ?)',
-    [title, description],
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('toeic_tests')
+    .insert({ title, description })
+    .select('id')
+    .single());
 
-  return getAdminToeicTestById(result.insertId);
+  return getAdminToeicTestById(row.id);
 }
 
 async function updateAdminToeicTest(testId, { title, description }) {
-  await pool.query(
-    'UPDATE Toeic_Tests SET title = ?, description = ? WHERE id = ?',
-    [title, description, testId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('toeic_tests')
+    .update({ title, description })
+    .eq('id', testId)
+    .select('id');
+
+  return unwrapList(result).length > 0;
 }
 
 async function deleteAdminToeicTest(testId) {
-  const [result] = await pool.query(
-    'DELETE FROM Toeic_Tests WHERE id = ?',
-    [testId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('toeic_tests')
+    .delete()
+    .eq('id', testId)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 async function listAdminToeicGroupsByTestId(testId) {
-  const [rows] = await pool.query(
-    `SELECT
-      g.id,
-      g.test_id AS testId,
-      g.part,
-      g.audio_url AS audioUrl,
-      g.image_url AS imageUrl,
-      g.passage_text AS passageText,
-      COUNT(q.id) AS questionCount
-    FROM Toeic_Question_Groups g
-    LEFT JOIN Toeic_Questions q ON q.group_id = g.id
-    WHERE g.test_id = ?
-    GROUP BY g.id
-    ORDER BY g.part ASC, g.id ASC`,
-    [testId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const groups = unwrapList(await admin
+    .from('toeic_question_groups')
+    .select('id, test_id, part, audio_url, image_url, passage_text')
+    .eq('test_id', testId)
+    .order('part', { ascending: true })
+    .order('id', { ascending: true }));
 
-  return rows.map(mapToeicGroupRow);
+  const questions = groups.length
+    ? unwrapList(await admin.from('toeic_questions').select('id, group_id').in('group_id', groups.map((group) => group.id)))
+    : [];
+  const counts = new Map();
+  questions.forEach((question) => {
+    counts.set(question.group_id, (counts.get(question.group_id) || 0) + 1);
+  });
+
+  return groups.map((group) => mapToeicGroupRow(group, counts.get(group.id) || 0));
 }
 
 async function getAdminToeicGroupById(groupId) {
-  const [rows] = await pool.query(
-    `SELECT
-      g.id,
-      g.test_id AS testId,
-      g.part,
-      g.audio_url AS audioUrl,
-      g.image_url AS imageUrl,
-      g.passage_text AS passageText,
-      COUNT(q.id) AS questionCount
-    FROM Toeic_Question_Groups g
-    LEFT JOIN Toeic_Questions q ON q.group_id = g.id
-    WHERE g.id = ?
-    GROUP BY g.id
-    LIMIT 1`,
-    [groupId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('toeic_question_groups')
+    .select('id, test_id, part, audio_url, image_url, passage_text')
+    .eq('id', groupId)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] ? mapToeicGroupRow(rows[0]) : null;
+  if (!row) return null;
+  const questions = unwrapList(await admin.from('toeic_questions').select('id').eq('group_id', groupId));
+  return mapToeicGroupRow(row, questions.length);
 }
 
 async function createAdminToeicGroup({ testId, part, audioUrl, imageUrl, passageText }) {
-  const [result] = await pool.query(
-    `INSERT INTO Toeic_Question_Groups (test_id, part, audio_url, image_url, passage_text)
-     VALUES (?, ?, ?, ?, ?)`,
-    [testId, part, audioUrl, imageUrl, passageText],
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('toeic_question_groups')
+    .insert({
+      test_id: testId,
+      part,
+      audio_url: audioUrl,
+      image_url: imageUrl,
+      passage_text: passageText,
+    })
+    .select('id')
+    .single());
 
-  return getAdminToeicGroupById(result.insertId);
+  return getAdminToeicGroupById(row.id);
 }
 
 async function updateAdminToeicGroup(groupId, { part, audioUrl, imageUrl, passageText }) {
-  await pool.query(
-    `UPDATE Toeic_Question_Groups
-     SET part = ?, audio_url = ?, image_url = ?, passage_text = ?
-     WHERE id = ?`,
-    [part, audioUrl, imageUrl, passageText, groupId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('toeic_question_groups')
+    .update({
+      part,
+      audio_url: audioUrl,
+      image_url: imageUrl,
+      passage_text: passageText,
+    })
+    .eq('id', groupId)
+    .select('id');
+
+  return unwrapList(result).length > 0;
 }
 
 async function deleteAdminToeicGroup(groupId) {
-  const [result] = await pool.query(
-    'DELETE FROM Toeic_Question_Groups WHERE id = ?',
-    [groupId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('toeic_question_groups')
+    .delete()
+    .eq('id', groupId)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 async function listAdminToeicQuestionsByTestId({ testId, limit, offset, search, part, groupId }) {
-  const explanationSql = await getQuestionSelectExplanationSql();
-  const whereClauses = ['q.test_id = ?'];
-  const params = [testId];
+  const admin = ensureSupabaseEnabled();
+  let countQuery = admin
+    .from('toeic_questions')
+    .select('*', { count: 'exact', head: true })
+    .eq('test_id', testId);
+  let query = admin
+    .from('toeic_questions')
+    .select('id, test_id, group_id, question_number, part, question_text, options, correct_answer, explanation, audio_url, image_url')
+    .eq('test_id', testId)
+    .order('question_number', { ascending: true })
+    .order('id', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (search) {
-    whereClauses.push('(q.question_text LIKE ? OR t.title LIKE ?)');
     const keyword = `%${search}%`;
-    params.push(keyword, keyword);
+    countQuery = countQuery.ilike('question_text', keyword);
+    query = query.ilike('question_text', keyword);
   }
-
   if (part) {
-    whereClauses.push('q.part = ?');
-    params.push(part);
+    countQuery = countQuery.eq('part', part);
+    query = query.eq('part', part);
   }
-
-  if (groupId === null) {
-    // no-op
-  } else if (groupId === 'ungrouped') {
-    whereClauses.push('q.group_id IS NULL');
+  if (groupId === 'ungrouped') {
+    countQuery = countQuery.is('group_id', null);
+    query = query.is('group_id', null);
   } else if (groupId) {
-    whereClauses.push('q.group_id = ?');
-    params.push(groupId);
+    countQuery = countQuery.eq('group_id', groupId);
+    query = query.eq('group_id', groupId);
   }
 
-  const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
-
-  const [countRows] = await pool.query(
-    `SELECT COUNT(*) AS total
-     FROM Toeic_Questions q
-     JOIN Toeic_Tests t ON t.id = q.test_id
-     ${whereSql}`,
-    params,
-  );
-
-  const [rows] = await pool.query(
-    `SELECT
-      q.id,
-      q.test_id AS testId,
-      q.group_id AS groupId,
-      q.question_number AS questionNumber,
-      q.part,
-      q.question_text AS questionText,
-      q.options,
-      q.correct_answer AS correctAnswer,
-      ${explanationSql}
-      q.audio_url AS audioUrl,
-      q.image_url AS imageUrl
-    FROM Toeic_Questions q
-    JOIN Toeic_Tests t ON t.id = q.test_id
-    ${whereSql}
-    ORDER BY q.question_number ASC, q.id ASC
-    LIMIT ? OFFSET ?`,
-    [...params, limit, offset],
-  );
-
+  const countResult = await countQuery;
   return {
-    items: rows.map(mapToeicQuestionRow),
-    total: Number(countRows[0]?.total || 0),
+    items: unwrapList(await query).map(mapToeicQuestionRow),
+    total: Number(countResult.count || 0),
   };
 }
 
 async function getAdminToeicQuestionById(questionId) {
-  const explanationSql = await getQuestionSelectExplanationSql();
-  const [rows] = await pool.query(
-    `SELECT
-      id,
-      test_id AS testId,
-      group_id AS groupId,
-      question_number AS questionNumber,
-      part,
-      question_text AS questionText,
-      options,
-      correct_answer AS correctAnswer,
-      ${explanationSql.replaceAll('q.', '')}
-      audio_url AS audioUrl,
-      image_url AS imageUrl
-    FROM Toeic_Questions
-    WHERE id = ?
-    LIMIT 1`,
-    [questionId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('toeic_questions')
+    .select('id, test_id, group_id, question_number, part, question_text, options, correct_answer, explanation, audio_url, image_url')
+    .eq('id', questionId)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] ? mapToeicQuestionRow(rows[0]) : null;
+  return row ? mapToeicQuestionRow(row) : null;
 }
 
 async function createAdminToeicQuestion({
@@ -373,45 +295,69 @@ async function createAdminToeicQuestion({
   audioUrl,
   imageUrl,
 }) {
-  const insertConfig = await getQuestionInsertConfig();
-  const [result] = await pool.query(
-    `INSERT INTO Toeic_Questions (${insertConfig.columns})
-     VALUES (${insertConfig.placeholders})`,
-    insertConfig.buildParams({ testId, groupId, questionNumber, part, questionText, options, correctAnswer, explanation, audioUrl, imageUrl }),
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('toeic_questions')
+    .insert({
+      test_id: testId,
+      group_id: groupId,
+      question_number: questionNumber,
+      part,
+      question_text: questionText,
+      options,
+      correct_answer: correctAnswer,
+      explanation,
+      audio_url: audioUrl,
+      image_url: imageUrl,
+    })
+    .select('id')
+    .single());
 
-  return getAdminToeicQuestionById(result.insertId);
+  return getAdminToeicQuestionById(row.id);
 }
 
-async function updateAdminToeicQuestion(
-  questionId,
-  { groupId, questionNumber, part, questionText, options, correctAnswer, explanation, audioUrl, imageUrl },
-) {
-  const updateConfig = await getQuestionUpdateConfig();
-  await pool.query(
-    `UPDATE Toeic_Questions
-     SET ${updateConfig.setSql}
-     WHERE id = ?`,
-    updateConfig.buildParams({ groupId, questionNumber, part, questionText, options, correctAnswer, explanation, audioUrl, imageUrl, questionId }),
-  );
+async function updateAdminToeicQuestion(questionId, payload) {
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('toeic_questions')
+    .update({
+      group_id: payload.groupId,
+      question_number: payload.questionNumber,
+      part: payload.part,
+      question_text: payload.questionText,
+      options: payload.options,
+      correct_answer: payload.correctAnswer,
+      explanation: payload.explanation,
+      audio_url: payload.audioUrl,
+      image_url: payload.imageUrl,
+    })
+    .eq('id', questionId)
+    .select('id');
+
+  return unwrapList(result).length > 0;
 }
 
 async function deleteAdminToeicQuestion(questionId) {
-  const [result] = await pool.query(
-    'DELETE FROM Toeic_Questions WHERE id = ?',
-    [questionId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('toeic_questions')
+    .delete()
+    .eq('id', questionId)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 async function getMaxToeicQuestionNumber(testId) {
-  const [rows] = await pool.query(
-    'SELECT COALESCE(MAX(question_number), 0) AS maxQuestionNumber FROM Toeic_Questions WHERE test_id = ?',
-    [testId],
-  );
+  const admin = ensureSupabaseEnabled();
+  const rows = unwrapList(await admin
+    .from('toeic_questions')
+    .select('question_number')
+    .eq('test_id', testId)
+    .order('question_number', { ascending: false })
+    .limit(1));
 
-  return Number(rows[0]?.maxQuestionNumber || 0);
+  return Number(rows[0]?.question_number || 0);
 }
 
 module.exports = {

@@ -1,6 +1,4 @@
-const pool = require('../db');
-
-let vocabActivityTableReadyPromise = null;
+const { ensureSupabaseEnabled, unwrapSingle, resolveProfileId } = require('../lib/supabaseData');
 
 const ALLOWED_VOCAB_ACTIVITY_MODES = new Set([
   'flashcard',
@@ -12,23 +10,7 @@ const ALLOWED_VOCAB_ACTIVITY_MODES = new Set([
 ]);
 
 function ensureVocabActivityTable() {
-  if (!vocabActivityTableReadyPromise) {
-    vocabActivityTableReadyPromise = pool.query(`
-      CREATE TABLE IF NOT EXISTS Vocab_Activity_Logs (
-        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        mode VARCHAR(32) NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_vocab_activity_user
-          FOREIGN KEY (user_id) REFERENCES Users(id)
-          ON DELETE CASCADE,
-        INDEX idx_vocab_activity_user_created (user_id, created_at),
-        INDEX idx_vocab_activity_mode_created (mode, created_at)
-      )
-    `);
-  }
-
-  return vocabActivityTableReadyPromise;
+  return Promise.resolve();
 }
 
 function normalizeVocabActivityMode(mode) {
@@ -37,22 +19,23 @@ function normalizeVocabActivityMode(mode) {
 }
 
 async function createVocabActivityLog(userId, mode) {
-  await ensureVocabActivityTable();
-
   const normalizedMode = normalizeVocabActivityMode(mode);
-  if (!normalizedMode) {
-    return null;
-  }
+  if (!normalizedMode) return null;
 
-  const [result] = await pool.query(
-    `INSERT INTO Vocab_Activity_Logs (user_id, mode)
-     VALUES (?, ?)`,
-    [userId, normalizedMode]
-  );
+  const admin = ensureSupabaseEnabled();
+  const profileId = await resolveProfileId(userId);
+  const inserted = unwrapSingle(await admin
+    .from('vocab_activity_logs')
+    .insert({
+      user_id: profileId,
+      mode: normalizedMode,
+    })
+    .select('id')
+    .single());
 
   return {
-    id: result.insertId,
-    userId,
+    id: inserted.id,
+    userId: profileId,
     mode: normalizedMode,
   };
 }

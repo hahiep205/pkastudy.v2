@@ -8,7 +8,12 @@ const {
   deleteAdminCourse,
 } = require('../models/adminCourseModel');
 const { getAdminTopicBySlug } = require('../models/adminTopicModel');
-const pool = require('../db');
+const {
+  createAdminTopic,
+} = require('../models/adminTopicModel');
+const {
+  createAdminFlashcard,
+} = require('../models/adminFlashcardModel');
 const {
   parsePaginationQuery,
   parseSearchQuery,
@@ -332,58 +337,43 @@ async function importAdminCourseEntry(payload) {
     });
   }
 
-  const connection = await pool.getConnection();
+  let importedCourseId = null;
 
   try {
-    await connection.beginTransaction();
-
-    const [courseResult] = await connection.query(
-      `INSERT INTO Courses (slug, title, description, thumbnail_url, language, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        resolvedCourseSlug,
-        normalized.course.title,
-        normalized.course.description,
-        normalized.course.thumbnailUrl,
-        normalized.course.language,
-        normalized.course.sortOrder,
-      ]
-    );
+    const course = await createAdminCourse({
+      slug: resolvedCourseSlug,
+      title: normalized.course.title,
+      description: normalized.course.description,
+      thumbnailUrl: normalized.course.thumbnailUrl,
+      language: normalized.course.language,
+      sortOrder: normalized.course.sortOrder,
+    });
+    importedCourseId = course.id;
 
     for (const topic of resolvedTopics) {
-      const [topicResult] = await connection.query(
-        `INSERT INTO Topics (course_id, slug, title, description, sort_order)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          courseResult.insertId,
-          topic.slug,
-          topic.title,
-          topic.description,
-          topic.sortOrder,
-        ]
-      );
+      const createdTopic = await createAdminTopic({
+        courseId: importedCourseId,
+        slug: topic.slug,
+        title: topic.title,
+        description: topic.description,
+        sortOrder: topic.sortOrder,
+      });
 
       for (const flashcard of topic.flashcards) {
-        await connection.query(
-          `INSERT INTO Flashcards (topic_id, word, transcription, meaning, word_type, example, example_vi, language)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            topicResult.insertId,
-            flashcard.word,
-            flashcard.transcription,
-            flashcard.meaning,
-            flashcard.wordType,
-            flashcard.example,
-            flashcard.exampleVi,
-            flashcard.language,
-          ]
-        );
+        await createAdminFlashcard({
+          topicId: createdTopic.id,
+          word: flashcard.word,
+          transcription: flashcard.transcription,
+          meaning: flashcard.meaning,
+          wordType: flashcard.wordType,
+          example: flashcard.example,
+          exampleVi: flashcard.exampleVi,
+          language: flashcard.language,
+        });
       }
     }
 
-    await connection.commit();
-
-    const importedCourse = await getAdminCourseById(courseResult.insertId);
+    const importedCourse = await getAdminCourseById(importedCourseId);
     return {
       course: importedCourse,
       importedCounts: {
@@ -405,10 +395,10 @@ async function importAdminCourseEntry(payload) {
       },
     };
   } catch (error) {
-    await connection.rollback();
+    if (importedCourseId) {
+      await deleteAdminCourse(importedCourseId).catch(() => undefined);
+    }
     throw error;
-  } finally {
-    connection.release();
   }
 }
 

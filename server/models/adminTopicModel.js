@@ -1,4 +1,4 @@
-const pool = require('../db');
+const { ensureSupabaseEnabled, unwrapList, unwrapSingle, fetchTopicsWithVocabularyCounts } = require('../lib/supabaseData');
 
 function mapAdminTopicRow(row) {
   return {
@@ -15,216 +15,140 @@ function mapAdminTopicRow(row) {
 }
 
 async function listAdminTopicsByCourse({ courseId, limit, offset, search }) {
-  const whereClauses = ['t.course_id = ?', 'COALESCE(t.is_custom, 0) = 0'];
-  const whereParams = [courseId];
-
+  let items = await fetchTopicsWithVocabularyCounts(courseId);
   if (search) {
-    whereClauses.push('(t.title LIKE ? OR t.slug LIKE ?)');
-    const keyword = `%${search}%`;
-    whereParams.push(keyword, keyword);
+    const keyword = search.toLowerCase();
+    items = items.filter((topic) =>
+      String(topic.title || '').toLowerCase().includes(keyword)
+      || String(topic.slug || '').toLowerCase().includes(keyword));
   }
 
-  const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
-
-  const [countRows] = await pool.query(
-    `SELECT COUNT(*) AS total
-     FROM Topics t
-     ${whereSql}`,
-    whereParams
-  );
-
-  const [rows] = await pool.query(
-    `SELECT
-      t.id,
-      t.course_id AS courseId,
-      t.slug,
-      t.title,
-      t.description,
-      t.sort_order AS sortOrder,
-      t.created_at AS createdAt,
-      t.updated_at AS updatedAt,
-      COUNT(f.id) AS vocabularyCount
-    FROM Topics t
-    LEFT JOIN Flashcards f ON f.topic_id = t.id
-    ${whereSql}
-    GROUP BY
-      t.id,
-      t.course_id,
-      t.slug,
-      t.title,
-      t.description,
-      t.sort_order,
-      t.created_at,
-      t.updated_at
-    ORDER BY t.sort_order ASC, t.id ASC
-    LIMIT ? OFFSET ?`,
-    [...whereParams, limit, offset]
-  );
-
   return {
-    items: rows.map(mapAdminTopicRow),
-    total: Number(countRows[0]?.total || 0),
+    items: items.slice(offset, offset + limit).map(mapAdminTopicRow),
+    total: items.length,
   };
 }
 
 async function getAdminTopicById(topicId) {
-  const [rows] = await pool.query(
-    `SELECT
-      t.id,
-      t.course_id AS courseId,
-      t.slug,
-      t.title,
-      t.description,
-      t.sort_order AS sortOrder,
-      t.created_at AS createdAt,
-      t.updated_at AS updatedAt,
-      COUNT(f.id) AS vocabularyCount
-    FROM Topics t
-    LEFT JOIN Flashcards f ON f.topic_id = t.id
-    WHERE t.id = ?
-      AND COALESCE(t.is_custom, 0) = 0
-    GROUP BY
-      t.id,
-      t.course_id,
-      t.slug,
-      t.title,
-      t.description,
-      t.sort_order,
-      t.created_at,
-      t.updated_at
-    LIMIT 1`,
-    [topicId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('topics')
+    .select('id, course_id, slug, title, description, sort_order, created_at, updated_at, owner_user_id')
+    .eq('id', topicId)
+    .is('owner_user_id', null)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] ? mapAdminTopicRow(rows[0]) : null;
+  if (!row) return null;
+
+  const flashcards = unwrapList(await admin
+    .from('flashcards')
+    .select('id')
+    .eq('topic_id', topicId));
+
+  return mapAdminTopicRow({
+    id: row.id,
+    courseId: row.course_id,
+    slug: row.slug,
+    title: row.title,
+    description: row.description,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    vocabularyCount: flashcards.length,
+  });
 }
 
 async function getAdminTopicBySlug(slug) {
-  const [rows] = await pool.query(
-    `SELECT id, course_id AS courseId, slug
-     FROM Topics
-     WHERE slug = ?
-       AND COALESCE(is_custom, 0) = 0
-     LIMIT 1`,
-    [slug]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('topics')
+    .select('id, course_id, slug')
+    .eq('slug', slug)
+    .is('owner_user_id', null)
+    .limit(1)
+    .maybeSingle());
 
-  return rows[0] || null;
+  return row ? { id: row.id, courseId: row.course_id, slug: row.slug } : null;
 }
 
 async function countAdminTopicsByCourse(courseId) {
-  const [rows] = await pool.query(
-    `SELECT COUNT(*) AS total
-     FROM Topics
-     WHERE course_id = ?
-       AND COALESCE(is_custom, 0) = 0`,
-    [courseId]
-  );
-
-  return Number(rows[0]?.total || 0);
+  const topics = await fetchTopicsWithVocabularyCounts(courseId);
+  return topics.length;
 }
 
 async function createAdminTopic({ courseId, slug, title, description, sortOrder }) {
-  const [result] = await pool.query(
-    `INSERT INTO Topics (course_id, slug, title, description, sort_order)
-     VALUES (?, ?, ?, ?, ?)`,
-    [courseId, slug, title, description, sortOrder]
-  );
+  const admin = ensureSupabaseEnabled();
+  const row = unwrapSingle(await admin
+    .from('topics')
+    .insert({
+      course_id: courseId,
+      slug,
+      title,
+      description,
+      sort_order: sortOrder,
+    })
+    .select('id')
+    .single());
 
-  return getAdminTopicById(result.insertId);
+  return getAdminTopicById(row.id);
 }
 
 async function updateAdminTopic(topicId, { slug, title, description, sortOrder }) {
-  const [result] = await pool.query(
-    `UPDATE Topics
-     SET slug = ?, title = ?, description = ?, sort_order = ?
-     WHERE id = ?
-       AND COALESCE(is_custom, 0) = 0`,
-    [slug, title, description, sortOrder, topicId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('topics')
+    .update({
+      slug,
+      title,
+      description,
+      sort_order: sortOrder,
+    })
+    .eq('id', topicId)
+    .is('owner_user_id', null)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 async function deleteAdminTopic(topicId) {
-  const [result] = await pool.query(
-    `DELETE FROM Topics
-     WHERE id = ?
-       AND COALESCE(is_custom, 0) = 0`,
-    [topicId]
-  );
+  const admin = ensureSupabaseEnabled();
+  const result = await admin
+    .from('topics')
+    .delete()
+    .eq('id', topicId)
+    .is('owner_user_id', null)
+    .select('id');
 
-  return result.affectedRows > 0;
+  return unwrapList(result).length > 0;
 }
 
 async function reorderAdminTopics(courseId, items) {
-  const connection = await pool.getConnection();
+  const admin = ensureSupabaseEnabled();
+  const existing = unwrapList(await admin
+    .from('topics')
+    .select('id')
+    .eq('course_id', courseId)
+    .is('owner_user_id', null)
+    .in('id', items.map((item) => item.id)));
 
-  try {
-    await connection.beginTransaction();
-
-    const topicIds = items.map((item) => item.id);
-    const [rows] = await connection.query(
-      `SELECT id
-       FROM Topics
-       WHERE course_id = ?
-         AND COALESCE(is_custom, 0) = 0
-         AND id IN (?)`,
-      [courseId, topicIds]
-    );
-
-    if (rows.length !== items.length) {
-      throw Object.assign(new Error('One or more topics were not found in this course'), { status: 404 });
-    }
-
-    for (const item of items) {
-      await connection.query(
-        `UPDATE Topics
-         SET sort_order = ?
-         WHERE id = ?
-           AND course_id = ?
-           AND COALESCE(is_custom, 0) = 0`,
-        [item.sortOrder, item.id, courseId]
-      );
-    }
-
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
+  if (existing.length !== items.length) {
+    throw Object.assign(new Error('One or more topics were not found in this course'), { status: 404 });
   }
 
-  const [rows] = await pool.query(
-    `SELECT
-      t.id,
-      t.course_id AS courseId,
-      t.slug,
-      t.title,
-      t.description,
-      t.sort_order AS sortOrder,
-      t.created_at AS createdAt,
-      t.updated_at AS updatedAt,
-      COUNT(f.id) AS vocabularyCount
-    FROM Topics t
-    LEFT JOIN Flashcards f ON f.topic_id = t.id
-    WHERE t.course_id = ?
-      AND COALESCE(t.is_custom, 0) = 0
-    GROUP BY
-      t.id,
-      t.course_id,
-      t.slug,
-      t.title,
-      t.description,
-      t.sort_order,
-      t.created_at,
-      t.updated_at
-    ORDER BY t.sort_order ASC, t.id ASC`,
-    [courseId]
-  );
+  for (const item of items) {
+    const result = await admin
+      .from('topics')
+      .update({ sort_order: item.sortOrder })
+      .eq('id', item.id)
+      .eq('course_id', courseId)
+      .is('owner_user_id', null)
+      .select('id');
+    unwrapList(result);
+  }
 
-  return rows.map(mapAdminTopicRow);
+  const reordered = await fetchTopicsWithVocabularyCounts(courseId);
+  return reordered.map(mapAdminTopicRow);
 }
 
 module.exports = {

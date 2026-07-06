@@ -20,9 +20,7 @@ const {
   updateAdminToeicQuestion,
   deleteAdminToeicQuestion,
   getMaxToeicQuestionNumber,
-  getQuestionInsertConfig,
 } = require('../models/adminToeicModel');
-const pool = require('../db');
 
 function normalizeRequiredText(value, fieldName) {
   if (typeof value !== 'string' || !value.trim()) {
@@ -327,49 +325,43 @@ async function exportAdminToeicTestEntry(testId) {
 
 async function importAdminToeicTestEntry(payload) {
   const normalized = normalizeImportedToeicPayload(payload);
-  const connection = await pool.getConnection();
+  let importedTestId = null;
 
   try {
-    await connection.beginTransaction();
-
-    const [testResult] = await connection.query(
-      'INSERT INTO Toeic_Tests (title, description) VALUES (?, ?)',
-      [normalized.test.title, normalized.test.description],
-    );
+    const createdTest = await createAdminToeicTest({
+      title: normalized.test.title,
+      description: normalized.test.description,
+    });
+    importedTestId = createdTest.id;
 
     const groupIdByRef = new Map();
     for (const group of normalized.groups) {
-      const [groupResult] = await connection.query(
-        `INSERT INTO Toeic_Question_Groups (test_id, part, audio_url, image_url, passage_text)
-         VALUES (?, ?, ?, ?, ?)`,
-        [testResult.insertId, group.part, group.audioUrl, group.imageUrl, group.passageText],
-      );
-      groupIdByRef.set(group.groupRef, groupResult.insertId);
+      const createdGroup = await createAdminToeicGroup({
+        testId: importedTestId,
+        part: group.part,
+        audioUrl: group.audioUrl,
+        imageUrl: group.imageUrl,
+        passageText: group.passageText,
+      });
+      groupIdByRef.set(group.groupRef, createdGroup.id);
     }
 
-    const insertConfig = await getQuestionInsertConfig();
     for (const question of normalized.questions) {
-      await connection.query(
-        `INSERT INTO Toeic_Questions (${insertConfig.columns})
-         VALUES (${insertConfig.placeholders})`,
-        insertConfig.buildParams({
-          testId: testResult.insertId,
-          groupId: question.groupRef ? groupIdByRef.get(question.groupRef) || null : null,
-          questionNumber: question.questionNumber,
-          part: question.part,
-          questionText: question.questionText,
-          options: question.options,
-          correctAnswer: question.correctAnswer,
-          explanation: question.explanation,
-          audioUrl: question.audioUrl,
-          imageUrl: question.imageUrl,
-        }),
-      );
+      await createAdminToeicQuestion({
+        testId: importedTestId,
+        groupId: question.groupRef ? groupIdByRef.get(question.groupRef) || null : null,
+        questionNumber: question.questionNumber,
+        part: question.part,
+        questionText: question.questionText,
+        options: question.options,
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation,
+        audioUrl: question.audioUrl,
+        imageUrl: question.imageUrl,
+      });
     }
 
-    await connection.commit();
-
-    const importedTest = await fetchAdminToeicTest(testResult.insertId);
+    const importedTest = await fetchAdminToeicTest(importedTestId);
     return {
       test: importedTest,
       importedCounts: {
@@ -378,10 +370,10 @@ async function importAdminToeicTestEntry(payload) {
       },
     };
   } catch (error) {
-    await connection.rollback();
+    if (importedTestId) {
+      await deleteAdminToeicTest(importedTestId).catch(() => undefined);
+    }
     throw error;
-  } finally {
-    connection.release();
   }
 }
 
