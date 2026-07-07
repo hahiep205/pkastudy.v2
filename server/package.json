@@ -9,6 +9,7 @@
     "db:init": "node scripts/init-db.js",
     "seed:external-data": "node scripts/seed-external-data.js",
     "seed:users": "node scripts/create-users.js",
+    "seed:supabase": "node scripts/seed-supabase-production.js",
     "make-admin": "node scripts/make-admin.js",
     "supabase:ensure-storage": "node scripts/ensure-supabase-storage.js",
     "supabase:verify-schema": "node scripts/verify-supabase-schema.js",
