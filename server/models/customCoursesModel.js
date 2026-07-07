@@ -299,7 +299,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
     const inserted = unwrapSingle(await admin
       .from('topics')
       .insert(topicPayload)
-      .select('id, title, description, language, shared_from_topic_id')
+      .select('id, title, description, language, shared_from_topic_id, created_at, updated_at')
       .single());
 
     createdTopicId = inserted.id;
@@ -312,19 +312,35 @@ async function createCustomTopic(userId, { title, description, language, sharedT
         .eq('topic_id', sourceTopic.id)
         .order('id', { ascending: true }));
 
-      for (const word of sourceWords) {
-        const copiedWord = await addWordToCustomTopic(userId, inserted.id, {
+      if (sourceWords.length > 0) {
+        const copiedRows = sourceWords.map((word) => ({
+          topic_id: inserted.id,
           word: word.word,
-          transcription: word.transcription,
-          mean: word.meaning,
-          wordtype: word.word_type,
-          example: word.example,
-          example_vi: word.example_vi,
+          transcription: word.transcription || null,
+          meaning: word.meaning,
+          word_type: word.word_type || null,
+          example: word.example || null,
+          example_vi: word.example_vi || null,
           language: word.language || inserted.language || language || 'en',
+        }));
+
+        const insertedWords = unwrapList(await admin
+          .from('flashcards')
+          .insert(copiedRows)
+          .select('id, word, transcription, meaning, word_type, example, example_vi, language'));
+
+        insertedWords.forEach((word) => {
+          copiedWords.push({
+            id: word.id,
+            word: word.word,
+            transcription: word.transcription,
+            mean: word.meaning,
+            wordtype: word.word_type,
+            example: word.example,
+            example_vi: word.example_vi,
+            language: word.language || inserted.language || language || 'en',
+          });
         });
-        if (copiedWord) {
-          copiedWords.push(copiedWord);
-        }
       }
     }
 
@@ -380,9 +396,18 @@ async function ensureSamplePersonalTopicForUser(userId) {
       .select('id')
       .single());
 
-    for (const word of SAMPLE_PERSONAL_TOPIC_WORDS) {
-      await addWordToCustomTopic(userId, inserted.id, word);
-    }
+    unwrapList(await admin
+      .from('flashcards')
+      .insert(SAMPLE_PERSONAL_TOPIC_WORDS.map((word) => ({
+        topic_id: inserted.id,
+        word: word.word,
+        transcription: word.transcription || null,
+        meaning: word.mean,
+        word_type: word.wordtype || null,
+        example: word.example || null,
+        example_vi: word.example_vi || null,
+        language: word.language || 'en',
+      }))));
 
     return true;
   } catch (error) {

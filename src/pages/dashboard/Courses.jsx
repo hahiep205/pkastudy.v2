@@ -29,7 +29,7 @@ export default function Courses() {
     const [topicForm, setTopicForm] = useState({ title: '', description: '', lang: 'en', sharedTopicId: '' });
     const [toastMessage, setToastMessage] = useState('');
     const [pendingDeleteTopic, setPendingDeleteTopic] = useState(null);
-    const { customCourses, createTopic, updateTopic, deleteTopic } = useCustomCourses();
+    const { customCourses, loading: customCoursesLoading, createTopic, updateTopic, deleteTopic } = useCustomCourses();
     const { remembered } = useCourseProgress();
 
     const [courses, setCourses] = useState([]);
@@ -253,7 +253,11 @@ export default function Courses() {
                     </div>
 
                     <div className="doc-list" id="cv-custom-list">
-                        {customCourses.length === 0 ? (
+                        {customCoursesLoading ? (
+                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-text)' }}>
+                                Đang tải tài liệu cá nhân...
+                            </div>
+                        ) : customCourses.length === 0 ? (
                             <div
                                 className="cv-empty-state reveal revealed"
                                 style={{

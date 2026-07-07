@@ -14,7 +14,7 @@ export default function CourseTopics() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { remembered } = useCourseProgress();
-  const { customCourses, createTopic, updateTopic, deleteTopic } =
+  const { customCourses, loading: customCoursesLoading, createTopic, updateTopic, deleteTopic } =
     useCustomCourses();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTopic, setEditingTopic] = useState(null);
@@ -246,7 +246,18 @@ export default function CourseTopics() {
       ) : null}
 
       <div className="cv-topics-grid">
-        {topics.length === 0 && courseId === "custom" ? (
+        {courseId === "custom" && customCoursesLoading ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px",
+              color: "var(--gray-text)",
+              gridColumn: "1 / -1",
+            }}
+          >
+            Đang tải tài liệu cá nhân...
+          </div>
+        ) : topics.length === 0 && courseId === "custom" ? (
           <div
             style={{
               textAlign: "center",

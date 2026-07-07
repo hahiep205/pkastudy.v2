@@ -502,7 +502,7 @@ export default function TopicWords() {
   const { courseId: rawCourseId, topicId } = useParams();
   const { user } = useAuth();
   const { remembered, toggleWord, replaceRememberedInTopic } = useCourseProgress();
-  const { customCourses, addWordToTopic, updateWordInTopic, deleteWordFromTopic, addManyWordsToTopic, createTopic } = useCustomCourses();
+  const { customCourses, loading: customCoursesLoading, addWordToTopic, updateWordInTopic, deleteWordFromTopic, addManyWordsToTopic, createTopic } = useCustomCourses();
 
   const [isWordModalOpen, setWordModalOpen] = useState(false);
   const [editingWord, setEditingWord] = useState(null);
@@ -599,9 +599,10 @@ export default function TopicWords() {
   const words = isCustom
     ? topic?.words || []
     : (builtInStatus === 'success' && builtInWords.length > 0 ? builtInWords : builtInTopicWords);
+  const customTopicLoading = isCustom && customCoursesLoading && !topic;
 
   const topicError = isCustom
-    ? (!topic ? 'Chủ đề không tồn tại.' : '')
+    ? (customTopicLoading ? '' : (!topic ? 'Chủ đề không tồn tại.' : ''))
     : (courseLoading ? '' : (!course ? 'Topic không tồn tại.' : (!topic ? 'Chủ đề không tồn tại.' : '')));
 
   useEffect(() => {
@@ -647,6 +648,14 @@ export default function TopicWords() {
     return (
       <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--gray-light, #64748b)' }}>
         Đang tải thông tin...
+      </div>
+    );
+  }
+
+  if (customTopicLoading) {
+    return (
+      <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--gray-light, #64748b)' }}>
+        Đang tải chủ đề cá nhân...
       </div>
     );
   }
