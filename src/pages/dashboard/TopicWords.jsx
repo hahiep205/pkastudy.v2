@@ -502,7 +502,7 @@ export default function TopicWords() {
   const { courseId: rawCourseId, topicId } = useParams();
   const { user } = useAuth();
   const { remembered, toggleWord, replaceRememberedInTopic } = useCourseProgress();
-  const { customCourses, loading: customCoursesLoading, addWordToTopic, updateWordInTopic, deleteWordFromTopic, addManyWordsToTopic, createTopic } = useCustomCourses();
+  const { customCourses, loading: customCoursesLoading, ready: customCoursesReady, isTopicPreloading, addWordToTopic, updateWordInTopic, deleteWordFromTopic, addManyWordsToTopic, createTopic } = useCustomCourses();
 
   const [isWordModalOpen, setWordModalOpen] = useState(false);
   const [editingWord, setEditingWord] = useState(null);
@@ -599,7 +599,11 @@ export default function TopicWords() {
   const words = isCustom
     ? topic?.words || []
     : (builtInStatus === 'success' && builtInWords.length > 0 ? builtInWords : builtInTopicWords);
-  const customTopicLoading = isCustom && customCoursesLoading && !topic;
+  const customTopicLoading = isCustom && (
+    !customCoursesReady
+    || customCoursesLoading
+    || (isTopicPreloading(topicId) && (!topic || !topic.words?.length))
+  ) && !topic?.words?.length;
 
   const topicError = isCustom
     ? (customTopicLoading ? '' : (!topic ? 'Chủ đề không tồn tại.' : ''))

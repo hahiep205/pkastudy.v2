@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import ConfirmActionModal from "../../components/common/ConfirmActionModal";
+import ToastNotice from "../../components/common/ToastNotice";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import TopicFormModal from "../../components/customDocs/TopicFormModal";
 import { useAuth } from "../../contexts/useAuth";
@@ -14,7 +15,7 @@ export default function CourseTopics() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { remembered } = useCourseProgress();
-  const { customCourses, loading: customCoursesLoading, createTopic, updateTopic, deleteTopic } =
+  const { customCourses, loading: customCoursesLoading, preloadTopicDetail, createTopic, updateTopic, deleteTopic } =
     useCustomCourses();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTopic, setEditingTopic] = useState(null);
@@ -25,6 +26,8 @@ export default function CourseTopics() {
     sharedTopicId: "",
   });
   const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("error");
+  const [isSavingTopic, setIsSavingTopic] = useState(false);
   const [pendingDeleteTopic, setPendingDeleteTopic] = useState(null);
 
   const openTopicModal = (topicId = null) => {
@@ -50,21 +53,44 @@ export default function CourseTopics() {
   const handleSaveTopic = async () => {
     if (!topicForm.title.trim()) {
       setToastMessage("Vui lòng nhập tên chủ đề");
+      setToastType("error");
       return;
     }
 
-    const result = editingTopic
-      ? await updateTopic(editingTopic.id, topicForm)
-      : await createTopic(topicForm);
-    if (result?.error) {
-      setToastMessage(result.error);
-      return;
-    }
+    setIsSavingTopic(true);
+    try {
+      const isCopyCreate = !editingTopic && Boolean(String(topicForm.sharedTopicId || "").trim());
+      const result = editingTopic
+        ? await updateTopic(editingTopic.id, topicForm)
+        : await createTopic(topicForm);
+      if (result?.error) {
+        setToastMessage(result.error);
+        setToastType("error");
+        return;
+      }
 
-    setModalOpen(false);
-    setEditingTopic(null);
-    setTopicForm({ title: "", description: "", lang: "en", sharedTopicId: "" });
-    setToastMessage("");
+      const createdWordCount = Array.isArray(result?.words) ? result.words.length : 0;
+      if (editingTopic) {
+        setToastMessage(`Đã lưu thay đổi cho chủ đề "${topicForm.title.trim()}".`);
+        setToastType("success");
+      } else if (isCopyCreate) {
+        setToastMessage(
+          createdWordCount > 0
+            ? `Đã sao chép ${createdWordCount} từ và tạo chủ đề riêng "${topicForm.title.trim()}".`
+            : `Đã tạo chủ đề riêng "${topicForm.title.trim()}".`,
+        );
+        setToastType("success");
+      } else {
+        setToastMessage(`Đã tạo chủ đề "${topicForm.title.trim()}".`);
+        setToastType("success");
+      }
+
+      setModalOpen(false);
+      setEditingTopic(null);
+      setTopicForm({ title: "", description: "", lang: "en", sharedTopicId: "" });
+    } finally {
+      setIsSavingTopic(false);
+    }
   };
 
   const handleShareTopic = async (topic, event) => {
@@ -72,12 +98,14 @@ export default function CourseTopics() {
     const shareCode = String(topic.id || "").trim();
     if (!shareCode) {
       setToastMessage("Không lấy được mã chia sẻ.");
+      setToastType("error");
       return;
     }
 
     try {
       await navigator.clipboard.writeText(shareCode);
       setToastMessage(`Đã sao chép mã chia sẻ: ${shareCode}`);
+      setToastType("success");
     } catch {
       window.prompt("Sao chép mã chia sẻ này và gửi cho người khác:", shareCode);
     }
@@ -87,11 +115,17 @@ export default function CourseTopics() {
     const result = await deleteTopic(topicId);
     if (result?.error) {
       setToastMessage(result.error);
+      setToastType("error");
       return;
     }
 
     setPendingDeleteTopic(null);
     setToastMessage("Đã xóa chủ đề");
+    setToastType("success");
+  };
+
+  const handlePreloadTopic = (topicId) => {
+    void preloadTopicDetail(topicId);
   };
 
   const [courseTitle, setCourseTitle] = useState("");
@@ -216,6 +250,14 @@ export default function CourseTopics() {
       id="cv-topics-view"
       style={{ display: "flex", flexDirection: "column", gap: "20px" }}
     >
+      <ToastNotice
+        message={toastMessage}
+        type={toastType}
+        onHide={() => {
+          setToastMessage("");
+          setToastType("error");
+        }}
+      />
       <div className="cv-subview-header">
         <Link className="cv-breadcrumb-btn" to="/dashboard/courses">
           <svg
@@ -292,6 +334,10 @@ export default function CourseTopics() {
             <div
               key={topic.id}
               className="cv-topic-card reveal"
+              onMouseEnter={() => handlePreloadTopic(topic.id)}
+              onMouseDown={() => handlePreloadTopic(topic.id)}
+              onFocus={() => handlePreloadTopic(topic.id)}
+              onTouchStart={() => handlePreloadTopic(topic.id)}
               onClick={() =>
                 navigate(
                   `/dashboard/courses/${courseId}/topic/${topic.slug || topic.id}`,
@@ -400,13 +446,15 @@ export default function CourseTopics() {
         })}
       </div>
 
-      <TopicFormModal
+        <TopicFormModal
         isOpen={modalOpen}
         onClose={() => {
           setModalOpen(false);
           setEditingTopic(null);
           setTopicForm({ title: "", description: "", lang: "en", sharedTopicId: "" });
           setToastMessage("");
+          setToastType("error");
+          setIsSavingTopic(false);
         }}
         onSave={handleSaveTopic}
         topicForm={topicForm}
@@ -414,6 +462,7 @@ export default function CourseTopics() {
         editingTopic={editingTopic}
         toastMessage={toastMessage}
         onToastHide={() => setToastMessage("")}
+        isSaving={isSavingTopic}
       />
 
       <ConfirmActionModal

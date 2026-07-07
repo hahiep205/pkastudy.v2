@@ -94,6 +94,25 @@ async function withOwnershipColumnFallback(queries) {
   throw lastError;
 }
 
+async function getOwnedTopicById(admin, profileId, topicId) {
+  return withOwnershipColumnFallback([
+    async () => unwrapSingle(await admin
+      .from('topics')
+      .select('id, language')
+      .eq('id', topicId)
+      .eq('owner_user_id', profileId)
+      .limit(1)
+      .maybeSingle()),
+    async () => unwrapSingle(await admin
+      .from('topics')
+      .select('id, language')
+      .eq('id', topicId)
+      .eq('user_id', profileId)
+      .limit(1)
+      .maybeSingle()),
+  ]);
+}
+
 async function ensureCustomTopicsCourseId() {
   const admin = ensureSupabaseEnabled();
   const existing = unwrapSingle(await admin
@@ -421,6 +440,8 @@ async function ensureSamplePersonalTopicForUser(userId) {
 async function updateCustomTopic(userId, topicId, { title, description, language }) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
+  const topic = await getOwnedTopicById(admin, profileId, topicId);
+  if (!topic) return false;
   const payload = {
     title,
     description: description || null,
@@ -432,7 +453,6 @@ async function updateCustomTopic(userId, topicId, { title, description, language
     .from('topics')
     .update(payload)
     .eq('id', topicId)
-    .eq('owner_user_id', profileId)
     .select('id');
 
   return unwrapList(result).length > 0;
@@ -441,11 +461,12 @@ async function updateCustomTopic(userId, topicId, { title, description, language
 async function deleteCustomTopic(userId, topicId) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
+  const topic = await getOwnedTopicById(admin, profileId, topicId);
+  if (!topic) return false;
   const result = await admin
     .from('topics')
     .delete()
     .eq('id', topicId)
-    .eq('owner_user_id', profileId)
     .select('id');
 
   return unwrapList(result).length > 0;
@@ -454,13 +475,7 @@ async function deleteCustomTopic(userId, topicId) {
 async function addWordToCustomTopic(userId, topicId, wordData) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
-  const topic = unwrapSingle(await admin
-    .from('topics')
-    .select('id')
-    .eq('id', topicId)
-    .eq('owner_user_id', profileId)
-    .limit(1)
-    .maybeSingle());
+  const topic = await getOwnedTopicById(admin, profileId, topicId);
   if (!topic) return null;
 
   const { word, mean, transcription, wordtype, example, example_vi, language } = wordData;
@@ -485,13 +500,7 @@ async function addWordToCustomTopic(userId, topicId, wordData) {
 async function updateWordInCustomTopic(userId, topicId, wordId, wordData) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
-  const topic = unwrapSingle(await admin
-    .from('topics')
-    .select('id')
-    .eq('id', topicId)
-    .eq('owner_user_id', profileId)
-    .limit(1)
-    .maybeSingle());
+  const topic = await getOwnedTopicById(admin, profileId, topicId);
   if (!topic) return false;
 
   const { word, mean, transcription, wordtype, example, example_vi } = wordData;
@@ -515,13 +524,7 @@ async function updateWordInCustomTopic(userId, topicId, wordId, wordData) {
 async function deleteWordFromCustomTopic(userId, topicId, wordId) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
-  const topic = unwrapSingle(await admin
-    .from('topics')
-    .select('id')
-    .eq('id', topicId)
-    .eq('owner_user_id', profileId)
-    .limit(1)
-    .maybeSingle());
+  const topic = await getOwnedTopicById(admin, profileId, topicId);
   if (!topic) return false;
 
   const result = await admin

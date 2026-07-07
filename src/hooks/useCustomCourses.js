@@ -8,6 +8,7 @@ const customCoursesStore = {
   cacheByUserKey: new Map(),
   inflightByUserKey: new Map(),
   listenersByUserKey: new Map(),
+  topicDetailInflightByUserKey: new Map(),
 };
 
 const normalizeLanguage = (value, fallback = "en") => {
@@ -70,6 +71,19 @@ const setCachedCustomCourses = (userKey, topics) => {
   return topics;
 };
 
+const mergeCachedCustomTopic = (userKey, detailedTopic) => {
+  if (!detailedTopic?.id) return null;
+
+  const topicId = String(detailedTopic.id);
+  const current = getCachedCustomCourses(userKey);
+  const nextTopics = current.some((item) => item.id === topicId)
+    ? current.map((item) => (item.id === topicId ? { ...item, ...detailedTopic } : item))
+    : [detailedTopic, ...current];
+
+  setCachedCustomCourses(userKey, nextTopics);
+  return detailedTopic;
+};
+
 const patchCachedCustomCourses = (userKey, updater) => {
   const current = getCachedCustomCourses(userKey);
   const nextTopics = typeof updater === "function" ? updater(current) : updater;
@@ -125,11 +139,14 @@ const mapApiTopic = (apiTopic) => {
   };
 };
 
+const normalizeTopicId = (topicId) => String(topicId || "").trim();
+
 export function useCustomCourses() {
   const { user } = useAuth();
   const userKey = getCustomCoursesUserKey(user);
   const [customCourses, setCustomCourses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
   const isMountedRef = useRef(true);
 
   const loadFromServer = useCallback(async ({ force = false } = {}) => {
@@ -137,6 +154,7 @@ export function useCustomCourses() {
       if (isMountedRef.current) {
         setCustomCourses([]);
         setLoading(false);
+        setReady(true);
       }
       return [];
     }
@@ -146,6 +164,7 @@ export function useCustomCourses() {
       if (isMountedRef.current) {
         setCustomCourses(cachedTopics);
         setLoading(false);
+        setReady(true);
       }
       return cachedTopics;
     }
@@ -159,6 +178,7 @@ export function useCustomCourses() {
       if (isMountedRef.current) {
         setCustomCourses(getCachedCustomCourses(userKey));
         setLoading(false);
+        setReady(true);
       }
       return sharedResult;
     }
@@ -195,6 +215,7 @@ export function useCustomCourses() {
       }
       if (isMountedRef.current) {
         setLoading(false);
+        setReady(true);
       }
     }
   }, [user, userKey]);
@@ -204,8 +225,10 @@ export function useCustomCourses() {
     const cachedTopics = getCachedCustomCourses(userKey);
     if (cachedTopics.length) {
       setCustomCourses(cachedTopics);
+      setReady(true);
     } else if (!isAuthenticatedUser(user)) {
       setCustomCourses([]);
+      setReady(true);
     }
 
     const unsubscribe = subscribeCustomCourses(userKey, (topics) => {
@@ -432,6 +455,55 @@ export function useCustomCourses() {
     [customCourses, user, userKey],
   );
 
+  const preloadTopicDetail = useCallback(
+    async (topicId) => {
+      if (!isAuthenticatedUser(user) || !userKey) return null;
+
+      const normalizedTopicId = normalizeTopicId(topicId);
+      if (!normalizedTopicId) return null;
+
+      const cachedTopic = getCachedCustomCourses(userKey).find((topic) => topic.id === normalizedTopicId);
+      if (cachedTopic?.words?.length) {
+        return cachedTopic;
+      }
+
+      const inflightKey = `${userKey}:${normalizedTopicId}`;
+      const inflightMap = customCoursesStore.topicDetailInflightByUserKey;
+      const existingInflight = inflightMap.get(inflightKey);
+      if (existingInflight) return existingInflight;
+
+      const request = (async () => {
+        const res = await axiosClient.get(`/courses/custom/topics/${normalizedTopicId}`);
+        const mappedTopic = mapApiTopic(res?.data || res);
+        return mergeCachedCustomTopic(userKey, mappedTopic);
+      })();
+
+      inflightMap.set(inflightKey, request);
+
+      try {
+        return await request;
+      } catch (error) {
+        console.warn("[CustomCourses] Topic preload failed:", error?.message);
+        return null;
+      } finally {
+        if (inflightMap.get(inflightKey) === request) {
+          inflightMap.delete(inflightKey);
+        }
+      }
+    },
+    [user, userKey],
+  );
+
+  const isTopicPreloading = useCallback(
+    (topicId) => {
+      if (!isAuthenticatedUser(user) || !userKey) return false;
+      const normalizedTopicId = normalizeTopicId(topicId);
+      if (!normalizedTopicId) return false;
+      return customCoursesStore.topicDetailInflightByUserKey.has(`${userKey}:${normalizedTopicId}`);
+    },
+    [user, userKey],
+  );
+
   const addManyWordsToTopic = useCallback(
     async (topicId, wordArray) => {
       let added = 0;
@@ -449,12 +521,15 @@ export function useCustomCourses() {
   return {
     customCourses,
     loading: loading || (isAuthenticatedUser(user) && !getCustomCoursesCacheEntry(userKey) && customCourses.length === 0),
+    ready,
     createTopic,
     updateTopic,
     deleteTopic,
     addWordToTopic,
     updateWordInTopic,
     deleteWordFromTopic,
+    preloadTopicDetail,
+    isTopicPreloading,
     addManyWordsToTopic,
     refresh: () => loadFromServer({ force: true }),
   };

@@ -10,6 +10,7 @@ export default function TopicFormModal({
     editingTopic,
     toastMessage,
     onToastHide,
+    isSaving = false,
 }) {
     const languageOptions = [
         { value: 'en', label: 'Tiếng Anh' },
@@ -90,29 +91,28 @@ export default function TopicFormModal({
                     <div className="cv-form-row">
                         <div className="cv-form-group" style={{ flex: 1 }}>
                             <label className="cv-form-label">Bộ từ vựng được chia sẻ</label>
-                            <input
-                                className="cv-form-input"
-                                maxLength="120"
-                                placeholder="Dán ID bộ từ vựng được bạn bè chia sẻ"
-                                value={topicForm.sharedTopicId || ''}
-                                onChange={(event) => {
-                                    setTopicForm({ ...topicForm, sharedTopicId: event.target.value });
-                                    onToastHide?.();
-                                }}
-                            />
-                            <div className="cv-form-help" style={{ marginTop: '6px' }}>
-                                Để trống nếu tạo bộ mới hoàn toàn. Dán ID từ nút Share để sao chép toàn bộ từ vựng.
-                            </div>
-                        </div>
+                        <input
+                            className="cv-form-input"
+                            maxLength="120"
+                            placeholder="Dán ID bộ từ vựng được chia sẻ"
+                            value={topicForm.sharedTopicId || ''}
+                            onChange={(event) => {
+                                setTopicForm({ ...topicForm, sharedTopicId: event.target.value });
+                                onToastHide?.();
+                            }}
+                        />
                     </div>
+                </div>
                 ) : null}
             </div>
             <div className="cv-modal-footer cv-modal-footer-split">
-                <button className="btn btn-secondary" onClick={onClose}>
+                <button className="btn btn-secondary" onClick={onClose} disabled={isSaving}>
                     Hủy
                 </button>
-                <button className="btn btn-primary" onClick={onSave}>
-                    {editingTopic ? 'Lưu thay đổi' : 'Tạo chủ đề'}
+                <button className="btn btn-primary" onClick={onSave} disabled={isSaving}>
+                    {isSaving
+                        ? (editingTopic ? 'Đang lưu...' : (topicForm.sharedTopicId ? 'Đang sao chép...' : 'Đang tạo...'))
+                        : (editingTopic ? 'Lưu thay đổi' : (topicForm.sharedTopicId ? 'Sao chép & tạo chủ đề' : 'Tạo chủ đề'))}
                 </button>
             </div>
         </CustomModal>
