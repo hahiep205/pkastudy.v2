@@ -5,6 +5,12 @@ import { applyTheme, getSavedTheme } from '../../utils/theme';
 import axiosClient from '../../utils/axiosClient';
 import { getSettingsPreferences, setSettingsPreferences } from '../../utils/preferences';
 
+function safeText(value, fallback = '') {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return fallback;
+}
+
 const preferences = [
     {
         key: 'notifications',
@@ -39,6 +45,7 @@ const supportActions = [
 export default function Settings() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const displayName = safeText(user?.name, 'Guest User');
 
     const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [feedbackType, setFeedbackType] = useState('gop-y');
@@ -117,10 +124,10 @@ export default function Settings() {
         <main className="dash-main settings-page settings2-page" id="page-settings">
             <section className="settings2-hero reveal" data-reveal-order="0">
                 <div className="settings2-hero-main">
-                    <div className="settings2-avatar">{user?.name ? user.name.charAt(0).toUpperCase() : 'G'}</div>
+                    <div className="settings2-avatar">{displayName ? displayName.charAt(0).toUpperCase() : 'G'}</div>
                     <div className="settings2-copy">
                         <div className="settings2-kicker">Cài đặt tài khoản</div>
-                        <h1>{user?.name || 'Guest User'}</h1>
+                        <h1>{displayName}</h1>
                         <p>Tinh chỉnh trải nghiệm học tập, quản lý hỗ trợ và giữ giao diện đồng bộ, rõ ràng trên cả laptop lẫn mobile.</p>
                     </div>
                 </div>

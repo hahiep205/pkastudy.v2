@@ -13,6 +13,12 @@ export const guestUser = {
 
 export const AuthContext = createContext();
 
+function toSafeString(value, fallback = '') {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return fallback;
+}
+
 export function normalizeUser(user) {
     if (!user || typeof user !== 'object') {
         return guestUser;
@@ -22,12 +28,12 @@ export function normalizeUser(user) {
         id: user.id ?? null,
         profileId: user.profileId ?? null,
         authUserId: user.authUserId ?? null,
-        name: user.name || guestUser.name,
-        email: user.email || null,
-        role: user.role || 'user',
-        status: user.status || 'active',
+        name: toSafeString(user.name, guestUser.name) || guestUser.name,
+        email: toSafeString(user.email, '') || null,
+        role: toSafeString(user.role, 'user') || 'user',
+        status: toSafeString(user.status, 'active') || 'active',
         samplePersonalTopicSeededAt: user.samplePersonalTopicSeededAt || null,
-        token: user.token || null,
+        token: toSafeString(user.token, '') || null,
     };
 }
 

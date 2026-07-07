@@ -3,8 +3,15 @@ import { useAuth } from '../contexts/useAuth';
 import './landingPage/LandingPage.css';
 import '../assets/css/logined-page.css';
 
+function safeText(value, fallback = '') {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return fallback;
+}
+
 function WelcomeAvatar({ name }) {
-    const initial = (name || 'U').trim().charAt(0).toUpperCase();
+    const safeName = safeText(name, 'User');
+    const initial = safeName.trim().charAt(0).toUpperCase();
 
     return (
         <div className="logined-avatar" aria-hidden="true">
@@ -26,7 +33,7 @@ function ActionCard({ title, desc, to, cta, tone = 'blue' }) {
 export default function Logined() {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const name = user?.name || 'user';
+    const name = safeText(user?.name, 'user');
     const roleLabel = user?.role === 'admin' ? 'Quản trị viên' : 'Học viên';
 
     const handleOpenAI = () => {

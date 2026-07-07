@@ -4,6 +4,12 @@ import { useAuth } from '../../contexts/useAuth';
 
 const getNavClass = ({ isActive }) => `manager-nav-link ${isActive ? 'active' : ''}`;
 
+function safeText(value, fallback = '') {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return fallback;
+}
+
 const OVERVIEW_ICON = (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">
         <path d="M20 20C20 20.5523 19.5523 21 19 21H5C4.44772 21 4 20.5523 4 20V11L1 11L11.3273 1.6115C11.7087 1.26475 12.2913 1.26475 12.6727 1.6115L23 11L20 11V20ZM11 13V19H13V13H11Z"></path>
@@ -45,6 +51,8 @@ const managerNavItems = [
 export default function ManagerSidebar({ isOpen, onClose }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const displayName = safeText(user?.name, 'Quản trị viên');
+    const avatarInitial = displayName ? displayName.charAt(0).toUpperCase() : 'A';
 
     const handleLogout = () => {
         onClose?.();
@@ -78,11 +86,11 @@ export default function ManagerSidebar({ isOpen, onClose }) {
             <div className="manager-sidebar-footer">
                 <div className="manager-user-card">
                     <div className="manager-user-avatar">
-                        {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                        {avatarInitial}
                     </div>
                     <div className="manager-user-meta">
-                        <strong>{user?.name || 'Quản trị viên'}</strong>
-                        <span>{user?.email || 'Chưa có email'}</span>
+                        <strong>{displayName}</strong>
+                        <span>{safeText(user?.email, 'Chưa có email')}</span>
                         <small>{user?.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}</small>
                     </div>
                 </div>
