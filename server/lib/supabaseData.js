@@ -1,4 +1,4 @@
-const { supabaseAdmin } = require('../supabase');
+const { supabaseAdmin, getSupabaseAdminConfigError } = require('../supabase');
 
 function isUuid(value) {
   return typeof value === 'string'
@@ -6,6 +6,11 @@ function isUuid(value) {
 }
 
 function ensureSupabaseEnabled() {
+  const configError = typeof getSupabaseAdminConfigError === 'function' ? getSupabaseAdminConfigError() : null;
+  if (configError) {
+    throw configError;
+  }
+
   if (!supabaseAdmin) {
     const error = new Error('Supabase admin client is not configured.');
     error.status = 500;

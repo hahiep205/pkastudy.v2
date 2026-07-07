@@ -10,7 +10,7 @@ const {
 } = require('../models/userModel');
 const {
   ensureSamplePersonalTopicForUser,
-} = require('../models/customCoursesModel');
+} = require('../models/samplePersonalTopicModel');
 const { sendVerificationCodeEmail } = require('../services/emailService');
 const {
   createSupabaseAuthUser,

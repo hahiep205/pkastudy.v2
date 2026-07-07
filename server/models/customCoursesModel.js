@@ -269,7 +269,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
     if (resolvedSharedTopicId) {
       sourceTopic = unwrapSingle(await admin
         .from('topics')
-        .select('id, title, description, language')
+        .select('id, title, description, language, owner_user_id')
         .eq('id', resolvedSharedTopicId)
         .limit(1)
         .maybeSingle());

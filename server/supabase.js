@@ -14,8 +14,36 @@ const supabaseServiceRoleKey =
   '';
 const supabaseJwksUrl = process.env.SUPABASE_JWKS_URL || '';
 
+function isLikelyPublishableSupabaseKey(value) {
+  return typeof value === 'string' && value.trim().startsWith('sb_publishable_');
+}
+
+function getSupabaseAdminConfigError() {
+  if (!supabaseUrl) {
+    const error = new Error('SUPABASE_URL is not configured.');
+    error.status = 500;
+    return error;
+  }
+
+  if (!supabaseServiceRoleKey) {
+    const error = new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
+    error.status = 500;
+    return error;
+  }
+
+  if (isLikelyPublishableSupabaseKey(supabaseServiceRoleKey)) {
+    const error = new Error(
+      'SUPABASE_SERVICE_ROLE_KEY is set to a publishable key. Use the Supabase secret service_role key instead of the public sb_publishable_* key.',
+    );
+    error.status = 500;
+    return error;
+  }
+
+  return null;
+}
+
 const isSupabaseConfigured = Boolean(supabaseUrl && (supabaseAnonKey || supabaseServiceRoleKey));
-const hasSupabaseAdmin = Boolean(supabaseUrl && supabaseServiceRoleKey);
+const hasSupabaseAdmin = Boolean(supabaseUrl && supabaseServiceRoleKey && !isLikelyPublishableSupabaseKey(supabaseServiceRoleKey));
 // In production we always want to use Supabase when the admin client exists.
 // The old toggle-only behavior caused production to 500 when the flag was not
 // explicitly enabled even though the database was correctly configured.
@@ -184,6 +212,7 @@ module.exports = {
   supabaseAdmin,
   isSupabaseConfigured,
   hasSupabaseAdmin,
+  getSupabaseAdminConfigError,
   useSupabaseDb,
   supabaseUrl,
   supabaseAnonKey,
