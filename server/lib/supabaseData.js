@@ -1,4 +1,4 @@
-const { supabaseAdmin, useSupabaseDb, allowSupabaseDbFallback } = require('../supabase');
+const { supabaseAdmin } = require('../supabase');
 
 function isUuid(value) {
   return typeof value === 'string'
@@ -6,12 +6,6 @@ function isUuid(value) {
 }
 
 function ensureSupabaseEnabled() {
-  if (!useSupabaseDb) {
-    const error = new Error('Supabase DB mode is not enabled.');
-    error.status = 500;
-    throw error;
-  }
-
   if (!supabaseAdmin) {
     const error = new Error('Supabase admin client is not configured.');
     error.status = 500;
@@ -116,5 +110,4 @@ module.exports = {
   resolveProfileId,
   fetchTopicsWithVocabularyCounts,
   isUuid,
-  allowSupabaseDbFallback,
 };

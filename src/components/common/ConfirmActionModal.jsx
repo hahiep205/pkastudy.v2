@@ -1,5 +1,18 @@
 import CustomModal from '../customDocs/CustomModal';
 
+function normalizeMessage(message) {
+    if (typeof message === 'string') return message;
+    if (!message) return '';
+    if (typeof message?.message === 'string') return message.message;
+    if (typeof message?.error === 'string') return message.error;
+
+    try {
+        return JSON.stringify(message);
+    } catch {
+        return String(message);
+    }
+}
+
 export default function ConfirmActionModal({
     isOpen,
     onClose,
@@ -9,10 +22,12 @@ export default function ConfirmActionModal({
     confirmLabel = 'Xóa',
     cancelLabel = 'Hủy',
 }) {
+    const safeMessage = normalizeMessage(message);
+
     return (
         <CustomModal isOpen={isOpen} onClose={onClose} title={title}>
             <div className="cv-modal-body">
-                <p className="cv-confirm-copy">{message}</p>
+                <p className="cv-confirm-copy">{safeMessage}</p>
             </div>
             <div className="cv-modal-footer cv-modal-footer-split">
                 <button className="btn btn-secondary" type="button" onClick={onClose}>

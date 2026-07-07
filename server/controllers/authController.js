@@ -294,7 +294,12 @@ async function login(req, res, next) {
       return res.status(400).json({ error: signIn.error?.message || 'Invalid email or password' });
     }
 
-    const seededUser = await seedPersonalTopicIfNeeded(user);
+    let seededUser = user;
+    try {
+      seededUser = await seedPersonalTopicIfNeeded(user);
+    } catch (seedError) {
+      console.warn('Personal topic seed skipped during login:', seedError.message);
+    }
     return res.json(buildAuthPayload(seededUser, signIn.data.session.access_token));
   } catch (err) {
     return next(err);
@@ -326,7 +331,12 @@ async function exchangeSession(req, res, next) {
       return res.status(403).json({ error: 'Your account has been banned.' });
     }
 
-    const seededUser = await seedPersonalTopicIfNeeded(user);
+    let seededUser = user;
+    try {
+      seededUser = await seedPersonalTopicIfNeeded(user);
+    } catch (seedError) {
+      console.warn('Personal topic seed skipped during session exchange:', seedError.message);
+    }
     return res.json(buildAuthPayload(seededUser, value.accessToken));
   } catch (err) {
     return next(err);
@@ -358,7 +368,12 @@ async function googleLogin(req, res, next) {
       return res.status(403).json({ error: 'Your account has been banned.' });
     }
 
-    const seededUser = await seedPersonalTopicIfNeeded(user);
+    let seededUser = user;
+    try {
+      seededUser = await seedPersonalTopicIfNeeded(user);
+    } catch (seedError) {
+      console.warn('Personal topic seed skipped during Google login:', seedError.message);
+    }
     return res.json(buildAuthPayload(seededUser, value.accessToken));
   } catch (err) {
     return next(err);

@@ -7,6 +7,19 @@ const normalizeLanguage = (value, fallback = "en") => {
   return language || fallback;
 };
 
+const normalizeErrorMessage = (error, fallback) => {
+  if (!error) return fallback;
+  if (typeof error === "string") return error;
+  if (typeof error?.message === "string") return error.message;
+  if (typeof error?.error === "string") return error.error;
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return fallback;
+  }
+};
+
 const isAuthenticatedUser = (user) =>
   Boolean(user?.id || user?.profileId || user?.authUserId || user?.token);
 
@@ -101,7 +114,7 @@ export function useCustomCourses() {
         await loadFromServer();
         return mapApiTopic(createdTopic?.data || createdTopic);
       } catch (e) {
-        return { error: e?.response?.data?.error || "Tạo chủ đề thất bại." };
+        return { error: normalizeErrorMessage(e?.response?.data?.error, "Tạo chủ đề thất bại.") };
       }
     },
     [loadFromServer, user],
@@ -124,7 +137,7 @@ export function useCustomCourses() {
         await loadFromServer();
         return {};
       } catch (e) {
-        return { error: e?.response?.data?.error || "Cập nhật thất bại." };
+        return { error: normalizeErrorMessage(e?.response?.data?.error, "Cập nhật thất bại.") };
       }
     },
     [customCourses, loadFromServer, user],
@@ -143,7 +156,7 @@ export function useCustomCourses() {
         await loadFromServer();
         return {};
       } catch (e) {
-        return { error: e?.response?.data?.error || "Xóa chủ đề thất bại." };
+        return { error: normalizeErrorMessage(e?.response?.data?.error, "Xóa chủ đề thất bại.") };
       }
     },
     [customCourses, loadFromServer, user],
@@ -175,7 +188,7 @@ export function useCustomCourses() {
         await loadFromServer();
         return {};
       } catch (e) {
-        return { error: e?.response?.data?.error || "Thêm từ thất bại." };
+        return { error: normalizeErrorMessage(e?.response?.data?.error, "Thêm từ thất bại.") };
       }
     },
     [customCourses, loadFromServer, user],
@@ -199,7 +212,7 @@ export function useCustomCourses() {
         await loadFromServer();
         return {};
       } catch (e) {
-        return { error: e?.response?.data?.error || "Cập nhật từ thất bại." };
+        return { error: normalizeErrorMessage(e?.response?.data?.error, "Cập nhật từ thất bại.") };
       }
     },
     [customCourses, loadFromServer, user],
@@ -222,7 +235,7 @@ export function useCustomCourses() {
         await loadFromServer();
         return {};
       } catch (e) {
-        return { error: e?.response?.data?.error || "Xóa từ thất bại." };
+        return { error: normalizeErrorMessage(e?.response?.data?.error, "Xóa từ thất bại.") };
       }
     },
     [customCourses, loadFromServer, user],

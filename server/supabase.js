@@ -13,12 +13,13 @@ const supabaseServiceRoleKey =
   process.env.SUPABASE_SECRET_KEY ||
   '';
 const supabaseJwksUrl = process.env.SUPABASE_JWKS_URL || '';
-const shouldUseSupabaseDb = process.env.USE_SUPABASE_DB === 'true';
-const allowSupabaseDbFallback = process.env.SUPABASE_DB_FALLBACK !== 'false';
 
 const isSupabaseConfigured = Boolean(supabaseUrl && (supabaseAnonKey || supabaseServiceRoleKey));
 const hasSupabaseAdmin = Boolean(supabaseUrl && supabaseServiceRoleKey);
-const useSupabaseDb = shouldUseSupabaseDb && hasSupabaseAdmin;
+// In production we always want to use Supabase when the admin client exists.
+// The old toggle-only behavior caused production to 500 when the flag was not
+// explicitly enabled even though the database was correctly configured.
+const useSupabaseDb = hasSupabaseAdmin;
 
 const supabasePublic = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
@@ -184,7 +185,6 @@ module.exports = {
   isSupabaseConfigured,
   hasSupabaseAdmin,
   useSupabaseDb,
-  allowSupabaseDbFallback,
   supabaseUrl,
   supabaseAnonKey,
   getSupabaseIssuer,
