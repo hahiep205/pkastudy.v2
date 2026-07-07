@@ -509,13 +509,14 @@ async function addWordToCustomTopic(userId, topicId, wordData) {
   if (!topic) return null;
 
   const { word, mean, transcription, wordtype, example, example_vi, language } = wordData;
+  const normalizedMean = typeof mean === 'string' ? mean.trim() : '';
   const inserted = unwrapSingle(await admin
     .from('flashcards')
     .insert({
       topic_id: topicId,
       word,
       transcription: transcription || null,
-      meaning: mean,
+      meaning: normalizedMean || null,
       word_type: wordtype || null,
       example: example || null,
       example_vi: example_vi || null,
@@ -524,7 +525,7 @@ async function addWordToCustomTopic(userId, topicId, wordData) {
     .select('id')
     .single());
 
-  return { id: inserted.id, word, mean, transcription, wordtype, example, example_vi, language: language || 'en' };
+  return { id: inserted.id, word, mean: normalizedMean, transcription, wordtype, example, example_vi, language: language || 'en' };
 }
 
 async function updateWordInCustomTopic(userId, topicId, wordId, wordData) {
@@ -534,12 +535,13 @@ async function updateWordInCustomTopic(userId, topicId, wordId, wordData) {
   if (!topic) return false;
 
   const { word, mean, transcription, wordtype, example, example_vi } = wordData;
+  const normalizedMean = typeof mean === 'string' ? mean.trim() : '';
   const result = await admin
     .from('flashcards')
     .update({
       word,
       transcription: transcription || null,
-      meaning: mean,
+      meaning: normalizedMean || null,
       word_type: wordtype || null,
       example: example || null,
       example_vi: example_vi || null,

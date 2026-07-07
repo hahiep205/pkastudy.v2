@@ -3842,7 +3842,7 @@ body.app-dark-mode .toeic-cell-reading {
 /* --- Floating Vocab Button --- */
 .toeic-floating-vocab-btn {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + 2rem);
   right: 24px;
   width: 56px;
   height: 56px;
@@ -3868,6 +3868,13 @@ body.app-dark-mode .toeic-cell-reading {
 
 .toeic-floating-vocab-btn:active {
   transform: scale(0.95);
+}
+
+@media (max-width: 640px) {
+  .toeic-floating-vocab-btn {
+    bottom: calc(24px + 3rem);
+    right: 16px;
+  }
 }
 
 /* --- Vocab Form Inside Modal --- */

@@ -20,11 +20,6 @@ export default function WordModal({ isOpen, onClose, onSave, existingWord }) {
             return;
         }
 
-        if (!meaning.trim()) {
-            setToastMessage('Vui lòng nhập nghĩa!');
-            return;
-        }
-
         onSave({
             word: word.trim(),
             transcription: transcription.trim(),
@@ -68,11 +63,11 @@ export default function WordModal({ isOpen, onClose, onSave, existingWord }) {
                 <div className="cv-form-row">
                     <div className="cv-form-group">
                         <label className="cv-form-label">
-                            Nghĩa tiếng Việt <span style={{ color: 'var(--red)' }}>*</span>
+                            Nghĩa tiếng Việt
                         </label>
                         <input
                             className="cv-form-input"
-                            placeholder="lịch trình, thời gian biểu"
+                            placeholder="có thể để trống nếu chưa biết nghĩa"
                             value={meaning}
                             onChange={(event) => {
                                 setMeaning(event.target.value);

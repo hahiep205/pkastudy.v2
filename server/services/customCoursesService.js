@@ -55,8 +55,8 @@ async function deleteTopic(userId, topicId) {
 }
 
 async function addWord(userId, topicId, wordData) {
-  if (!wordData.word || !wordData.mean) {
-    throw Object.assign(new Error('word and mean are required'), { status: 400 });
+  if (!wordData.word || !wordData.word.trim()) {
+    throw Object.assign(new Error('word is required'), { status: 400 });
   }
   const result = await addWordToCustomTopic(userId, topicId, wordData);
   if (!result) throw Object.assign(new Error('Topic not found'), { status: 404 });
