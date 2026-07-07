@@ -7,7 +7,6 @@ import {
     readDashboardProgress,
     syncDashboardProgressWithServer,
 } from '../../utils/dashboardProgress';
-import { buildStatsLeaderboard } from '../../utils/userStats';
 import { syncXpWithServer } from '../../utils/xpSystem';
 import axiosClient from '../../utils/axiosClient';
 import { isAuthenticatedUser } from '../../utils/userStorage';
@@ -36,8 +35,7 @@ export default function Stats() {
                     : Array.isArray(res?.data)
                         ? res.data
                         : [];
-                const localFallback = buildStatsLeaderboard('exp', 5, serverLeaderboard);
-                setLeaderboard(serverLeaderboard.length > 0 ? serverLeaderboard : localFallback);
+                setLeaderboard(serverLeaderboard);
             })
             .catch(console.error);
 
@@ -189,7 +187,7 @@ export default function Stats() {
                     </header>
                     <div className="stats2-history">
                         {leaderboard.length === 0 ? (
-                            <div style={{ padding: '1rem', color: 'var(--text-light)' }}>Chưa có dữ liệu xếp hạng.</div>
+                            <div style={{ padding: '1rem', color: 'var(--text-light)' }}>Chưa có dữ liệu xếp hạng từ server.</div>
                         ) : leaderboard.map((entry, index) => (
                             <article key={entry.id} className="stats2-history-item">
                                 <div className="stats2-leader-main">

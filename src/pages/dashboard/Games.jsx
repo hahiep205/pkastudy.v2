@@ -163,7 +163,8 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
           id: topic.id,
           title: topic.title,
           source: 'Tài liệu của bạn',
-          lang: topic.lang || 'en',
+          lang: topic.language || topic.lang || 'en',
+          language: topic.language || topic.lang || 'en',
           words: topic.words,
         });
       }

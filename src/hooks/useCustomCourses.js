@@ -1,328 +1,81 @@
-/**
- * useCustomCourses - Custom (user-owned) topics & words
- *
- * Strategy:
- *  - If user is authenticated -> use backend API (source of truth)
- *  - Otherwise -> fall back to localStorage (guest mode)
- *  - On first load with API, migrate any existing localStorage data once
- */
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "../contexts/useAuth";
 import axiosClient from "../utils/axiosClient";
 
-const CUSTOM_KEY = "pka_custom_courses";
-const MIGRATED_KEY = "pka_custom_courses_migrated_v1";
-const DEFAULT_PERSONAL_TOPICS = [
-  {
-  title: "Bộ từ cá nhân 1",
-  description: "bộ từ cá nhân mẫu",
-  lang: "en",
-  words: [
-    {
-      word: "apple",
-      mean: "táo",
-      transcription: "/ˈæp.əl/",
-      wordtype: "noun",
-      example: "I eat an apple every day.",
-      example_vi: "Tôi ăn một quả táo mỗi ngày.",
-      language: "en",
-    },
-    {
-      word: "book",
-      mean: "sách",
-      transcription: "/bʊk/",
-      wordtype: "noun",
-      example: "This book is very helpful.",
-      example_vi: "Cuốn sách này rất hữu ích.",
-      language: "en",
-    },
-    {
-      word: "school",
-      mean: "trường học",
-      transcription: "/skuːl/",
-      wordtype: "noun",
-      example: "She goes to school by bus.",
-      example_vi: "Cô ấy đến trường bằng xe buýt.",
-      language: "en",
-    },
-    {
-      word: "friend",
-      mean: "bạn bè",
-      transcription: "/frend/",
-      wordtype: "noun",
-      example: "He is my best friend.",
-      example_vi: "Anh ấy là bạn thân nhất của tôi.",
-      language: "en",
-    },
-    {
-      word: "water",
-      mean: "nước",
-      transcription: "/ˈwɔː.tər/",
-      wordtype: "noun",
-      example: "Please drink more water.",
-      example_vi: "Hãy uống nhiều nước hơn.",
-      language: "en",
-    },
-  ],
-  },
-  {
-    title: "Bộ từ cá nhân 2",
-    description: "bộ từ cá nhân mẫu",
-    lang: "zh",
-    words: [
-      {
-        word: "你好",
-        mean: "xin chào",
-        transcription: "nǐ hǎo",
-        wordtype: "interjection",
-        example: "你好！",
-        example_vi: "Xin chào!",
-        language: "zh",
-      },
-      {
-        word: "谢谢",
-        mean: "cảm ơn",
-        transcription: "xiè xie",
-        wordtype: "interjection",
-        example: "谢谢你的帮助。",
-        example_vi: "Cảm ơn sự giúp đỡ của bạn.",
-        language: "zh",
-      },
-      {
-        word: "学习",
-        mean: "học tập",
-        transcription: "xué xí",
-        wordtype: "verb",
-        example: "我每天学习中文。",
-        example_vi: "Tôi học tiếng Trung mỗi ngày.",
-        language: "zh",
-      },
-      {
-        word: "朋友",
-        mean: "bạn bè",
-        transcription: "péng yǒu",
-        wordtype: "noun",
-        example: "他是我的朋友。",
-        example_vi: "Anh ấy là bạn của tôi.",
-        language: "zh",
-      },
-      {
-        word: "水",
-        mean: "nước",
-        transcription: "shuǐ",
-        wordtype: "noun",
-        example: "我想喝水。",
-        example_vi: "Tôi muốn uống nước.",
-        language: "zh",
-      },
-    ],
-  },
-];
-
-const getLocalCourses = () => {
-  try {
-    return JSON.parse(localStorage.getItem(CUSTOM_KEY)) || [];
-  } catch {
-    return [];
-  }
+const normalizeLanguage = (value, fallback = "en") => {
+  const language = String(value || "").trim().toLowerCase();
+  return language || fallback;
 };
 
-const saveLocalCourses = (courses) =>
-  localStorage.setItem(CUSTOM_KEY, JSON.stringify(courses));
+const isAuthenticatedUser = (user) =>
+  Boolean(user?.id || user?.profileId || user?.authUserId || user?.token);
 
-const createLocalId = (prefix) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
-const normalizeCourseTitle = (value) =>
-  String(value || "").trim().toLowerCase();
-
-const isDefaultPersonalCourse = (topic, seed) =>
-  normalizeCourseTitle(topic?.title) === normalizeCourseTitle(seed?.title);
-
-const buildDefaultPersonalCourse = (seed) => ({
-  id: createLocalId("custop"),
-  title: seed.title,
-  description: seed.description,
-  lang: seed.lang,
-  words: seed.words.map((word) => ({
-    id: createLocalId("cuswd"),
-    ...word,
-  })),
-});
-
-const ensureDefaultPersonalCourseLocal = () => {
-  const local = getLocalCourses();
-  const missingSeeds = DEFAULT_PERSONAL_TOPICS.filter(
-    (seed) => !local.some((topic) => isDefaultPersonalCourse(topic, seed)),
-  );
-  if (missingSeeds.length === 0) return local;
-  const updated = [...local, ...missingSeeds.map(buildDefaultPersonalCourse)];
-  saveLocalCourses(updated);
-  return updated;
+const mapApiWord = (word, topicLanguage = "en") => {
+  const language = normalizeLanguage(word?.language || word?.lang, topicLanguage);
+  return {
+    id: String(word.id),
+    _serverId: word.id,
+    word: word.word,
+    mean: word.mean || word.meaning,
+    transcription: word.transcription || "",
+    wordtype: word.wordtype || word.word_type || "",
+    example: word.example || "",
+    example_vi: word.example_vi || "",
+    language,
+  };
 };
 
-const createDefaultPersonalCourseOnServer = async (seed) => {
-  const createdTopic = await axiosClient.post("/courses/custom/topics", {
-    title: seed.title,
-    description: seed.description,
-    lang: seed.lang,
-  });
-  const topicId = createdTopic?.id || createdTopic?.data?.id;
-  if (!topicId) return;
-  for (const word of seed.words) {
-    await axiosClient.post(`/courses/custom/topics/${topicId}/words`, word);
-  }
-};
-
-function isLoggedIn() {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    return Boolean(user?.token || user?.id);
-  } catch {
-    return false;
-  }
-}
-
-function mapApiTopic(apiTopic) {
+const mapApiTopic = (apiTopic) => {
+  const language = normalizeLanguage(apiTopic?.language || apiTopic?.lang, "en");
   return {
     id: String(apiTopic.id),
     _serverId: apiTopic.id,
     title: apiTopic.title,
     description: apiTopic.description || "",
-    lang: apiTopic.lang || "en",
-    words: (apiTopic.words || []).map((w) => ({
-      id: String(w.id),
-      _serverId: w.id,
-      word: w.word,
-      mean: w.mean || w.meaning,
-      transcription: w.transcription || "",
-      wordtype: w.wordtype || w.word_type || "",
-      example: w.example || "",
-      example_vi: w.example_vi || "",
-      language: w.language || "en",
-    })),
-    word_count: apiTopic.word_count || 0,
+    lang: language,
+    language,
+    words: (apiTopic.words || []).map((word) => mapApiWord(word, language)),
+    word_count: apiTopic.word_count || apiTopic.words?.length || 0,
   };
-}
+};
 
 export function useCustomCourses() {
+  const { user } = useAuth();
   const [customCourses, setCustomCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const isMountedRef = useRef(true);
 
-  const migrateLocalToServer = useCallback(async (serverTopics) => {
-    if (localStorage.getItem(MIGRATED_KEY)) return;
-    const local = getLocalCourses();
-    if (local.length === 0) {
-      localStorage.setItem(MIGRATED_KEY, "1");
-      return;
-    }
-    if (serverTopics.length > 0) {
-      localStorage.setItem(MIGRATED_KEY, "1");
-      return;
-    }
-
-    console.log(
-      "[CustomCourses] Migrating localStorage topics to server...",
-      local.length,
-    );
-
-    for (const topic of local) {
-      try {
-        const res = await axiosClient.post("/courses/custom/topics", {
-          title: topic.title,
-          description: topic.description || "",
-          lang: topic.lang || "en",
-        });
-        const newTopicId = res?.id;
-        if (newTopicId && Array.isArray(topic.words)) {
-          for (const w of topic.words) {
-            try {
-              await axiosClient.post(
-                `/courses/custom/topics/${newTopicId}/words`,
-                {
-                  word: w.word,
-                  mean: w.mean || w.meaning,
-                  transcription: w.transcription,
-                  wordtype: w.wordtype,
-                  example: w.example,
-                  example_vi: w.example_vi,
-                  language: w.language || "en",
-                },
-              );
-            } catch (err) {
-              console.warn("Word migration failed:", w.word, err?.message);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("Topic migration failed:", topic.title, err?.message);
-      }
-    }
-
-    localStorage.setItem(MIGRATED_KEY, "1");
-    console.log("[CustomCourses] Migration done!");
-  }, []);
-
-  const ensureDefaultPersonalCourseServer = useCallback(
-    async (serverTopics) => {
-      const existingTopics = Array.isArray(serverTopics) ? serverTopics : [];
-      const missingSeeds = DEFAULT_PERSONAL_TOPICS.filter(
-        (seed) => !existingTopics.some((topic) => isDefaultPersonalCourse(topic, seed)),
-      );
-      if (missingSeeds.length === 0) return;
-      try {
-        for (const seed of missingSeeds) {
-          await createDefaultPersonalCourseOnServer(seed);
-        }
-      } catch (err) {
-        console.warn(
-          "[CustomCourses] Default personal course seed failed:",
-          err?.message,
-        );
-      }
-    },
-    [],
-  );
-
   const loadFromServer = useCallback(async () => {
+    if (!isAuthenticatedUser(user)) {
+      if (isMountedRef.current) {
+        setCustomCourses([]);
+        setLoading(false);
+      }
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await axiosClient.get("/courses/custom/topics");
       const topics = (Array.isArray(res) ? res : []).map(mapApiTopic);
-      if (isMountedRef.current) setCustomCourses(topics);
-      await migrateLocalToServer(topics);
-
-      const res2 = await axiosClient.get("/courses/custom/topics");
-      const topics2 = (Array.isArray(res2) ? res2 : []).map(mapApiTopic);
-      const missingSeeds = DEFAULT_PERSONAL_TOPICS.filter(
-        (seed) => !topics2.some((topic) => isDefaultPersonalCourse(topic, seed)),
-      );
-      if (isMountedRef.current && missingSeeds.length > 0) {
-        await ensureDefaultPersonalCourseServer(topics2);
-        const res3 = await axiosClient.get("/courses/custom/topics");
-        const topics3 = (Array.isArray(res3) ? res3 : []).map(mapApiTopic);
-        if (isMountedRef.current) setCustomCourses(topics3);
-        return;
+      if (isMountedRef.current) {
+        setCustomCourses(topics);
       }
-      if (isMountedRef.current) setCustomCourses(topics2);
     } catch (e) {
-      console.warn(
-        "[CustomCourses] API load failed, using localStorage:",
-        e?.message,
-      );
-      if (isMountedRef.current) setCustomCourses(ensureDefaultPersonalCourseLocal());
+      console.warn("[CustomCourses] API load failed:", e?.message);
+      if (isMountedRef.current) {
+        setCustomCourses([]);
+      }
     } finally {
-      if (isMountedRef.current) setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, [ensureDefaultPersonalCourseServer, migrateLocalToServer]);
+  }, [user]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (isLoggedIn()) {
-      loadFromServer();
-    } else {
-      setCustomCourses(ensureDefaultPersonalCourseLocal());
-    }
+    loadFromServer();
     return () => {
       isMountedRef.current = false;
     };
@@ -330,68 +83,41 @@ export function useCustomCourses() {
 
   const createTopic = useCallback(
     async ({ title, description, lang }) => {
-      if (!title?.trim()) return { error: "Tên chủ đề không được để trống." };
-      if (!isLoggedIn()) {
-        const local = getLocalCourses();
-        if (
-          local.some(
-            (t) => t.title.trim().toLowerCase() === title.trim().toLowerCase(),
-          )
-        ) {
-          return { error: "Tên chủ đề đã tồn tại." };
-        }
-        const newTopic = {
-          id: createLocalId("custop"),
-          title,
-          description,
-          lang: lang || "en",
-          words: [],
-        };
-        const updated = [...local, newTopic];
-        saveLocalCourses(updated);
-        setCustomCourses(updated);
-        return newTopic;
+      if (!title?.trim()) {
+        return { error: "Tên chủ đề không được để trống." };
       }
+      if (!isAuthenticatedUser(user)) {
+        return { error: "Bạn cần đăng nhập để tạo chủ đề." };
+      }
+
       try {
         const createdTopic = await axiosClient.post("/courses/custom/topics", {
           title: title.trim(),
           description,
-          lang,
+          lang: normalizeLanguage(lang, "en"),
         });
         await loadFromServer();
-        return mapApiTopic(
-          createdTopic?.data || createdTopic || {
-            id: createdTopic?.id,
-            title: title.trim(),
-            description,
-            words: [],
-          },
-        );
+        return mapApiTopic(createdTopic?.data || createdTopic);
       } catch (e) {
         return { error: e?.response?.data?.error || "Tạo chủ đề thất bại." };
       }
     },
-    [loadFromServer],
+    [loadFromServer, user],
   );
 
   const updateTopic = useCallback(
     async (topicId, { title, description, lang }) => {
-      if (!isLoggedIn()) {
-        const local = getLocalCourses();
-        const idx = local.findIndex((t) => t.id === topicId);
-        if (idx === -1) return { error: "Không tìm thấy chủ đề." };
-        local[idx] = { ...local[idx], title, description, lang };
-        saveLocalCourses(local);
-        setCustomCourses([...local]);
-        return local[idx];
+      if (!isAuthenticatedUser(user)) {
+        return { error: "Bạn cần đăng nhập để cập nhật chủ đề." };
       }
+
       try {
-        const t = customCourses.find((c) => c.id === String(topicId));
-        const serverId = t?._serverId || topicId;
+        const topic = customCourses.find((course) => course.id === String(topicId));
+        const serverId = topic?._serverId || topicId;
         await axiosClient.put(`/courses/custom/topics/${serverId}`, {
           title: title.trim(),
           description,
-          lang,
+          lang: normalizeLanguage(lang || topic?.lang, "en"),
         });
         await loadFromServer();
         return {};
@@ -399,144 +125,115 @@ export function useCustomCourses() {
         return { error: e?.response?.data?.error || "Cập nhật thất bại." };
       }
     },
-    [customCourses, loadFromServer],
+    [customCourses, loadFromServer, user],
   );
 
   const deleteTopic = useCallback(
     async (topicId) => {
-      if (!isLoggedIn()) {
-        const updated = getLocalCourses().filter((t) => t.id !== topicId);
-        saveLocalCourses(updated);
-        setCustomCourses(updated);
-        return;
+      if (!isAuthenticatedUser(user)) {
+        return { error: "Bạn cần đăng nhập để xóa chủ đề." };
       }
+
       try {
-        const t = customCourses.find((c) => c.id === String(topicId));
-        const serverId = t?._serverId || topicId;
+        const topic = customCourses.find((course) => course.id === String(topicId));
+        const serverId = topic?._serverId || topicId;
         await axiosClient.delete(`/courses/custom/topics/${serverId}`);
         await loadFromServer();
+        return {};
       } catch (e) {
-        console.error("[CustomCourses] deleteTopic failed:", e?.message);
+        return { error: e?.response?.data?.error || "Xóa chủ đề thất bại." };
       }
     },
-    [customCourses, loadFromServer],
+    [customCourses, loadFromServer, user],
   );
 
   const addWordToTopic = useCallback(
     async (topicId, wordData) => {
-      const normalizeLanguage = (value) => String(value || '').trim().toLowerCase();
-      const topicLanguage = (topic) => normalizeLanguage(topic?.lang || 'en');
-      const wordLanguage = normalizeLanguage(wordData?.language || wordData?.lang || '');
-      if (!isLoggedIn()) {
-        const local = getLocalCourses();
-        const topic = local.find((t) => t.id === topicId);
-        if (!topic) return { error: "Không tìm thấy chủ đề." };
-        const resolvedTopicLanguage = topicLanguage(topic);
-        const resolvedWordLanguage = wordLanguage || resolvedTopicLanguage;
-        if (resolvedWordLanguage && resolvedWordLanguage !== resolvedTopicLanguage) {
-          return { error: "Từ vựng không khớp ngôn ngữ của chủ đề." };
-        }
-        if (
-          topic.words.some(
-            (w) => w.word?.toLowerCase() === wordData.word?.toLowerCase(),
-          )
-        ) {
-          return {
-            error: `Từ "${wordData.word}" đã tồn tại trong chủ đề này.`,
-          };
-        }
-        topic.words.push({ id: createLocalId("cuswd"), ...wordData, language: resolvedWordLanguage || resolvedTopicLanguage });
-        saveLocalCourses(local);
-        setCustomCourses([...local]);
-        return {};
+      if (!isAuthenticatedUser(user)) {
+        return { error: "Bạn cần đăng nhập để thêm từ." };
       }
+
+      const topic = customCourses.find((course) => course.id === String(topicId));
+      if (!topic) {
+        return { error: "Không tìm thấy chủ đề." };
+      }
+
+      const topicLanguage = normalizeLanguage(topic.lang || topic.language, "en");
+      const wordLanguage = normalizeLanguage(wordData?.language || wordData?.lang, topicLanguage);
+      if (wordLanguage !== topicLanguage) {
+        return { error: "Từ vựng không khớp ngôn ngữ của chủ đề." };
+      }
+
       try {
-        const t = customCourses.find((c) => c.id === String(topicId));
-        const serverId = t?._serverId || topicId;
-        const resolvedTopicLanguage = topicLanguage(t);
-        const resolvedWordLanguage = wordLanguage || resolvedTopicLanguage;
-        if (resolvedWordLanguage && resolvedWordLanguage !== resolvedTopicLanguage) {
-          return { error: "Từ vựng không khớp ngôn ngữ của chủ đề." };
-        }
-        await axiosClient.post(
-          `/courses/custom/topics/${serverId}/words`,
-          { ...wordData, language: resolvedWordLanguage || resolvedTopicLanguage },
-        );
+        const serverId = topic._serverId || topicId;
+        await axiosClient.post(`/courses/custom/topics/${serverId}/words`, {
+          ...wordData,
+          language: topicLanguage,
+        });
         await loadFromServer();
         return {};
       } catch (e) {
         return { error: e?.response?.data?.error || "Thêm từ thất bại." };
       }
     },
-    [customCourses, loadFromServer],
+    [customCourses, loadFromServer, user],
   );
 
   const updateWordInTopic = useCallback(
     async (topicId, wordId, updates) => {
-      if (!isLoggedIn()) {
-        const local = getLocalCourses();
-        const topic = local.find((t) => t.id === topicId);
-        if (topic) {
-          const w = topic.words.find((x) => x.id === wordId);
-          if (w) Object.assign(w, updates);
-          saveLocalCourses(local);
-          setCustomCourses([...local]);
-        }
-        return;
+      if (!isAuthenticatedUser(user)) {
+        return { error: "Bạn cần đăng nhập để cập nhật từ." };
       }
+
       try {
-        const t = customCourses.find((c) => c.id === String(topicId));
-        const topicServerId = t?._serverId || topicId;
-        const word = t?.words?.find((w) => w.id === String(wordId));
-        const wordServerId = word?._serverId || wordId;
+        const topic = customCourses.find((course) => course.id === String(topicId));
+        const serverTopicId = topic?._serverId || topicId;
+        const word = topic?.words?.find((item) => item.id === String(wordId));
+        const serverWordId = word?._serverId || wordId;
         await axiosClient.put(
-          `/courses/custom/topics/${topicServerId}/words/${wordServerId}`,
+          `/courses/custom/topics/${serverTopicId}/words/${serverWordId}`,
           updates,
         );
         await loadFromServer();
+        return {};
       } catch (e) {
-        console.error("[CustomCourses] updateWord failed:", e?.message);
+        return { error: e?.response?.data?.error || "Cập nhật từ thất bại." };
       }
     },
-    [customCourses, loadFromServer],
+    [customCourses, loadFromServer, user],
   );
 
   const deleteWordFromTopic = useCallback(
     async (topicId, wordId) => {
-      if (!isLoggedIn()) {
-        const local = getLocalCourses();
-        const topic = local.find((t) => t.id === topicId);
-        if (topic) {
-          topic.words = topic.words.filter((w) => w.id !== wordId);
-          saveLocalCourses(local);
-          setCustomCourses([...local]);
-        }
-        return;
+      if (!isAuthenticatedUser(user)) {
+        return { error: "Bạn cần đăng nhập để xóa từ." };
       }
+
       try {
-        const t = customCourses.find((c) => c.id === String(topicId));
-        const topicServerId = t?._serverId || topicId;
-        const word = t?.words?.find((w) => w.id === String(wordId));
-        const wordServerId = word?._serverId || wordId;
+        const topic = customCourses.find((course) => course.id === String(topicId));
+        const serverTopicId = topic?._serverId || topicId;
+        const word = topic?.words?.find((item) => item.id === String(wordId));
+        const serverWordId = word?._serverId || wordId;
         await axiosClient.delete(
-          `/courses/custom/topics/${topicServerId}/words/${wordServerId}`,
+          `/courses/custom/topics/${serverTopicId}/words/${serverWordId}`,
         );
         await loadFromServer();
+        return {};
       } catch (e) {
-        console.error("[CustomCourses] deleteWord failed:", e?.message);
+        return { error: e?.response?.data?.error || "Xóa từ thất bại." };
       }
     },
-    [customCourses, loadFromServer],
+    [customCourses, loadFromServer, user],
   );
 
   const addManyWordsToTopic = useCallback(
     async (topicId, wordArray) => {
       let added = 0;
       let skipped = 0;
-      for (const w of wordArray) {
-        const result = await addWordToTopic(topicId, w);
-        if (result?.error) skipped++;
-        else added++;
+      for (const word of wordArray) {
+        const result = await addWordToTopic(topicId, word);
+        if (result?.error) skipped += 1;
+        else added += 1;
       }
       return { added, skipped };
     },

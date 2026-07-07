@@ -9,6 +9,11 @@ const {
   deleteWordFromCustomTopic,
 } = require('../models/customCoursesModel');
 
+function normalizeLanguage(value, fallback = 'en') {
+  const language = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return language || fallback;
+}
+
 async function fetchCustomTopics(userId) {
   return getCustomTopicsByUser(userId);
 }
@@ -23,14 +28,22 @@ async function createTopic(userId, data) {
   if (!data.title || !data.title.trim()) {
     throw Object.assign(new Error('Title is required'), { status: 400 });
   }
-  return createCustomTopic(userId, { ...data, title: data.title.trim() });
+  return createCustomTopic(userId, {
+    ...data,
+    title: data.title.trim(),
+    language: normalizeLanguage(data.lang || data.language, 'en'),
+  });
 }
 
 async function updateTopic(userId, topicId, data) {
   if (!data.title || !data.title.trim()) {
     throw Object.assign(new Error('Title is required'), { status: 400 });
   }
-  const ok = await updateCustomTopic(userId, topicId, { ...data, title: data.title.trim() });
+  const payload = { ...data, title: data.title.trim() };
+  if (data.lang || data.language) {
+    payload.language = normalizeLanguage(data.lang || data.language, 'en');
+  }
+  const ok = await updateCustomTopic(userId, topicId, payload);
   if (!ok) throw Object.assign(new Error('Topic not found'), { status: 404 });
 }
 

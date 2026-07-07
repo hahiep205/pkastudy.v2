@@ -592,7 +592,9 @@ export default function TopicWords() {
 
   const courseTitle = isCustom ? 'Tài liệu của bạn' : course?.courseTitle || course?.title || '';
   const topicTitle = topic?.title || '';
-  const topicLang = isCustom ? topic?.lang || 'en' : course?.lang || 'en';
+  const topicLang = isCustom
+    ? topic?.language || topic?.lang || 'en'
+    : course?.lang || 'en';
   const builtInTopicWords = !isCustom && topic ? (Array.isArray(topic.words) ? topic.words : []) : [];
   const words = isCustom
     ? topic?.words || []

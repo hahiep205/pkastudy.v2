@@ -35,7 +35,7 @@ export default function CourseTopics() {
       setTopicForm({
         title: topic?.title || "",
         description: topic?.description || "",
-        lang: topic?.lang || "en",
+        lang: topic?.language || topic?.lang || "en",
       });
     } else {
       setEditingTopic(null);
@@ -163,6 +163,8 @@ export default function CourseTopics() {
       id: topic.id,
       title: topic.title,
       description: topic.description || "Chủ đề tùy chỉnh",
+      lang: topic.language || topic.lang || "en",
+      language: topic.language || topic.lang || "en",
       words: topic.words,
     }));
   } else {

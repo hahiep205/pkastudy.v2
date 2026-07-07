@@ -101,7 +101,7 @@ export default function Courses() {
             setTopicForm({
                 title: topic.title,
                 description: topic.description,
-                lang: topic.lang || 'en',
+                lang: topic.language || topic.lang || 'en',
             });
         } else {
             setEditingTopic(null);
@@ -262,7 +262,7 @@ export default function Courses() {
                                             <div className="doc-meta-row">
                                                 <span className="doc-type-badge cv-custom-badge">Cá nhân</span>
                                                 <span className="doc-level">
-                                                    {languageLabels[topic.lang] || 'Ngôn ngữ'} · {progress.total} từ
+                                                    {languageLabels[topic.language || topic.lang] || 'Ngôn ngữ'} · {progress.total} từ
                                                 </span>
                                             </div>
                                             <h3 className="doc-name">{topic.title}</h3>

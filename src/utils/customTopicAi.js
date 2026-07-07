@@ -47,8 +47,13 @@ export const TOPIC_LANGUAGE_META = {
   },
 };
 
+function normalizeTopicLang(topicLang = 'en') {
+  return String(topicLang || 'en').trim().toLowerCase() || 'en';
+}
+
 export function getTopicLanguageMeta(topicLang = 'en') {
-  return TOPIC_LANGUAGE_META[topicLang] || TOPIC_LANGUAGE_META.en;
+  const normalized = normalizeTopicLang(topicLang);
+  return TOPIC_LANGUAGE_META[normalized] || TOPIC_LANGUAGE_META.en;
 }
 
 export function cleanText(value) {
@@ -110,7 +115,8 @@ export function collectVocabularyCandidatesFromText(rawText, topicLang = 'en', m
   const text = cleanText(rawText);
   if (!text) return [];
 
-  const languageMeta = getTopicLanguageMeta(topicLang);
+  const normalizedTopicLang = normalizeTopicLang(topicLang);
+  const languageMeta = getTopicLanguageMeta(normalizedTopicLang);
   const tokens = text.match(languageMeta.candidatePattern) || [];
   const counts = new Map();
   const firstSeen = new Map();
@@ -118,9 +124,9 @@ export function collectVocabularyCandidatesFromText(rawText, topicLang = 'en', m
   tokens.forEach((token, index) => {
     const normalized = token.toLowerCase().replace(/^'+|'+$/g, '');
     if (!normalized) return;
-    if (topicLang === 'en' && (normalized.length < 3 || STOPWORDS.has(normalized))) return;
-    if (topicLang !== 'en' && normalized.length < 1) return;
-    if (topicLang === 'en' && !/[a-z]/i.test(normalized)) return;
+    if (normalizedTopicLang === 'en' && (normalized.length < 3 || STOPWORDS.has(normalized))) return;
+    if (normalizedTopicLang !== 'en' && normalized.length < 1) return;
+    if (normalizedTopicLang === 'en' && !/[a-z]/i.test(normalized)) return;
     counts.set(normalized, (counts.get(normalized) || 0) + 1);
     if (!firstSeen.has(normalized)) firstSeen.set(normalized, index);
   });
@@ -148,7 +154,7 @@ export function buildSmartVocabularyPrompt({
   existingWords = [],
   maxPreviewWords = MAX_PREVIEW_WORDS,
 }) {
-  const languageMeta = getTopicLanguageMeta(topicLang);
+  const languageMeta = getTopicLanguageMeta(normalizeTopicLang(topicLang));
   const existingList = existingWords.slice(0, 40).map((word) => cleanText(word?.word)).filter(Boolean).join(', ');
   const candidateList = candidates.slice(0, 220).join(', ');
   const excerpt = cleanText(rawText).slice(0, 12000);

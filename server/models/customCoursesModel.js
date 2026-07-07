@@ -43,7 +43,7 @@ async function getCustomTopicsByUser(userId) {
 
   const topics = unwrapList(await admin
     .from('topics')
-    .select('id, title, description, created_at')
+    .select('id, title, description, language, created_at')
     .eq('owner_user_id', profileId)
     .order('created_at', { ascending: false }));
 
@@ -76,6 +76,7 @@ async function getCustomTopicsByUser(userId) {
     id: topic.id,
     title: topic.title,
     description: topic.description,
+    language: topic.language || 'en',
     created_at: topic.created_at,
     word_count: (wordsByTopicId.get(topic.id) || []).length,
     words: wordsByTopicId.get(topic.id) || [],
@@ -87,7 +88,7 @@ async function getCustomTopicWithWords(userId, topicId) {
   const profileId = await resolveProfileId(userId);
   const topic = unwrapSingle(await admin
     .from('topics')
-    .select('id, course_id, slug, title, description, sort_order, created_at, updated_at')
+    .select('id, course_id, slug, title, description, language, sort_order, created_at, updated_at')
     .eq('id', topicId)
     .eq('owner_user_id', profileId)
     .limit(1)
@@ -103,6 +104,7 @@ async function getCustomTopicWithWords(userId, topicId) {
 
   return {
     ...topic,
+    language: topic.language || 'en',
     words: words.map((word) => ({
       id: word.id,
       word: word.word,
@@ -116,7 +118,7 @@ async function getCustomTopicWithWords(userId, topicId) {
   };
 }
 
-async function createCustomTopic(userId, { title, description }) {
+async function createCustomTopic(userId, { title, description, language }) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
   const customCourseId = await ensureCustomTopicsCourseId();
@@ -126,24 +128,35 @@ async function createCustomTopic(userId, { title, description }) {
       course_id: customCourseId,
       title,
       description: description || null,
+      language: language || 'en',
       owner_user_id: profileId,
       sort_order: 0,
     })
-    .select('id, title, description')
+    .select('id, title, description, language')
     .single());
 
-  return { id: inserted.id, title: inserted.title, description: inserted.description, words: [] };
+  return {
+    id: inserted.id,
+    title: inserted.title,
+    description: inserted.description,
+    language: inserted.language || 'en',
+    words: [],
+  };
 }
 
-async function updateCustomTopic(userId, topicId, { title, description }) {
+async function updateCustomTopic(userId, topicId, { title, description, language }) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
+  const payload = {
+    title,
+    description: description || null,
+  };
+  if (language) {
+    payload.language = language;
+  }
   const result = await admin
     .from('topics')
-    .update({
-      title,
-      description: description || null,
-    })
+    .update(payload)
     .eq('id', topicId)
     .eq('owner_user_id', profileId)
     .select('id');
