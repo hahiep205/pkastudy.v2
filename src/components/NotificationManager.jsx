@@ -5,6 +5,7 @@ import { checkStreak } from '../utils/streakSystem';
 import { getDueCount } from '../utils/srsStorage';
 import { useAuth } from '../contexts/useAuth';
 import { isAuthenticatedUser } from '../utils/userStorage';
+import { isNotificationsEnabled, SETTINGS_CHANGE_EVENT } from '../utils/preferences';
 
 const overlay = { position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', animation: 'fadeIn .3s ease' };
 const card = { background: 'linear-gradient(135deg,#1a1a2e,#16213e)', borderRadius: 20, padding: '40px 32px', textAlign: 'center', maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.1)', animation: 'scaleIn .4s cubic-bezier(.22,1,.36,1)' };
@@ -142,6 +143,7 @@ export default function NotificationManager() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isGuestUser = !isAuthenticatedUser(user);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => isNotificationsEnabled());
   const [levelUp, setLevelUp] = useState(null);
   const [streakInfo, setStreakInfo] = useState(null);
   const [srsCount, setSrsCount] = useState(0);
@@ -167,6 +169,27 @@ export default function NotificationManager() {
     return () => clearTimeout(timer);
   }, [isGuestUser]);
 
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      setNotificationsEnabled(isNotificationsEnabled());
+    };
+
+    window.addEventListener(SETTINGS_CHANGE_EVENT, handleSettingsChange);
+    window.addEventListener('storage', handleSettingsChange);
+
+    return () => {
+      window.removeEventListener(SETTINGS_CHANGE_EVENT, handleSettingsChange);
+      window.removeEventListener('storage', handleSettingsChange);
+    };
+  }, [isGuestUser]);
+
+  useEffect(() => {
+    if (notificationsEnabled) return;
+    setLevelUp(null);
+    setStreakInfo(null);
+    setSrsCount(0);
+  }, [notificationsEnabled]);
+
   const closeLevelUp = () => {
     markLevelUpSeen();
     setLevelUp(null);
@@ -180,10 +203,14 @@ export default function NotificationManager() {
 
   return (
     <>
-      {levelUp && <LevelUpModal data={levelUp} onClose={closeLevelUp} />}
-      {streakInfo && !levelUp && <StreakModal streak={streakInfo.streak} lost={streakInfo.lost} onClose={closeStreak} />}
-      {srsCount > 0 && !levelUp && !streakInfo && (
-        <SrsToast count={srsCount} onClose={closeSrs} onReview={goReview} />
+      {!notificationsEnabled ? null : (
+        <>
+          {levelUp && <LevelUpModal data={levelUp} onClose={closeLevelUp} />}
+          {streakInfo && !levelUp && <StreakModal streak={streakInfo.streak} lost={streakInfo.lost} onClose={closeStreak} />}
+          {srsCount > 0 && !levelUp && !streakInfo && (
+            <SrsToast count={srsCount} onClose={closeSrs} onReview={goReview} />
+          )}
+        </>
       )}
     </>
   );

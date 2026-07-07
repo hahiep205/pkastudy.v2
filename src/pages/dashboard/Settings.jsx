@@ -3,29 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/useAuth';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
 import axiosClient from '../../utils/axiosClient';
-
-const SETTINGS_STORAGE_KEY = 'pka_settings_preferences_v1';
-
-function getInitialPreferences() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)) || {};
-        return {
-            notifications: saved.notifications ?? true,
-            darkMode: getSavedTheme() === 'dark',
-        };
-    } catch {
-        return {
-            notifications: true,
-            darkMode: getSavedTheme() === 'dark',
-        };
-    }
-}
-
-function persistPreferences(preferences) {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({
-        notifications: preferences.notifications,
-    }));
-}
+import { getSettingsPreferences, setSettingsPreferences } from '../../utils/preferences';
 
 const preferences = [
     {
@@ -67,7 +45,10 @@ export default function Settings() {
     const [feedbackTitle, setFeedbackTitle] = useState('');
     const [feedbackContent, setFeedbackContent] = useState('');
     const [submitState, setSubmitState] = useState('idle');
-    const [toggles, setToggles] = useState(getInitialPreferences);
+    const [toggles, setToggles] = useState(() => ({
+        ...getSettingsPreferences(),
+        darkMode: getSavedTheme() === 'dark',
+    }));
 
     useEffect(() => {
         document.body.style.overflow = feedbackOpen ? 'hidden' : '';
@@ -77,8 +58,8 @@ export default function Settings() {
     }, [feedbackOpen]);
 
     useEffect(() => {
-        persistPreferences(toggles);
-    }, [toggles]);
+        setSettingsPreferences({ notifications: toggles.notifications });
+    }, [toggles.notifications]);
 
     const handleLogout = () => {
         logout();

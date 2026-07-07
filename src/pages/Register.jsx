@@ -18,12 +18,12 @@ export default function Register() {
         setSuccessMessage('');
 
         if (!name.trim() || !email.trim() || !password.trim()) {
-            setErrorMessage('Vui long nhap day du thong tin.');
+            setErrorMessage('Vui lòng nhập đầy đủ thông tin.');
             return;
         }
 
         if (password !== confirmPassword) {
-            setErrorMessage('Mat khau xac nhan khong khop.');
+            setErrorMessage('Mật khẩu xác nhận không khớp.');
             return;
         }
 
@@ -44,10 +44,10 @@ export default function Register() {
                 throw error;
             }
 
-            setSuccessMessage('Da tao tai khoan. Vui long kiem tra email de xac minh neu can.');
+            setSuccessMessage('Đã tạo tài khoản. Vui lòng kiểm tra email để xác minh nếu cần.');
             setTimeout(() => navigate('/login'), 1000);
         } catch (error) {
-            setErrorMessage(error.message || 'Dang ky that bai');
+            setErrorMessage(error.message || 'Đăng ký thất bại');
         } finally {
             setLoading(false);
         }
@@ -58,21 +58,21 @@ export default function Register() {
             <div className="auth-container">
                 <div className="auth-sidebar">
                     <div className="auth-sidebar-content">
-                        <h2 className="sidebar-title">Hoc ngoai ngu<br />Mien phi. Thong minh.</h2>
-                        <p className="sidebar-subtitle">Luu tien trinh, hoc voi AI va ket noi cong dong.</p>
+                        <h2 className="sidebar-title">Học ngoại ngữ<br />Miễn phí. Thông minh.</h2>
+                        <p className="sidebar-subtitle">Lưu tiến trình, học với AI và kết nối cộng đồng.</p>
 
                         <ul className="modern-benefits-list">
-                            <li><span className="b-icon">+</span> 100% Mien phi tron doi</li>
-                            <li><span className="b-icon">+</span> Tro ly AI ho tro 24/7</li>
-                            <li><span className="b-icon">+</span> Ca nhan hoa lo trinh hoc</li>
+                            <li><span className="b-icon">+</span> 100% Miễn phí trọn đời</li>
+                            <li><span className="b-icon">+</span> Trợ lý AI hỗ trợ 24/7</li>
+                            <li><span className="b-icon">+</span> Cá nhân hóa lộ trình học</li>
                         </ul>
                     </div>
                 </div>
 
                 <div className="auth-main">
                     <div className="auth-form-header">
-                        <h1 className="be-vietnam-pro-extrabold">Dang ky ngay</h1>
-                        <p>Chao mung ban! Vui long nhap thong tin de bat dau.</p>
+                        <h1 className="be-vietnam-pro-extrabold">Đăng ký ngay</h1>
+                        <p>Chào mừng bạn! Vui lòng nhập thông tin để bắt đầu.</p>
                     </div>
 
                     <form className="modern-form" onSubmit={(e) => e.preventDefault()}>
@@ -85,7 +85,7 @@ export default function Register() {
                                 placeholder=" "
                                 required
                             />
-                            <label htmlFor="name">Ho va ten</label>
+                            <label htmlFor="name">Họ và tên</label>
                         </div>
 
                         <div className="form-floating">
@@ -110,7 +110,7 @@ export default function Register() {
                                     placeholder=" "
                                     required
                                 />
-                                <label htmlFor="password">Mat khau</label>
+                                <label htmlFor="password">Mật khẩu</label>
                             </div>
                             <div className="form-floating">
                                 <input
@@ -121,7 +121,7 @@ export default function Register() {
                                     placeholder=" "
                                     required
                                 />
-                                <label htmlFor="confirmPassword">Xac nhan mat khau</label>
+                                <label htmlFor="confirmPassword">Xác nhận mật khẩu</label>
                             </div>
                         </div>
 
@@ -134,14 +134,14 @@ export default function Register() {
                             onClick={handleRegister}
                             disabled={loading}
                         >
-                            {loading ? <span className="spinner"></span> : 'Tao tai khoan Pkastudy'}
+                            {loading ? <span className="spinner"></span> : 'Tạo tài khoản Pkastudy'}
                         </button>
                     </form>
 
                     <div className="auth-form-footer">
-                        <p>Da co tai khoan? <Link to="/login" className="text-link-bold">Dang nhap</Link></p>
+                        <p>Đã có tài khoản? <Link to="/login" className="text-link-bold">Đăng nhập</Link></p>
                         <p className="legal-text">
-                            Bang viec dang ky, ban dong y voi <a href="#" className="text-link">Dieu khoan dich vu</a> va <a href="#" className="text-link">Chinh sach bao mat</a>.
+                            Bằng việc đăng ký, bạn đồng ý với <a href="#" className="text-link">Điều khoản dịch vụ</a> và <a href="#" className="text-link">Chính sách bảo mật</a>.
                         </p>
                     </div>
                 </div>

@@ -64,25 +64,42 @@ async function updateXPAndLevel(userId, xpToAdd) {
 
 async function getLeaderboard(limit = 10) {
   const admin = ensureSupabaseEnabled();
+  const profiles = unwrapList(await admin
+    .from('profiles')
+    .select('id, legacy_user_id, name, status, created_at')
+    .neq('status', 'banned')
+    .order('legacy_user_id', { ascending: true })
+    .order('created_at', { ascending: true }));
+
+  if (!profiles.length) {
+    return [];
+  }
+
   const progressRows = unwrapList(await admin
     .from('user_progress')
     .select('user_id, current_xp, level, current_streak, updated_at')
-    .order('current_xp', { ascending: false })
-    .limit(limit));
+    .in('user_id', profiles.map((profile) => profile.id)));
 
-  const profiles = progressRows.length
-    ? unwrapList(await admin.from('profiles').select('id, name, legacy_user_id').in('id', progressRows.map((row) => row.user_id)))
-    : [];
-  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+  const progressMap = new Map(progressRows.map((row) => [row.user_id, row]));
+  const entries = profiles.map((profile) => {
+    const progress = progressMap.get(profile.id);
+    return {
+      id: profile.legacy_user_id || profile.id,
+      name: profile.name || 'User',
+      score: progress?.current_xp || 0,
+      level: progress?.level || 1,
+      current_streak: progress?.current_streak || 0,
+      updated_at: progress?.updated_at || profile.created_at,
+    };
+  });
 
-  return progressRows.map((row) => ({
-    id: profileMap.get(row.user_id)?.legacy_user_id || row.user_id,
-    name: profileMap.get(row.user_id)?.name || 'User',
-    score: row.current_xp,
-    level: row.level,
-    current_streak: row.current_streak,
-    updated_at: row.updated_at,
-  }));
+  return entries
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.level !== a.level) return b.level - a.level;
+      return String(a.name).localeCompare(String(b.name));
+    })
+    .slice(0, limit);
 }
 
 module.exports = {

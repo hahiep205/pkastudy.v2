@@ -112,11 +112,11 @@ export default function WordDetailOverlay({
                     </div>
                 </div>
                 <div className="cv-modal-footer cv-modal-footer-split">
-                    <button className="cv-ask-ai-btn" type="button" onClick={() => onAskAI(word)}>
+                    <button className="cv-ask-ai-btn" type="button" onClick={() => onAskAI?.(word)}>
                         ✨ Hỏi AI chi tiết về từ này
                     </button>
                     {showAddBtn && (
-                        <button className="cv-add-to-my-btn" type="button" onClick={() => onAdd(word)}>
+                        <button className="cv-add-to-my-btn" type="button" onClick={() => onAdd?.(word)}>
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
                                 <path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z" />
                             </svg>

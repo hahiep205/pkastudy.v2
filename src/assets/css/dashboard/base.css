@@ -274,9 +274,9 @@ button {
 
 
 .btn-primary {
-    background: #ffffff;
+    background: var(--blue);
     color: #fff;
-    border: 2px solid var(--border-color);
+    border: none;
     box-shadow: 0 4px 0 var(--blue-shadow);
 }
 
