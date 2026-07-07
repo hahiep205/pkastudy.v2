@@ -1,4 +1,4 @@
-import { getExpressApp } from '../../../../_getApp.js';
+import { getExpressApp } from '../../../_getApp.js';
 
 const app = getExpressApp();
 
