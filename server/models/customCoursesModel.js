@@ -137,10 +137,10 @@ async function selectCustomTopicList(admin, profileId) {
     .order('created_at', { ascending: false });
 
   const queries = [
-    () => unwrapList(buildQuery('id, slug, title, description, language, shared_from_topic_id, created_at', 'owner_user_id')),
-    () => unwrapList(buildQuery('id, slug, title, description, language, shared_from_topic_id, created_at', 'user_id')),
-    () => unwrapList(buildQuery('id, slug, title, description, language, created_at', 'owner_user_id')),
-    () => unwrapList(buildQuery('id, slug, title, description, language, created_at', 'user_id')),
+    async () => unwrapList(await buildQuery('id, slug, title, description, language, shared_from_topic_id, created_at', 'owner_user_id')),
+    async () => unwrapList(await buildQuery('id, slug, title, description, language, shared_from_topic_id, created_at', 'user_id')),
+    async () => unwrapList(await buildQuery('id, slug, title, description, language, created_at', 'owner_user_id')),
+    async () => unwrapList(await buildQuery('id, slug, title, description, language, created_at', 'user_id')),
   ];
 
   return withOwnershipColumnFallback(queries);
