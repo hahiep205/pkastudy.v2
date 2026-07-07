@@ -128,6 +128,16 @@ async function ensureLocalUser({ email, name }) {
   return user;
 }
 
+async function seedPersonalTopicIfNeeded(user) {
+  if (!user?.profileId || user.samplePersonalTopicSeededAt) {
+    return user;
+  }
+
+  await ensureSamplePersonalTopicForUser(user.profileId);
+  const updated = await markSamplePersonalTopicSeeded(user.profileId);
+  return updated || user;
+}
+
 async function getIdentityFromAccessToken(accessToken) {
   if (!supabaseAdmin) {
     const error = new Error('Supabase admin client is not configured.');
@@ -284,7 +294,8 @@ async function login(req, res, next) {
       return res.status(400).json({ error: signIn.error?.message || 'Invalid email or password' });
     }
 
-    return res.json(buildAuthPayload(user, signIn.data.session.access_token));
+    const seededUser = await seedPersonalTopicIfNeeded(user);
+    return res.json(buildAuthPayload(seededUser, signIn.data.session.access_token));
   } catch (err) {
     return next(err);
   }
@@ -315,7 +326,8 @@ async function exchangeSession(req, res, next) {
       return res.status(403).json({ error: 'Your account has been banned.' });
     }
 
-    return res.json(buildAuthPayload(user, value.accessToken));
+    const seededUser = await seedPersonalTopicIfNeeded(user);
+    return res.json(buildAuthPayload(seededUser, value.accessToken));
   } catch (err) {
     return next(err);
   }
@@ -346,7 +358,8 @@ async function googleLogin(req, res, next) {
       return res.status(403).json({ error: 'Your account has been banned.' });
     }
 
-    return res.json(buildAuthPayload(user, value.accessToken));
+    const seededUser = await seedPersonalTopicIfNeeded(user);
+    return res.json(buildAuthPayload(seededUser, value.accessToken));
   } catch (err) {
     return next(err);
   }

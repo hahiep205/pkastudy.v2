@@ -87,15 +87,61 @@ async function ensureCustomTopicsCourseId() {
   return inserted.id;
 }
 
+async function selectCustomTopicList(admin, profileId) {
+  const baseQuery = admin
+    .from('topics')
+    .select('id, slug, title, description, language, created_at')
+    .eq('owner_user_id', profileId)
+    .order('created_at', { ascending: false });
+
+  const withSharedQuery = admin
+    .from('topics')
+    .select('id, slug, title, description, language, shared_from_topic_id, created_at')
+    .eq('owner_user_id', profileId)
+    .order('created_at', { ascending: false });
+
+  try {
+    return unwrapList(await withSharedQuery);
+  } catch (error) {
+    if (String(error?.message || '').toLowerCase().includes('shared_from_topic_id')) {
+      return unwrapList(await baseQuery);
+    }
+    throw error;
+  }
+}
+
+async function selectCustomTopicDetail(admin, profileId, topicId) {
+  const baseQuery = admin
+    .from('topics')
+    .select('id, course_id, slug, title, description, language, sort_order, created_at, updated_at')
+    .eq('id', topicId)
+    .eq('owner_user_id', profileId)
+    .limit(1)
+    .maybeSingle();
+
+  const withSharedQuery = admin
+    .from('topics')
+    .select('id, course_id, slug, title, description, language, shared_from_topic_id, sort_order, created_at, updated_at')
+    .eq('id', topicId)
+    .eq('owner_user_id', profileId)
+    .limit(1)
+    .maybeSingle();
+
+  try {
+    return unwrapSingle(await withSharedQuery);
+  } catch (error) {
+    if (String(error?.message || '').toLowerCase().includes('shared_from_topic_id')) {
+      return unwrapSingle(await baseQuery);
+    }
+    throw error;
+  }
+}
+
 async function getCustomTopicsByUser(userId) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
 
-  const topics = unwrapList(await admin
-    .from('topics')
-    .select('id, slug, title, description, language, shared_from_topic_id, created_at')
-    .eq('owner_user_id', profileId)
-    .order('created_at', { ascending: false }));
+  const topics = await selectCustomTopicList(admin, profileId);
 
   if (!topics.length) return [];
 
@@ -138,13 +184,7 @@ async function getCustomTopicsByUser(userId) {
 async function getCustomTopicWithWords(userId, topicId) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
-  const topic = unwrapSingle(await admin
-    .from('topics')
-    .select('id, course_id, slug, title, description, language, shared_from_topic_id, sort_order, created_at, updated_at')
-    .eq('id', topicId)
-    .eq('owner_user_id', profileId)
-    .limit(1)
-    .maybeSingle());
+  const topic = await selectCustomTopicDetail(admin, profileId, topicId);
 
   if (!topic) return null;
 
@@ -215,17 +255,21 @@ async function createCustomTopic(userId, { title, description, language, sharedT
       }
     }
 
+    const topicPayload = {
+      course_id: customCourseId,
+      title,
+      description: description || null,
+      language: sourceTopic?.language || language || 'en',
+      owner_user_id: profileId,
+      sort_order: 0,
+    };
+    if (sourceTopic?.id) {
+      topicPayload.shared_from_topic_id = sourceTopic.id;
+    }
+
     const inserted = unwrapSingle(await admin
       .from('topics')
-      .insert({
-        course_id: customCourseId,
-        title,
-        description: description || null,
-        language: sourceTopic?.language || language || 'en',
-        owner_user_id: profileId,
-        shared_from_topic_id: sourceTopic?.id || null,
-        sort_order: 0,
-      })
+      .insert(topicPayload)
       .select('id, title, description, language, shared_from_topic_id')
       .single());
 
