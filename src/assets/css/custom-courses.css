@@ -614,6 +614,19 @@ body.app-dark-mode .cv-tp-message.is-error {
     background: #166534;
 }
 
+@media (max-width: 640px) {
+    .cv-toast {
+        bottom: 16px;
+        width: calc(100vw - 24px);
+        max-width: calc(100vw - 24px);
+        padding: 12px 14px;
+        border-radius: 18px;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.35;
+    }
+}
+
 .cv-expand-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -706,6 +719,13 @@ body.app-dark-mode .cv-tp-message.is-error {
     font-size: .92rem;
     line-height: 1.6;
     color: var(--gray-text);
+}
+
+.cv-confirm-hint {
+    margin: 10px 0 0;
+    font-size: .8rem;
+    line-height: 1.5;
+    color: var(--gray-light);
 }
 
 /* ── Custom toolbar (above word table, in word view) ── */
@@ -1197,6 +1217,10 @@ body.app-dark-mode .cv-modal-box select {
 
 body.app-dark-mode .cv-confirm-copy {
     color: #cbd5e1;
+}
+
+body.app-dark-mode .cv-confirm-hint {
+    color: #94a3b8;
 }
 
 body.app-dark-mode .cv-icon-btn {

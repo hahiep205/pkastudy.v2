@@ -5,6 +5,7 @@ import FileFormatModal from '../../components/common/FileFormatModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 import {
     downloadCourseExportFile,
     downloadCourseSampleFile,
@@ -22,6 +23,17 @@ function createEmptyCourseForm() {
         thumbnailUrl: '',
         language: 'en',
     };
+}
+
+function buildToastErrorMessage(err, fallback) {
+    return normalizeErrorMessage(
+        err.response?.data?.error || err.response?.data || err.message,
+        fallback,
+    );
+}
+
+function buildToastSuccessMessage(action, target) {
+    return `Đã ${action} ${target}.`;
 }
 
 function CourseFormModal({
@@ -144,7 +156,12 @@ export default function ManagerCourses() {
             .catch((err) => {
                 if (!active) return;
                 setCoursesData({ items: [], meta: null, filters: null });
-                setError(err.response?.data?.error || err.message || 'Không tải được danh sách khóa học.');
+                setError(
+                    normalizeErrorMessage(
+                        err.response?.data?.error || err.response?.data || err.message,
+                        'Không tải được danh sách khóa học.',
+                    ),
+                );
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -208,10 +225,10 @@ export default function ManagerCourses() {
         try {
             if (modalMode === 'edit' && editingCourse) {
                 await axiosClient.put(`/admin/courses/${editingCourse.id}`, form);
-                setToast({ message: `Đã cập nhật khóa học ${form.title}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('cập nhật khóa học', form.title), type: 'success' });
             } else {
                 await axiosClient.post('/admin/courses', form);
-                setToast({ message: `Đã tạo khóa học ${form.title}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('tạo khóa học', form.title), type: 'success' });
             }
 
             closeForm();
@@ -219,7 +236,7 @@ export default function ManagerCourses() {
             await refetchCourses(modalMode === 'create' ? 1 : page);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Lưu khóa học thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể lưu khóa học.'),
                 type: 'error',
             });
         } finally {
@@ -233,7 +250,7 @@ export default function ManagerCourses() {
         setSubmitting(true);
         try {
             await axiosClient.delete(`/admin/courses/${pendingDelete.id}`);
-            setToast({ message: `Đã xóa khóa học ${pendingDelete.title}.`, type: 'success' });
+            setToast({ message: buildToastSuccessMessage('xóa khóa học', pendingDelete.title), type: 'success' });
             setPendingDelete(null);
             const nextPage = items.length === 1 && page > 1 ? page - 1 : page;
             if (nextPage !== page) {
@@ -242,7 +259,7 @@ export default function ManagerCourses() {
             await refetchCourses(nextPage);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Xóa khóa học thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể xóa khóa học.'),
                 type: 'error',
             });
         } finally {
@@ -264,10 +281,10 @@ export default function ManagerCourses() {
         try {
             const data = await axiosClient.get(`/admin/courses/${course.id}/export`);
             downloadCourseExportFile(data, fileFormat);
-            setToast({ message: `Đã export khóa học ${course.title}.`, type: 'success' });
+            setToast({ message: buildToastSuccessMessage('xuất khóa học', course.title), type: 'success' });
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Export khóa học thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể xuất khóa học.'),
                 type: 'error',
             });
         } finally {
@@ -285,12 +302,12 @@ export default function ManagerCourses() {
             downloadCourseSampleFile(fileFormat);
             setIsSampleModalOpen(false);
             setToast({
-                message: `Đã tải file import mẫu khóa học dưới dạng ${fileFormat === 'excel' ? 'Excel' : 'JSON'}.`,
+                message: `Đã tải file mẫu khóa học (${fileFormat === 'excel' ? 'Excel' : 'JSON'}).`,
                 type: 'success',
             });
         } catch (err) {
             setToast({
-                message: err.message || 'Tải file import mẫu thất bại.',
+                message: err.message || 'Không thể tải file mẫu khóa học.',
                 type: 'error',
             });
         } finally {
@@ -310,12 +327,12 @@ export default function ManagerCourses() {
             setPage(1);
             await refetchCourses(1);
             setToast({
-                message: `Đã import khóa học ${data.course?.title || payload?.course?.title || file.name}.`,
+                message: buildToastSuccessMessage('import khóa học', data.course?.title || payload?.course?.title || file.name),
                 type: 'success',
             });
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Import khóa học thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể import khóa học.'),
                 type: 'error',
             });
         } finally {
@@ -347,7 +364,7 @@ export default function ManagerCourses() {
                             onClick={handleImportButtonClick}
                             disabled={importing}
                         >
-                            {importing ? 'Đang import...' : 'Import'}
+                            {importing ? 'Đang nhập...' : 'Nhập'}
                         </button>
                         <button
                             type="button"
@@ -355,7 +372,7 @@ export default function ManagerCourses() {
                             onClick={() => setIsSampleModalOpen(true)}
                             disabled={downloadingSample}
                         >
-                            {downloadingSample ? 'Đang tải mẫu...' : 'Tải file Import mẫu'}
+                            {downloadingSample ? 'Đang tải mẫu...' : 'Tải file mẫu'}
                         </button>
                         <button type="button" className="manager-primary-btn" onClick={openCreateModal}>
                             Tạo khóa học
@@ -450,7 +467,7 @@ export default function ManagerCourses() {
                                     onClick={() => handleExportCourse(course)}
                                     disabled={Number(exportingCourseId) === Number(course.id)}
                                 >
-                                    {Number(exportingCourseId) === Number(course.id) ? 'Đang export...' : 'Export'}
+                                    {Number(exportingCourseId) === Number(course.id) ? 'Đang xuất...' : 'Xuất'}
                                 </button>
                                 <button
                                     type="button"
@@ -500,8 +517,8 @@ export default function ManagerCourses() {
             <FileFormatModal
                 isOpen={Boolean(exportTargetCourse)}
                 onClose={() => setExportTargetCourse(null)}
-                title="Chọn định dạng export khóa học"
-                description="Hãy chọn loại file muốn tải xuống. Cấu trúc file export sẽ tương thích trực tiếp với file import."
+                title="Chọn định dạng xuất khóa học"
+                description="Hãy chọn loại file muốn tải xuống. Cấu trúc file xuất sẽ tương thích trực tiếp với file nhập."
                 options={[
                     {
                         value: 'excel',
@@ -512,7 +529,7 @@ export default function ManagerCourses() {
                     {
                         value: 'json',
                         label: 'JSON (.json)',
-                        description: 'Giữ nguyên định dạng JSON hiện tại để tiếp tục dùng luồng import/export đã ổn định.',
+                        description: 'Giữ nguyên định dạng JSON hiện tại để tiếp tục dùng luồng nhập/xuất đã ổn định.',
                         onSelect: handleExportCourseWithFormat,
                     },
                 ]}
@@ -521,8 +538,8 @@ export default function ManagerCourses() {
             <FileFormatModal
                 isOpen={isSampleModalOpen}
                 onClose={() => setIsSampleModalOpen(false)}
-                title="Tải file import mẫu khóa học"
-                description="File mẫu gồm thông tin khóa học, 2 topic và mỗi topic có 2 từ vựng để admin dễ tăng giảm dữ liệu trước khi import."
+                title="Tải file mẫu khóa học"
+                description="File mẫu gồm thông tin khóa học, 2 topic và mỗi topic có 2 từ vựng để admin dễ kiểm tra dữ liệu trước khi nhập."
                 options={[
                     {
                         value: 'excel',
@@ -533,7 +550,7 @@ export default function ManagerCourses() {
                     {
                         value: 'json',
                         label: 'JSON (.json)',
-                        description: 'JSON mẫu cùng schema với file export/import hiện tại.',
+                        description: 'JSON mẫu cùng schema với file nhập/xuất hiện tại.',
                         onSelect: handleDownloadSample,
                     },
                 ]}

@@ -4,6 +4,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 
 const PAGE_SIZE = 10;
 
@@ -25,6 +26,18 @@ function createEmptyWordForm() {
         exampleVi: '',
         language: 'en',
     };
+}
+
+function buildToastErrorMessage(err, fallback) {
+    return normalizeErrorMessage(
+        err.response?.data?.error || err.response?.data || err.message,
+        fallback,
+    );
+}
+
+function buildToastSuccessMessage(action, entity, value) {
+    const label = value?.trim() ? ` "${value.trim()}"` : '';
+    return `Đã ${action} ${entity}${label}.`;
 }
 
 function TopicFormModal({ isOpen, mode, form, onChange, onClose, onSubmit, submitting }) {
@@ -207,7 +220,7 @@ export default function ManagerTopics() {
             .catch((err) => {
                 if (!active) return;
                 setCourse(null);
-                setCourseError(err.response?.data?.error || err.message || 'Không tải được thông tin khóa học.');
+                setCourseError(buildToastErrorMessage(err, 'Không thể tải thông tin khóa học.'));
             });
 
         return () => {
@@ -233,7 +246,7 @@ export default function ManagerTopics() {
             .catch((err) => {
                 if (!active) return;
                 setTopicsData({ items: [], meta: null, filters: null });
-                setTopicsError(err.response?.data?.error || err.message || 'Không tải được danh sách chủ đề.');
+                setTopicsError(buildToastErrorMessage(err, 'Không thể tải danh sách chủ đề.'));
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -328,7 +341,7 @@ export default function ManagerTopics() {
         } catch (err) {
             setFlashcardsErrorByTopic((current) => ({
                 ...current,
-                [topicId]: err.response?.data?.error || err.message || 'Không tải được danh sách từ vựng.',
+                [topicId]: buildToastErrorMessage(err, 'Không thể tải danh sách từ vựng.'),
             }));
             return [];
         } finally {
@@ -342,10 +355,10 @@ export default function ManagerTopics() {
         try {
             if (modalMode === 'edit' && editingTopic) {
                 await axiosClient.put(`/admin/topics/${editingTopic.id}`, form);
-                setToast({ message: `Đã cập nhật chủ đề ${form.title}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('cập nhật', 'chủ đề', form.title), type: 'success' });
             } else {
                 await axiosClient.post(`/admin/courses/${courseId}/topics`, form);
-                setToast({ message: `Đã tạo chủ đề ${form.title}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('tạo', 'chủ đề', form.title), type: 'success' });
             }
 
             closeForm();
@@ -353,7 +366,7 @@ export default function ManagerTopics() {
             await refetchTopics(modalMode === 'create' ? 1 : page);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Lưu chủ đề thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể lưu chủ đề.'),
                 type: 'error',
             });
         } finally {
@@ -367,7 +380,7 @@ export default function ManagerTopics() {
         setSubmitting(true);
         try {
             await axiosClient.delete(`/admin/topics/${pendingDelete.id}`);
-            setToast({ message: `Đã xóa chủ đề ${pendingDelete.title}.`, type: 'success' });
+            setToast({ message: buildToastSuccessMessage('xóa', 'chủ đề', pendingDelete.title), type: 'success' });
             setPendingDelete(null);
             const nextPage = items.length === 1 && page > 1 ? page - 1 : page;
             if (nextPage !== page) {
@@ -376,7 +389,7 @@ export default function ManagerTopics() {
             await refetchTopics(nextPage);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Xóa chủ đề thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể xóa chủ đề.'),
                 type: 'error',
             });
         } finally {
@@ -430,17 +443,17 @@ export default function ManagerTopics() {
             const targetTopicId = activeWordTopic.id;
             if (wordModalMode === 'edit' && editingWord) {
                 await axiosClient.put(`/admin/flashcards/${editingWord.id}`, wordForm);
-                setToast({ message: `Đã cập nhật từ ${wordForm.word}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('cập nhật', 'từ', wordForm.word), type: 'success' });
             } else {
                 await axiosClient.post(`/admin/topics/${targetTopicId}/flashcards`, wordForm);
-                setToast({ message: `Đã thêm từ ${wordForm.word}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('thêm', 'từ', wordForm.word), type: 'success' });
             }
 
             closeWordModal();
             await refetchFlashcards(targetTopicId, { force: true });
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Lưu từ vựng thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể lưu từ vựng.'),
                 type: 'error',
             });
         } finally {
@@ -455,12 +468,12 @@ export default function ManagerTopics() {
         try {
             const targetTopicId = activeWordTopic.id;
             await axiosClient.delete(`/admin/flashcards/${pendingWordDelete.id}`);
-            setToast({ message: `Đã xóa từ ${pendingWordDelete.word}.`, type: 'success' });
+            setToast({ message: buildToastSuccessMessage('xóa', 'từ', pendingWordDelete.word), type: 'success' });
             setPendingWordDelete(null);
             await refetchFlashcards(targetTopicId, { force: true });
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Xóa từ vựng thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể xóa từ vựng.'),
                 type: 'error',
             });
         } finally {
@@ -529,7 +542,7 @@ export default function ManagerTopics() {
                                 Array.from({ length: 6 }).map((_, index) => (
                                     <tr key={`topic-skeleton-${index}`}>
                                         <td colSpan="5">
-                                            <div className="manager-table-loading-row">Đang tải dữ liệu chủ đề...</div>
+                                            <div className="manager-table-loading-row">Đang tải danh sách chủ đề...</div>
                                         </td>
                                     </tr>
                                 ))
@@ -538,7 +551,7 @@ export default function ManagerTopics() {
                             {!loading && !items.length ? (
                                 <tr>
                                     <td colSpan="5">
-                                        <div className="manager-table-empty">Không có chủ đề nào khớp với bộ lọc hiện tại.</div>
+                                        <div className="manager-table-empty">Chưa có chủ đề nào khớp với bộ lọc hiện tại.</div>
                                     </td>
                                 </tr>
                             ) : null}
@@ -639,11 +652,11 @@ export default function ManagerTopics() {
                         ) : null}
 
                         {viewingWordsTopic && Number(flashcardsLoadingTopicId) === Number(viewingWordsTopic.id) ? (
-                            <div className="manager-table-loading-row">Đang tải danh sách từ vựng...</div>
+                            <div className="manager-table-loading-row">Đang tải từ vựng...</div>
                         ) : null}
 
                         {viewingWordsTopic && Number(flashcardsLoadingTopicId) !== Number(viewingWordsTopic.id) && !(flashcardsByTopic[viewingWordsTopic.id] || []).length ? (
-                            <div className="manager-table-empty">Chủ đề này chưa có từ vựng nào.</div>
+                            <div className="manager-table-empty">Chủ đề này chưa có từ vựng.</div>
                         ) : null}
 
                         {viewingWordsTopic && Number(flashcardsLoadingTopicId) !== Number(viewingWordsTopic.id) && (flashcardsByTopic[viewingWordsTopic.id] || []).length ? (

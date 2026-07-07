@@ -5,6 +5,17 @@ function formatNumber(value) {
     return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
 }
 
+function normalizeErrorMessage(error, fallback) {
+    if (!error) return fallback;
+    if (typeof error === 'string') return error;
+    if (typeof error?.message === 'string') return error.message;
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return fallback;
+    }
+}
+
 function SummaryCard({ label, value, hint, loading }) {
     return (
         <article className="manager-stat-card">
@@ -209,7 +220,12 @@ export default function ManagerOverview() {
             })
             .catch((err) => {
                 if (!active) return;
-                setSummaryError(err.response?.data?.error || err.message || 'Không tải được tổng quan hệ thống.');
+                setSummaryError(
+                    normalizeErrorMessage(
+                        err.response?.data?.error || err.response?.data || err.message,
+                        'Không thể tải tổng quan hệ thống.',
+                    ),
+                );
             })
             .finally(() => {
                 if (active) setSummaryLoading(false);
@@ -232,7 +248,12 @@ export default function ManagerOverview() {
             })
             .catch((err) => {
                 if (!active) return;
-                setChartError(err.response?.data?.error || err.message || 'Không tải được dữ liệu đăng ký mới.');
+                setChartError(
+                    normalizeErrorMessage(
+                        err.response?.data?.error || err.response?.data || err.message,
+                        'Không thể tải dữ liệu đăng ký mới.',
+                    ),
+                );
             })
             .finally(() => {
                 if (active) setChartLoading(false);

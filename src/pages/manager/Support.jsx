@@ -3,6 +3,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 
 const PAGE_SIZE = 10;
 
@@ -22,6 +23,17 @@ function formatDateTime(value) {
     }
 }
 
+function buildToastErrorMessage(err, fallback) {
+    return normalizeErrorMessage(
+        err.response?.data?.error || err.response?.data || err.message,
+        fallback,
+    );
+}
+
+function buildToastSuccessMessage(message) {
+    return `Đã ${message}.`;
+}
+
 function SupportTypePill({ type }) {
     return (
         <span className={`manager-table-pill ${type === 'bao-loi' ? 'is-danger' : 'is-accent'}`}>
@@ -38,10 +50,10 @@ function SupportStatusPill({ status }) {
             : '';
 
     const label = status === 'agreed'
-        ? 'Resolved'
+        ? 'Đã xử lý'
         : status === 'rejected'
-            ? 'Reject'
-            : 'Pending';
+            ? 'Từ chối'
+            : 'Chờ xử lý';
 
     return <span className={`manager-table-pill ${className}`}>{label}</span>;
 }
@@ -88,7 +100,12 @@ export default function ManagerSupport() {
             })
             .catch((err) => {
                 if (!active) return;
-                setError(err.response?.data?.error || err.message || 'Không tải được danh sách góp ý.');
+                setError(
+                    normalizeErrorMessage(
+                        err.response?.data?.error || err.response?.data || err.message,
+                        'Không tải được danh sách góp ý.',
+                    ),
+                );
                 setSupportData({ items: [], meta: null, filters: null });
             })
             .finally(() => {
@@ -127,16 +144,16 @@ export default function ManagerSupport() {
             item,
             nextStatus,
             title: nextStatus === 'agreed'
-                ? 'Đánh dấu Resolve cho phản hồi này?'
+                ? 'Đánh dấu đã xử lý cho phản hồi này?'
                 : nextStatus === 'pending'
-                    ? 'Đưa phản hồi này về Pending?'
-                    : 'Đánh dấu Reject cho phản hồi này?',
+                    ? 'Đưa phản hồi này về chờ xử lý?'
+                    : 'Đánh dấu từ chối cho phản hồi này?',
             message: nextStatus === 'agreed'
-                ? `Phản hồi "${item.title}" sẽ được đánh dấu là Resolve.`
+                ? `Phản hồi "${item.title}" sẽ được đánh dấu là đã xử lý.`
                 : nextStatus === 'pending'
-                    ? `Phản hồi "${item.title}" sẽ được đưa về trạng thái Pending.`
-                    : `Phản hồi "${item.title}" sẽ được đánh dấu là Reject.`,
-            confirmLabel: nextStatus === 'agreed' ? 'Resolve' : nextStatus === 'pending' ? 'Pending' : 'Reject',
+                    ? `Phản hồi "${item.title}" sẽ được đưa về trạng thái chờ xử lý.`
+                    : `Phản hồi "${item.title}" sẽ được đánh dấu là từ chối.`,
+            confirmLabel: nextStatus === 'agreed' ? 'Đã xử lý' : nextStatus === 'pending' ? 'Chờ xử lý' : 'Từ chối',
         });
     };
 
@@ -154,17 +171,17 @@ export default function ManagerSupport() {
             });
             setToast({
                 message: pendingAction.nextStatus === 'agreed'
-                    ? 'Đã chuyển phản hồi sang Resolve.'
+                    ? buildToastSuccessMessage('đánh dấu phản hồi là đã xử lý')
                     : pendingAction.nextStatus === 'pending'
-                        ? 'Đã chuyển phản hồi về Pending.'
-                        : 'Đã chuyển phản hồi sang Reject.',
+                        ? buildToastSuccessMessage('đưa phản hồi về chờ xử lý')
+                        : buildToastSuccessMessage('đánh dấu phản hồi là từ chối'),
                 type: 'success',
             });
             closePendingAction();
             await refetchCurrentPage();
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Cập nhật phản hồi thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể cập nhật phản hồi.'),
                 type: 'error',
             });
         } finally {
@@ -260,7 +277,7 @@ export default function ManagerSupport() {
                                 <tr>
                                     <td colSpan="7">
                                         <div className="manager-table-empty">
-                                            Chưa có góp ý hoặc báo lỗi nào khớp với bộ lọc hiện tại.
+                                            Chưa có phản hồi nào khớp với bộ lọc hiện tại.
                                         </div>
                                     </td>
                                 </tr>
@@ -306,7 +323,7 @@ export default function ManagerSupport() {
                                                     disabled={submittingKey === resolveKey || item.status === 'agreed'}
                                                     onClick={() => openReviewAction(item, 'agreed')}
                                                 >
-                                                    {submittingKey === resolveKey ? 'Đang lưu...' : 'Resolve'}
+                                                    {submittingKey === resolveKey ? 'Đang lưu...' : 'Đã xử lý'}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -314,7 +331,7 @@ export default function ManagerSupport() {
                                                     disabled={submittingKey === pendingKey || item.status === 'pending'}
                                                     onClick={() => openReviewAction(item, 'pending')}
                                                 >
-                                                    {submittingKey === pendingKey ? 'Đang lưu...' : 'Pending'}
+                                                    {submittingKey === pendingKey ? 'Đang lưu...' : 'Chờ xử lý'}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -322,7 +339,7 @@ export default function ManagerSupport() {
                                                     disabled={submittingKey === rejectKey || item.status === 'rejected'}
                                                     onClick={() => openReviewAction(item, 'rejected')}
                                                 >
-                                                    {submittingKey === rejectKey ? 'Đang lưu...' : 'Reject'}
+                                                    {submittingKey === rejectKey ? 'Đang lưu...' : 'Từ chối'}
                                                 </button>
                                             </div>
                                         </td>

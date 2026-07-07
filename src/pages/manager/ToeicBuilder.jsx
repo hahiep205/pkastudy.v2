@@ -4,6 +4,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 
 const PAGE_SIZE = 10;
 
@@ -33,6 +34,17 @@ function createEmptyQuestionForm() {
         audioSource: '',
         imageSource: '',
     };
+}
+
+function buildToastErrorMessage(err, fallback) {
+    return normalizeErrorMessage(
+        err.response?.data?.error || err.response?.data || err.message,
+        fallback,
+    );
+}
+
+function buildToastSuccessMessage(message) {
+    return `Đã ${message}.`;
 }
 
 function GroupFormModal({ isOpen, mode, form, onChange, onClose, onSubmit, submitting }) {
@@ -276,10 +288,10 @@ export default function ManagerToeicBuilder() {
         setLoading(true);
         setError('');
 
-        fetchBuilderData(page)
+            fetchBuilderData(page)
             .catch((err) => {
                 if (!active) return;
-                setError(err.response?.data?.error || err.message || 'Không tải được dữ liệu TOEIC builder.');
+                setError(buildToastErrorMessage(err, 'Không thể tải dữ liệu TOEIC builder.'));
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -440,16 +452,16 @@ export default function ManagerToeicBuilder() {
         try {
             if (groupModalMode === 'edit' && editingGroup) {
                 await axiosClient.put(`/admin/toeic/groups/${editingGroup.id}`, groupForm);
-                setToast({ message: `Đã cập nhật nhóm #${editingGroup.id}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('cập nhật nhóm #' + editingGroup.id), type: 'success' });
             } else {
                 await axiosClient.post(`/admin/toeic/tests/${testId}/groups`, groupForm);
-                setToast({ message: 'Đã tạo nhóm câu hỏi mới.', type: 'success' });
+                setToast({ message: buildToastSuccessMessage('tạo nhóm câu hỏi mới'), type: 'success' });
             }
             closeGroupModal();
             await fetchBuilderData(page);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Lưu nhóm câu hỏi thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể lưu nhóm câu hỏi.'),
                 type: 'error',
             });
         } finally {
@@ -463,10 +475,10 @@ export default function ManagerToeicBuilder() {
             const payload = buildQuestionPayload(questionForm);
             if (questionModalMode === 'edit' && editingQuestion) {
                 await axiosClient.put(`/admin/toeic/questions/${editingQuestion.id}`, payload);
-                setToast({ message: `Đã cập nhật câu hỏi #${editingQuestion.questionNumber}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('cập nhật câu hỏi #' + editingQuestion.questionNumber), type: 'success' });
             } else {
                 await axiosClient.post(`/admin/toeic/tests/${testId}/questions`, payload);
-                setToast({ message: 'Đã tạo câu hỏi TOEIC mới.', type: 'success' });
+                setToast({ message: buildToastSuccessMessage('tạo câu hỏi TOEIC mới'), type: 'success' });
             }
 
             closeQuestionModal();
@@ -479,7 +491,7 @@ export default function ManagerToeicBuilder() {
             }
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Lưu câu hỏi TOEIC thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể lưu câu hỏi TOEIC.'),
                 type: 'error',
             });
         } finally {
@@ -494,10 +506,10 @@ export default function ManagerToeicBuilder() {
         try {
             if (pendingDelete.type === 'group') {
                 await axiosClient.delete(`/admin/toeic/groups/${pendingDelete.item.id}`);
-                setToast({ message: `Đã xóa nhóm #${pendingDelete.item.id}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('xóa nhóm #' + pendingDelete.item.id), type: 'success' });
             } else {
                 await axiosClient.delete(`/admin/toeic/questions/${pendingDelete.item.id}`);
-                setToast({ message: `Đã xóa câu hỏi #${pendingDelete.item.questionNumber}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('xóa câu hỏi #' + pendingDelete.item.questionNumber), type: 'success' });
                 if (String(selectedQuestion?.id) === String(pendingDelete.item.id)) {
                     setSelectedQuestion(null);
                 }
@@ -507,7 +519,7 @@ export default function ManagerToeicBuilder() {
             await fetchBuilderData(page);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Xóa dữ liệu TOEIC thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể xóa dữ liệu TOEIC.'),
                 type: 'error',
             });
         } finally {
@@ -634,14 +646,14 @@ export default function ManagerToeicBuilder() {
                             {loading ? (
                                 Array.from({ length: 6 }).map((_, index) => (
                                     <tr key={`toeic-question-skeleton-${index}`}>
-                                        <td colSpan="5"><div className="manager-table-loading-row">Đang tải dữ liệu câu hỏi...</div></td>
+                                        <td colSpan="5"><div className="manager-table-loading-row">Đang tải danh sách câu hỏi...</div></td>
                                     </tr>
                                 ))
                             ) : null}
 
                             {!loading && !questionItems.length ? (
                                 <tr>
-                                    <td colSpan="5"><div className="manager-table-empty">Chưa có câu hỏi nào khớp bộ lọc hiện tại.</div></td>
+                                    <td colSpan="5"><div className="manager-table-empty">Chưa có câu hỏi nào khớp với bộ lọc hiện tại.</div></td>
                                 </tr>
                             ) : null}
 
@@ -752,7 +764,7 @@ export default function ManagerToeicBuilder() {
             >
                 <div className="cv-modal-body">
                     {selectedQuestionLoading ? (
-                        <div className="manager-table-loading-row">Đang tải preview câu hỏi...</div>
+                        <div className="manager-table-loading-row">Đang tải preview...</div>
                     ) : selectedQuestion ? (
                         <div className="manager-detail-modal-content">
                             <div className="manager-preview-layout">
@@ -761,7 +773,7 @@ export default function ManagerToeicBuilder() {
                                     <div className="manager-kv-list manager-kv-list-single">
                                         <div>
                                             <span>Nội dung câu hỏi</span>
-                                            <strong>{selectedQuestion.questionText || 'Không có nội dung text.'}</strong>
+                                            <strong>{selectedQuestion.questionText || 'Chưa có nội dung câu hỏi.'}</strong>
                                         </div>
                                         <div>
                                             <span>Đáp án</span>
@@ -818,7 +830,7 @@ export default function ManagerToeicBuilder() {
                             </div>
                         </div>
                     ) : (
-                        <div className="manager-table-empty">Không có dữ liệu preview cho câu hỏi này.</div>
+                        <div className="manager-table-empty">Chưa có dữ liệu preview cho câu hỏi này.</div>
                     )}
                 </div>
                 <div className="cv-modal-footer cv-modal-footer-split">
@@ -845,13 +857,13 @@ export default function ManagerToeicBuilder() {
             >
                 <div className="cv-modal-body">
                     {selectedQuestionLoading ? (
-                        <div className="manager-table-loading-row">Đang tải chi tiết câu hỏi...</div>
+                        <div className="manager-table-loading-row">Đang tải chi tiết...</div>
                     ) : selectedQuestion ? (
                         <div className="manager-detail-modal-content">
                             <div className="manager-kv-list manager-kv-list-single">
                                 <div>
                                     <span>Nội dung câu hỏi</span>
-                                    <strong>{selectedQuestion.questionText || 'Không có nội dung text.'}</strong>
+                                    <strong>{selectedQuestion.questionText || 'Chưa có nội dung câu hỏi.'}</strong>
                                 </div>
                                 <div>
                                     <span>Đáp án A</span>
@@ -898,7 +910,7 @@ export default function ManagerToeicBuilder() {
                             </div>
                         </div>
                     ) : (
-                        <div className="manager-table-empty">Không có dữ liệu chi tiết cho câu hỏi này.</div>
+                        <div className="manager-table-empty">Chưa có dữ liệu chi tiết cho câu hỏi này.</div>
                     )}
                 </div>
                 <div className="cv-modal-footer cv-modal-footer-split">

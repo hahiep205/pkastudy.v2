@@ -5,6 +5,7 @@ import FileFormatModal from '../../components/common/FileFormatModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 import {
     downloadToeicExportFile,
     downloadToeicSampleFile,
@@ -19,6 +20,17 @@ function createEmptyTestForm() {
         title: '',
         description: '',
     };
+}
+
+function buildToastErrorMessage(err, fallback) {
+    return normalizeErrorMessage(
+        err.response?.data?.error || err.response?.data || err.message,
+        fallback,
+    );
+}
+
+function buildToastSuccessMessage(action, target) {
+    return `Đã ${action} ${target}.`;
 }
 
 function ToeicTestFormModal({
@@ -112,7 +124,12 @@ export default function ManagerToeic() {
             .catch((err) => {
                 if (!active) return;
                 setTestsData({ items: [], meta: null, filters: null });
-                setError(err.response?.data?.error || err.message || 'Không tải được danh sách đề TOEIC.');
+                setError(
+                    normalizeErrorMessage(
+                        err.response?.data?.error || err.response?.data || err.message,
+                        'Không tải được danh sách đề TOEIC.',
+                    ),
+                );
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -173,10 +190,10 @@ export default function ManagerToeic() {
         try {
             if (modalMode === 'edit' && editingTest) {
                 await axiosClient.put(`/admin/toeic/tests/${editingTest.id}`, form);
-                setToast({ message: `Đã cập nhật đề ${form.title}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('cập nhật đề', form.title), type: 'success' });
             } else {
                 await axiosClient.post('/admin/toeic/tests', form);
-                setToast({ message: `Đã tạo đề ${form.title}.`, type: 'success' });
+                setToast({ message: buildToastSuccessMessage('tạo đề', form.title), type: 'success' });
             }
 
             closeForm();
@@ -184,7 +201,7 @@ export default function ManagerToeic() {
             await refetchTests(modalMode === 'create' ? 1 : page);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Lưu đề TOEIC thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể lưu đề TOEIC.'),
                 type: 'error',
             });
         } finally {
@@ -198,14 +215,14 @@ export default function ManagerToeic() {
         setSubmitting(true);
         try {
             await axiosClient.delete(`/admin/toeic/tests/${pendingDelete.id}`);
-            setToast({ message: `Đã xóa đề ${pendingDelete.title}.`, type: 'success' });
+            setToast({ message: buildToastSuccessMessage('xóa đề', pendingDelete.title), type: 'success' });
             setPendingDelete(null);
             const nextPage = items.length === 1 && page > 1 ? page - 1 : page;
             if (nextPage !== page) setPage(nextPage);
             await refetchTests(nextPage);
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Xóa đề TOEIC thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể xóa đề TOEIC.'),
                 type: 'error',
             });
         } finally {
@@ -227,10 +244,10 @@ export default function ManagerToeic() {
         try {
             const data = await axiosClient.get(`/admin/toeic/tests/${test.id}/export`);
             downloadToeicExportFile(data, fileFormat);
-            setToast({ message: `Đã export đề ${test.title}.`, type: 'success' });
+            setToast({ message: buildToastSuccessMessage('xuất đề', test.title), type: 'success' });
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Export đề TOEIC thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể xuất đề TOEIC.'),
                 type: 'error',
             });
         } finally {
@@ -248,12 +265,12 @@ export default function ManagerToeic() {
             downloadToeicSampleFile(fileFormat);
             setIsSampleModalOpen(false);
             setToast({
-                message: `Đã tải file import mẫu đề TOEIC dưới dạng ${fileFormat === 'excel' ? 'Excel' : 'JSON'}.`,
+                message: `Đã tải file mẫu đề TOEIC (${fileFormat === 'excel' ? 'Excel' : 'JSON'}).`,
                 type: 'success',
             });
         } catch (err) {
             setToast({
-                message: err.message || 'Tải file import mẫu thất bại.',
+                message: err.message || 'Không thể tải file mẫu đề TOEIC.',
                 type: 'error',
             });
         } finally {
@@ -273,12 +290,12 @@ export default function ManagerToeic() {
             setPage(1);
             await refetchTests(1);
             setToast({
-                message: `Đã import đề ${data.test?.title || payload?.test?.title || file.name}.`,
+                message: buildToastSuccessMessage('import đề', data.test?.title || payload?.test?.title || file.name),
                 type: 'success',
             });
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Import đề TOEIC thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể import đề TOEIC.'),
                 type: 'error',
             });
         } finally {

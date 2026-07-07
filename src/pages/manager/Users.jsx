@@ -3,6 +3,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import { useAuth } from '../../contexts/useAuth';
 import axiosClient from '../../utils/axiosClient';
+import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 import { clearUserStudyLocalState } from '../../utils/userStorage';
 
 const PAGE_SIZE = 10;
@@ -23,6 +24,17 @@ function formatDate(value) {
     } catch {
         return value;
     }
+}
+
+function buildToastErrorMessage(err, fallback) {
+    return normalizeErrorMessage(
+        err.response?.data?.error || err.response?.data || err.message,
+        fallback,
+    );
+}
+
+function buildToastSuccessMessage(action, target) {
+    return `Đã ${action} ${target}.`;
 }
 
 function UserStatusPill({ status }) {
@@ -83,7 +95,12 @@ export default function ManagerUsers() {
             })
             .catch((err) => {
                 if (!active) return;
-                setError(err.response?.data?.error || err.message || 'Không tải được danh sách người dùng.');
+                setError(
+                    normalizeErrorMessage(
+                        err.response?.data?.error || err.response?.data || err.message,
+                        'Không tải được danh sách người dùng.',
+                    ),
+                );
                 setUsersData({ items: [], meta: null, filters: null });
             })
             .finally(() => {
@@ -175,7 +192,7 @@ export default function ManagerUsers() {
                     role: pendingAction.nextValue,
                 });
                 setToast({
-                    message: `Đã cập nhật quyền cho ${pendingAction.user.email}.`,
+                    message: buildToastSuccessMessage('cập nhật quyền cho', pendingAction.user.email),
                     type: 'success',
                 });
             }
@@ -185,7 +202,7 @@ export default function ManagerUsers() {
                     status: pendingAction.nextValue,
                 });
                 setToast({
-                    message: `Đã cập nhật trạng thái cho ${pendingAction.user.email}.`,
+                    message: buildToastSuccessMessage('cập nhật trạng thái cho', pendingAction.user.email),
                     type: 'success',
                 });
             }
@@ -196,7 +213,7 @@ export default function ManagerUsers() {
                     clearUserStudyLocalState(currentUser);
                 }
                 setToast({
-                    message: `Đã xóa toàn bộ dữ liệu học của ${pendingAction.user.email}.`,
+                    message: buildToastSuccessMessage('xóa toàn bộ dữ liệu học của', pendingAction.user.email),
                     type: 'success',
                 });
             }
@@ -204,7 +221,7 @@ export default function ManagerUsers() {
             if (pendingAction.type === 'account-delete') {
                 await axiosClient.delete(`/admin/users/${pendingAction.user.id}`);
                 setToast({
-                    message: `Đã xóa tài khoản ${pendingAction.user.email}.`,
+                    message: buildToastSuccessMessage('xóa tài khoản', pendingAction.user.email),
                     type: 'success',
                 });
             }
@@ -213,7 +230,7 @@ export default function ManagerUsers() {
             await refetchCurrentPage();
         } catch (err) {
             setToast({
-                message: err.response?.data?.error || err.message || 'Cập nhật người dùng thất bại.',
+                message: buildToastErrorMessage(err, 'Không thể cập nhật người dùng.'),
                 type: 'error',
             });
         } finally {
@@ -347,7 +364,7 @@ export default function ManagerUsers() {
                                                     {submittingKey === roleActionKey
                                                         ? 'Đang lưu...'
                                                         : isRootAdmin
-                                                            ? 'Admin root'
+                                                            ? 'Tài khoản gốc'
                                                             : item.role === 'admin'
                                                                 ? 'Đổi thành người dùng'
                                                                 : 'Cấp quyền admin'}
@@ -383,7 +400,7 @@ export default function ManagerUsers() {
                                                     {submittingKey === deleteAccountActionKey
                                                         ? 'Đang xóa...'
                                                         : isRootAdmin
-                                                            ? 'Không thể xóa root'
+                                                            ? 'Không thể xóa tài khoản gốc'
                                                             : isCurrentUser
                                                                 ? 'Không thể tự xóa'
                                                                 : 'Xóa tài khoản'}
