@@ -299,7 +299,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
     const inserted = unwrapSingle(await admin
       .from('topics')
       .insert(topicPayload)
-      .select('id, title, description, language')
+      .select('id, title, description, language, shared_from_topic_id')
       .single());
 
     createdTopicId = inserted.id;
@@ -333,7 +333,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
       title: inserted.title,
       description: inserted.description,
       language: inserted.language || 'en',
-      sharedFromTopicId: null,
+      sharedFromTopicId: inserted.shared_from_topic_id || null,
       words: copiedWords,
     };
   } catch (error) {

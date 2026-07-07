@@ -83,8 +83,13 @@ export default function CourseTopics() {
     }
   };
 
-  const handleDeleteTopic = (topicId) => {
-    deleteTopic(topicId);
+  const handleDeleteTopic = async (topicId) => {
+    const result = await deleteTopic(topicId);
+    if (result?.error) {
+      setToastMessage(result.error);
+      return;
+    }
+
     setPendingDeleteTopic(null);
     setToastMessage("Đã xóa chủ đề");
   };
