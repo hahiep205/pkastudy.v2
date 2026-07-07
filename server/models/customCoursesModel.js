@@ -52,6 +52,23 @@ const SAMPLE_PERSONAL_TOPIC_WORDS = [
   },
 ];
 
+function slugify(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+function buildCustomTopicSlug(title, profileId) {
+  const titleSlug = slugify(title) || 'topic';
+  const profileSlug = slugify(profileId).slice(0, 8) || 'user';
+  const suffix = Date.now().toString(36);
+  return `custom-${titleSlug}-${profileSlug}-${suffix}`.slice(0, 120);
+}
+
 async function ensureCustomTopicsCourseId() {
   const admin = ensureSupabaseEnabled();
   const existing = unwrapSingle(await admin
@@ -257,6 +274,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
 
     const topicPayload = {
       course_id: customCourseId,
+      slug: buildCustomTopicSlug(title, profileId),
       title,
       description: description || null,
       language: sourceTopic?.language || language || 'en',
