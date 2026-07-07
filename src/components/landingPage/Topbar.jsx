@@ -79,7 +79,7 @@ export default function Topbar({ onMenuClick }) {
                     <>
                         <div
                             className="topbar-xp"
-                            title={`Level ${levelInfo.level} — ${levelInfo.title}\n${levelInfo.totalXp} XP`}
+                            title={`Level ${levelInfo.level}\n${levelInfo.totalXp} XP`}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',

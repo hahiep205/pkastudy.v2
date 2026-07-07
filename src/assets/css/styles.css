@@ -1454,6 +1454,10 @@ img {
     .nav-right {
         display: none;
     }
+
+    .mobile-menu-actions .theme-switch-btn-menu {
+        display: none !important;
+    }
 }
 
 /* Điều chỉnh width menu trên màn hình rất nhỏ */

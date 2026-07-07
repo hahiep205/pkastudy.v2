@@ -316,7 +316,7 @@ export default function Overview() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                 <span style={{ fontSize: '1.5rem' }}>{levelInfo.badge}</span>
                                 <div>
-                                    <strong className="welcome-focus-heading">Level {levelInfo.level} — {levelInfo.title}</strong>
+                                    <strong className="welcome-focus-heading">Level {levelInfo.level}</strong>
                                     <div className="welcome-focus-meta">{levelInfo.totalXp} XP tổng cộng</div>
                                 </div>
                             </div>

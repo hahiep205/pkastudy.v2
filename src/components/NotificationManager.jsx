@@ -76,7 +76,7 @@ function LevelUpModal({ data, onClose }) {
         <Confetti />
         <span style={badgeStyle}>{data.badge}</span>
         <h2 style={titleStyle}>Level Up!</h2>
-        <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 18, margin: '0 0 8px' }}>Level {data.to} - {data.title}</p>
+        <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: 18, margin: '0 0 8px' }}>Level {data.to}</p>
         <p style={subtitleStyle}>Bạn đã mở khóa badge mới!</p>
         <button style={btnStyle} onClick={onClose} onMouseOver={(e) => { e.target.style.transform = 'translateY(-2px)'; }} onMouseOut={(e) => { e.target.style.transform = 'none'; }}>
           Tuyệt vời!

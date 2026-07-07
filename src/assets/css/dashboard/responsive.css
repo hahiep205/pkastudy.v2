@@ -52,7 +52,7 @@
     }
 
     .topbar-hamburger {
-        display: flex;
+        display: none !important;
     }
 
     .topbar-greeting {
