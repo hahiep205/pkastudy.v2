@@ -361,6 +361,7 @@ export default function Courses() {
                                             </Link>
                                             <div className="cv-icon-btns">
                                                 <button
+                                                    type="button"
                                                     className="cv-icon-btn cv-cc-share"
                                                     title="Chia sẻ bộ từ vựng"
                                                     onClick={(event) => handleShareTopic(topic, event)}
@@ -374,9 +375,13 @@ export default function Courses() {
                                                     </svg>
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     className="cv-icon-btn cv-cc-edit"
                                                     title="Sửa chủ đề"
-                                                    onClick={() => handleOpenTopicForm(topic)}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        handleOpenTopicForm(topic);
+                                                    }}
                                                 >
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -384,10 +389,13 @@ export default function Courses() {
                                                     </svg>
                                                 </button>
                                                 <button
+                                                    type="button"
                                                     className="cv-icon-btn cv-cc-delete"
                                                     title="Xóa chủ đề"
-                                                    style={{ '--icon-color': 'var(--red)' }}
-                                                    onClick={() => setPendingDeleteTopic(topic)}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        setPendingDeleteTopic(topic);
+                                                    }}
                                                 >
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <polyline points="3 6 5 6 21 6"></polyline>

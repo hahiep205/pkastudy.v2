@@ -358,6 +358,7 @@ export default function CourseTopics() {
                 {courseId === "custom" ? (
                   <div className="cv-icon-btns">
                     <button
+                      type="button"
                       className="cv-icon-btn cv-cc-share"
                       title="Chia sẻ bộ từ vựng"
                       onClick={(event) => {
@@ -379,6 +380,7 @@ export default function CourseTopics() {
                       </svg>
                     </button>
                     <button
+                      type="button"
                       className="cv-icon-btn cv-cc-edit"
                       title="Sửa chủ đề"
                       onClick={(event) => {
@@ -397,9 +399,9 @@ export default function CourseTopics() {
                       </svg>
                     </button>
                     <button
+                      type="button"
                       className="cv-icon-btn cv-cc-delete"
                       title="Xóa chủ đề"
-                      style={{ "--icon-color": "var(--red)" }}
                       onClick={(event) => {
                         event.stopPropagation();
                         setPendingDeleteTopic(topic);

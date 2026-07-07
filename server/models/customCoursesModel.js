@@ -463,6 +463,36 @@ async function deleteCustomTopic(userId, topicId) {
   const profileId = await resolveProfileId(userId);
   const topic = await getOwnedTopicById(admin, profileId, topicId);
   if (!topic) return false;
+
+  const flashcards = unwrapList(await admin
+    .from('flashcards')
+    .select('id')
+    .eq('topic_id', topicId));
+
+  if (flashcards.length) {
+    const flashcardIds = flashcards.map((flashcard) => flashcard.id);
+
+    await admin
+      .from('user_word_progress')
+      .delete()
+      .in('flashcard_id', flashcardIds);
+
+    await admin
+      .from('srs_reviews')
+      .delete()
+      .in('flashcard_id', flashcardIds);
+
+    const flashcardDeleteResult = await admin
+      .from('flashcards')
+      .delete()
+      .eq('topic_id', topicId)
+      .select('id');
+
+    if (flashcardDeleteResult.error) {
+      throw flashcardDeleteResult.error;
+    }
+  }
+
   const result = await admin
     .from('topics')
     .delete()

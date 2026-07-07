@@ -939,7 +939,23 @@ body.app-dark-mode .cv-tp-message.is-error {
     background: rgba(28, 176, 246, .06);
 }
 
-.cv-icon-btn[style*="--icon-color:var(--red)"]:hover {
+.cv-cc-share:hover {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(88, 204, 2, .08);
+}
+
+.cv-cc-edit:hover {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: rgba(28, 176, 246, .06);
+}
+
+.cv-cc-delete {
+    color: var(--red);
+}
+
+.cv-cc-delete:hover {
     border-color: var(--red);
     color: var(--red);
     background: rgba(255, 75, 75, .06);

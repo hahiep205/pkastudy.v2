@@ -161,21 +161,20 @@ export default function Navbar() {
             </div>
 
             <div className="nav-right">
-                <button
-                    type="button"
-                    className={`btn btn-nav btn-secondary theme-switch-btn theme-switch-btn-desktop${isDarkMode ? ' is-dark' : ''}`}
-                    onClick={toggleTheme}
-                    aria-label={isDarkMode ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
-                    title={isDarkMode ? 'Chế độ sáng' : 'Chế độ tối'}
-                >
-                    <span className="theme-switch-icon" aria-hidden="true">{isDarkMode ? '☀' : '☾'}</span>
-                </button>
-
                 {isAuthenticated ? (
                     <>
                         <span className="nav-greeting">
                             Xin chào, <strong>{greetingName}</strong>!
                         </span>
+                        <button
+                            type="button"
+                            className={`btn btn-nav btn-secondary theme-switch-btn theme-switch-btn-desktop${isDarkMode ? ' is-dark' : ''}`}
+                            onClick={toggleTheme}
+                            aria-label={isDarkMode ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+                            title={isDarkMode ? 'Chế độ sáng' : 'Chế độ tối'}
+                        >
+                            <span className="theme-switch-icon" aria-hidden="true">{isDarkMode ? '☀' : '☾'}</span>
+                        </button>
                         <button
                             type="button"
                             className={`btn btn-nav btn-secondary theme-switch-btn nav-logout-btn theme-switch-btn-desktop${isDarkMode ? ' is-dark' : ''}`}
@@ -188,6 +187,15 @@ export default function Navbar() {
                     </>
                 ) : (
                     <>
+                        <button
+                            type="button"
+                            className={`btn btn-nav btn-secondary theme-switch-btn theme-switch-btn-desktop${isDarkMode ? ' is-dark' : ''}`}
+                            onClick={toggleTheme}
+                            aria-label={isDarkMode ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+                            title={isDarkMode ? 'Chế độ sáng' : 'Chế độ tối'}
+                        >
+                            <span className="theme-switch-icon" aria-hidden="true">{isDarkMode ? '☀' : '☾'}</span>
+                        </button>
                         <Link to="/login"><button className="btn btn-nav btn-secondary" style={{ maxHeight: '38px', width: 'auto' }}>Đăng nhập</button></Link>
                         <Link to="/register"><button className="btn btn-nav btn-primary" style={{ maxHeight: '38px', width: 'auto' }}>Đăng ký</button></Link>
                     </>
