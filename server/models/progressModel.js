@@ -67,21 +67,22 @@ async function getLeaderboard(limit = 10) {
   const profiles = unwrapList(await admin
     .from('profiles')
     .select('id, legacy_user_id, name, status, created_at')
-    .neq('status', 'banned')
     .order('legacy_user_id', { ascending: true })
     .order('created_at', { ascending: true }));
 
-  if (!profiles.length) {
+  const visibleProfiles = profiles.filter((profile) => profile?.status !== 'banned');
+
+  if (!visibleProfiles.length) {
     return [];
   }
 
   const progressRows = unwrapList(await admin
     .from('user_progress')
     .select('user_id, current_xp, level, current_streak, updated_at')
-    .in('user_id', profiles.map((profile) => profile.id)));
+    .in('user_id', visibleProfiles.map((profile) => profile.id)));
 
   const progressMap = new Map(progressRows.map((row) => [row.user_id, row]));
-  const entries = profiles.map((profile) => {
+  const entries = visibleProfiles.map((profile) => {
     const progress = progressMap.get(profile.id);
     return {
       id: profile.legacy_user_id || profile.id,

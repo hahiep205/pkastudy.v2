@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import FloatChat from './components/FloatChat';
+import { useAuth } from './contexts/useAuth';
 import { initializeTheme } from './utils/theme';
 
 const RequireAdmin = lazy(() => import('./components/manager/RequireAdmin'));
@@ -17,6 +18,7 @@ const TopicWords = lazy(() => import('./pages/dashboard/TopicWords'));
 const TOEIC = lazy(() => import('./pages/dashboard/TOEIC'));
 const LandingPage = lazy(() => import('./pages/landingPage/LandingPage'));
 const Login = lazy(() => import('./pages/Login'));
+const Logined = lazy(() => import('./pages/Logined'));
 const ManagerCourses = lazy(() => import('./pages/manager/Courses'));
 const ManagerOverview = lazy(() => import('./pages/manager/Overview'));
 const ManagerSupport = lazy(() => import('./pages/manager/Support'));
@@ -30,6 +32,26 @@ function AppShellFallback() {
   return <div className="app-shell-loading">Loading...</div>;
 }
 
+function HomeRoute() {
+  const { user } = useAuth();
+
+  if (user?.token) {
+    return <Navigate to="/logined" replace />;
+  }
+
+  return <LandingPage />;
+}
+
+function LoginedRoute() {
+  const { user } = useAuth();
+
+  if (!user?.token) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Logined />;
+}
+
 function App() {
   useEffect(() => {
     initializeTheme();
@@ -40,7 +62,8 @@ function App() {
       <Suspense fallback={<AppShellFallback />}>
         <Routes>
           <Route element={<MainLayout />}>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/logined" element={<LoginedRoute />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Route>

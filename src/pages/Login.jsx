@@ -13,7 +13,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
 
     const navigateAfterLogin = (nextUser) => {
-        navigate(nextUser?.role === 'admin' ? '/manager' : '/dashboard');
+        navigate(nextUser?.role === 'admin' ? '/manager' : '/logined');
     };
 
     useEffect(() => {
@@ -91,7 +91,7 @@ export default function Login() {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/login`,
+                    redirectTo: `${window.location.origin}/logined`,
                 },
             });
 

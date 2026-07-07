@@ -123,6 +123,16 @@ img {
     gap: 10px;
 }
 
+.nav-greeting {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-text);
+    white-space: nowrap;
+}
+
 .theme-switch-btn {
     flex: 0 0 auto;
     aspect-ratio: 1 / 1;
@@ -162,6 +172,16 @@ img {
 .theme-switch-icon {
     font-size: 16px;
     line-height: 1;
+}
+
+.nav-logout-btn {
+    color: var(--blue);
+}
+
+.nav-logout-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
 }
 
 .nav-link {
@@ -1429,6 +1449,22 @@ img {
     height: 48px;
 }
 
+.mobile-auth-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.mobile-auth-greeting {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-text);
+    line-height: 1.35;
+}
+
 /* Responsive - Hiện hamburger button trên mobile */
 @media (max-width: 900px) {
     .nav-mobile-controls {
@@ -1568,6 +1604,12 @@ body.app-dark-mode .theme-switch-btn-menu {
     border-color: rgba(148, 163, 184, .18);
     box-shadow: 0 4px 0 rgba(15, 23, 42, .9);
     color: #7dd3fc;
+}
+
+body.app-dark-mode .nav-greeting,
+body.app-dark-mode .mobile-auth-greeting,
+body.app-dark-mode .nav-logout-btn {
+    color: #e2e8f0;
 }
 
 body.app-dark-mode .theme-switch-btn-mobile:hover,
