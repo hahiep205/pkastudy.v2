@@ -46,11 +46,13 @@ CREATE TABLE IF NOT EXISTS Topics (
   slug VARCHAR(120) DEFAULT NULL,
   title VARCHAR(255) NOT NULL,
   description TEXT DEFAULT NULL,
+  shared_from_topic_id INT DEFAULT NULL,
   language VARCHAR(20) NOT NULL DEFAULT 'en',
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_topics_course FOREIGN KEY (course_id) REFERENCES Courses(id) ON DELETE CASCADE,
+  CONSTRAINT fk_topics_shared_from_topic FOREIGN KEY (shared_from_topic_id) REFERENCES Topics(id) ON DELETE SET NULL,
   INDEX idx_topics_course_id (course_id)
 );
 

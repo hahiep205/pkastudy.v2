@@ -42,6 +42,7 @@ create table if not exists public.topics (
   slug text,
   title text not null,
   description text,
+  shared_from_topic_id bigint references public.topics(id) on delete set null,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

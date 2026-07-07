@@ -86,6 +86,26 @@ export default function TopicFormModal({
                         </select>
                     </div>
                 </div>
+                {!editingTopic ? (
+                    <div className="cv-form-row">
+                        <div className="cv-form-group" style={{ flex: 1 }}>
+                            <label className="cv-form-label">Bộ từ vựng được chia sẻ</label>
+                            <input
+                                className="cv-form-input"
+                                maxLength="120"
+                                placeholder="Dán ID bộ từ vựng được bạn bè chia sẻ"
+                                value={topicForm.sharedTopicId || ''}
+                                onChange={(event) => {
+                                    setTopicForm({ ...topicForm, sharedTopicId: event.target.value });
+                                    onToastHide?.();
+                                }}
+                            />
+                            <div className="cv-form-help" style={{ marginTop: '6px' }}>
+                                Để trống nếu tạo bộ mới hoàn toàn. Dán ID từ nút Share để sao chép toàn bộ từ vựng.
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </div>
             <div className="cv-modal-footer cv-modal-footer-split">
                 <button className="btn btn-secondary" onClick={onClose}>

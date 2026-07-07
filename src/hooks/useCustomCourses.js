@@ -34,6 +34,7 @@ const mapApiTopic = (apiTopic) => {
     description: apiTopic.description || "",
     lang: language,
     language,
+    sharedFromTopicId: apiTopic.shared_from_topic_id || apiTopic.sharedFromTopicId || null,
     words: (apiTopic.words || []).map((word) => mapApiWord(word, language)),
     word_count: apiTopic.word_count || apiTopic.words?.length || 0,
   };
@@ -82,7 +83,7 @@ export function useCustomCourses() {
   }, [loadFromServer]);
 
   const createTopic = useCallback(
-    async ({ title, description, lang }) => {
+    async ({ title, description, lang, sharedTopicId }) => {
       if (!title?.trim()) {
         return { error: "Tên chủ đề không được để trống." };
       }
@@ -95,6 +96,7 @@ export function useCustomCourses() {
           title: title.trim(),
           description,
           lang: normalizeLanguage(lang, "en"),
+          sharedTopicId: sharedTopicId ? String(sharedTopicId).trim() : null,
         });
         await loadFromServer();
         return mapApiTopic(createdTopic?.data || createdTopic);

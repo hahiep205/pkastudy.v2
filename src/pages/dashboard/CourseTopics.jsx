@@ -22,6 +22,7 @@ export default function CourseTopics() {
     title: "",
     description: "",
     lang: "en",
+    sharedTopicId: "",
   });
   const [toastMessage, setToastMessage] = useState("");
   const [pendingDeleteTopic, setPendingDeleteTopic] = useState(null);
@@ -36,10 +37,11 @@ export default function CourseTopics() {
         title: topic?.title || "",
         description: topic?.description || "",
         lang: topic?.language || topic?.lang || "en",
+        sharedTopicId: "",
       });
     } else {
       setEditingTopic(null);
-      setTopicForm({ title: "", description: "", lang: "en" });
+      setTopicForm({ title: "", description: "", lang: "en", sharedTopicId: "" });
     }
 
     setModalOpen(true);
@@ -61,8 +63,24 @@ export default function CourseTopics() {
 
     setModalOpen(false);
     setEditingTopic(null);
-    setTopicForm({ title: "", description: "", lang: "en" });
+    setTopicForm({ title: "", description: "", lang: "en", sharedTopicId: "" });
     setToastMessage("");
+  };
+
+  const handleShareTopic = async (topic, event) => {
+    event.stopPropagation();
+    const shareCode = String(topic.id || "").trim();
+    if (!shareCode) {
+      setToastMessage("Không lấy được mã chia sẻ.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareCode);
+      setToastMessage(`Đã sao chép mã chia sẻ: ${shareCode}`);
+    } catch {
+      window.prompt("Sao chép mã chia sẻ này và gửi cho người khác:", shareCode);
+    }
   };
 
   const handleDeleteTopic = (topicId) => {
@@ -278,6 +296,27 @@ export default function CourseTopics() {
                 {courseId === "custom" ? (
                   <div className="cv-icon-btns">
                     <button
+                      className="cv-icon-btn cv-cc-share"
+                      title="Chia sẻ bộ từ vựng"
+                      onClick={(event) => {
+                        handleShareTopic(topic, event);
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        width="14"
+                        height="14"
+                        fill="currentColor"
+                      >
+                        <circle cx="18" cy="5" r="3" />
+                        <circle cx="6" cy="12" r="3" />
+                        <circle cx="18" cy="19" r="3" />
+                        <path d="M8.59 13.51l6.83 3.98" />
+                        <path d="M15.41 6.51L8.59 10.49" />
+                      </svg>
+                    </button>
+                    <button
                       className="cv-icon-btn cv-cc-edit"
                       title="Sửa chủ đề"
                       onClick={(event) => {
@@ -350,7 +389,7 @@ export default function CourseTopics() {
         onClose={() => {
           setModalOpen(false);
           setEditingTopic(null);
-          setTopicForm({ title: "", description: "", lang: "en" });
+          setTopicForm({ title: "", description: "", lang: "en", sharedTopicId: "" });
           setToastMessage("");
         }}
         onSave={handleSaveTopic}

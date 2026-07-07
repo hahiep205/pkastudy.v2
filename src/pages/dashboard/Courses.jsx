@@ -26,7 +26,7 @@ export default function Courses() {
     });
     const [modalType, setModalType] = useState(null);
     const [editingTopic, setEditingTopic] = useState(null);
-    const [topicForm, setTopicForm] = useState({ title: '', description: '', lang: 'en' });
+    const [topicForm, setTopicForm] = useState({ title: '', description: '', lang: 'en', sharedTopicId: '' });
     const [toastMessage, setToastMessage] = useState('');
     const [pendingDeleteTopic, setPendingDeleteTopic] = useState(null);
     const { customCourses, createTopic, updateTopic, deleteTopic } = useCustomCourses();
@@ -102,10 +102,11 @@ export default function Courses() {
                 title: topic.title,
                 description: topic.description,
                 lang: topic.language || topic.lang || 'en',
+                sharedTopicId: '',
             });
         } else {
             setEditingTopic(null);
-            setTopicForm({ title: '', description: '', lang: 'en' });
+            setTopicForm({ title: '', description: '', lang: 'en', sharedTopicId: '' });
         }
 
         setModalType('topic-form');
@@ -131,8 +132,24 @@ export default function Courses() {
 
         setModalType(null);
         setEditingTopic(null);
-        setTopicForm({ title: '', description: '', lang: 'en' });
+        setTopicForm({ title: '', description: '', lang: 'en', sharedTopicId: '' });
         setToastMessage('');
+    };
+
+    const handleShareTopic = async (topic, event) => {
+        event.stopPropagation();
+        const shareCode = String(topic.id || '').trim();
+        if (!shareCode) {
+            setToastMessage('Không lấy được mã chia sẻ.');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(shareCode);
+            setToastMessage(`Đã sao chép mã chia sẻ: ${shareCode}`);
+        } catch {
+            window.prompt('Sao chép mã chia sẻ này và gửi cho người khác:', shareCode);
+        }
     };
 
     const handleDeleteTopic = (topicId) => {
@@ -282,6 +299,19 @@ export default function Courses() {
                                             </Link>
                                             <div className="cv-icon-btns">
                                                 <button
+                                                    className="cv-icon-btn cv-cc-share"
+                                                    title="Chia sẻ bộ từ vựng"
+                                                    onClick={(event) => handleShareTopic(topic, event)}
+                                                >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <circle cx="18" cy="5" r="3"></circle>
+                                                        <circle cx="6" cy="12" r="3"></circle>
+                                                        <circle cx="18" cy="19" r="3"></circle>
+                                                        <path d="M8.59 13.51l6.83 3.98"></path>
+                                                        <path d="M15.41 6.51L8.59 10.49"></path>
+                                                    </svg>
+                                                </button>
+                                                <button
                                                     className="cv-icon-btn cv-cc-edit"
                                                     title="Sửa chủ đề"
                                                     onClick={() => handleOpenTopicForm(topic)}
@@ -319,7 +349,7 @@ export default function Courses() {
                 onClose={() => {
                     setModalType(null);
                     setEditingTopic(null);
-                    setTopicForm({ title: '', description: '', lang: 'en' });
+                    setTopicForm({ title: '', description: '', lang: 'en', sharedTopicId: '' });
                     setToastMessage('');
                 }}
                 onSave={handleSaveTopic}

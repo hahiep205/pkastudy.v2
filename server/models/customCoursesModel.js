@@ -93,7 +93,7 @@ async function getCustomTopicsByUser(userId) {
 
   const topics = unwrapList(await admin
     .from('topics')
-    .select('id, slug, title, description, language, created_at')
+    .select('id, slug, title, description, language, shared_from_topic_id, created_at')
     .eq('owner_user_id', profileId)
     .order('created_at', { ascending: false }));
 
@@ -128,6 +128,7 @@ async function getCustomTopicsByUser(userId) {
     title: topic.title,
     description: topic.description,
     language: topic.language || 'en',
+    sharedFromTopicId: topic.shared_from_topic_id || null,
     created_at: topic.created_at,
     word_count: (wordsByTopicId.get(topic.id) || []).length,
     words: wordsByTopicId.get(topic.id) || [],
@@ -139,7 +140,7 @@ async function getCustomTopicWithWords(userId, topicId) {
   const profileId = await resolveProfileId(userId);
   const topic = unwrapSingle(await admin
     .from('topics')
-    .select('id, course_id, slug, title, description, language, sort_order, created_at, updated_at')
+    .select('id, course_id, slug, title, description, language, shared_from_topic_id, sort_order, created_at, updated_at')
     .eq('id', topicId)
     .eq('owner_user_id', profileId)
     .limit(1)
@@ -156,6 +157,7 @@ async function getCustomTopicWithWords(userId, topicId) {
   return {
     ...topic,
     language: topic.language || 'en',
+    sharedFromTopicId: topic.shared_from_topic_id || null,
     words: words.map((word) => ({
       id: word.id,
       word: word.word,
@@ -169,30 +171,104 @@ async function getCustomTopicWithWords(userId, topicId) {
   };
 }
 
-async function createCustomTopic(userId, { title, description, language }) {
+function parseSharedTopicId(sharedTopicId) {
+  const rawValue = typeof sharedTopicId === 'string' ? sharedTopicId.trim() : sharedTopicId;
+  if (rawValue === null || rawValue === undefined || rawValue === '') {
+    return null;
+  }
+
+  const rawText = String(rawValue);
+  if (!/^\d+$/.test(rawText)) {
+    const error = new Error('Shared topic is invalid.');
+    error.status = 400;
+    throw error;
+  }
+
+  const parsed = Number.parseInt(rawText, 10);
+
+  return parsed;
+}
+
+async function createCustomTopic(userId, { title, description, language, sharedTopicId }) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
   const customCourseId = await ensureCustomTopicsCourseId();
-  const inserted = unwrapSingle(await admin
-    .from('topics')
-    .insert({
-      course_id: customCourseId,
-      title,
-      description: description || null,
-      language: language || 'en',
-      owner_user_id: profileId,
-      sort_order: 0,
-    })
-    .select('id, title, description, language')
-    .single());
+  const resolvedSharedTopicId = parseSharedTopicId(sharedTopicId);
+  let sourceTopic = null;
+  let createdTopicId = null;
 
-  return {
-    id: inserted.id,
-    title: inserted.title,
-    description: inserted.description,
-    language: inserted.language || 'en',
-    words: [],
-  };
+  try {
+    if (resolvedSharedTopicId) {
+      sourceTopic = unwrapSingle(await admin
+        .from('topics')
+        .select('id, owner_user_id, title, description, language')
+        .eq('id', resolvedSharedTopicId)
+        .limit(1)
+        .maybeSingle());
+
+      if (!sourceTopic?.id) {
+        throw Object.assign(new Error('Shared topic not found.'), { status: 404 });
+      }
+
+      if (!sourceTopic.owner_user_id) {
+        throw Object.assign(new Error('Chỉ có thể chia sẻ từ bộ từ vựng cá nhân.'), { status: 400 });
+      }
+    }
+
+    const inserted = unwrapSingle(await admin
+      .from('topics')
+      .insert({
+        course_id: customCourseId,
+        title,
+        description: description || null,
+        language: sourceTopic?.language || language || 'en',
+        owner_user_id: profileId,
+        shared_from_topic_id: sourceTopic?.id || null,
+        sort_order: 0,
+      })
+      .select('id, title, description, language, shared_from_topic_id')
+      .single());
+
+    createdTopicId = inserted.id;
+
+    const copiedWords = [];
+    if (sourceTopic?.id) {
+      const sourceWords = unwrapList(await admin
+        .from('flashcards')
+        .select('word, transcription, meaning, word_type, example, example_vi, language')
+        .eq('topic_id', sourceTopic.id)
+        .order('id', { ascending: true }));
+
+      for (const word of sourceWords) {
+        const copiedWord = await addWordToCustomTopic(userId, inserted.id, {
+          word: word.word,
+          transcription: word.transcription,
+          mean: word.meaning,
+          wordtype: word.word_type,
+          example: word.example,
+          example_vi: word.example_vi,
+          language: word.language || inserted.language || language || 'en',
+        });
+        if (copiedWord) {
+          copiedWords.push(copiedWord);
+        }
+      }
+    }
+
+    return {
+      id: inserted.id,
+      title: inserted.title,
+      description: inserted.description,
+      language: inserted.language || 'en',
+      sharedFromTopicId: inserted.shared_from_topic_id || null,
+      words: copiedWords,
+    };
+  } catch (error) {
+    if (createdTopicId) {
+      await admin.from('topics').delete().eq('id', createdTopicId).eq('owner_user_id', profileId);
+    }
+    throw error;
+  }
 }
 
 async function ensureSamplePersonalTopicForUser(userId) {

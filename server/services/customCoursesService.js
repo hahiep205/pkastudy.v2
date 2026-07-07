@@ -28,10 +28,12 @@ async function createTopic(userId, data) {
   if (!data.title || !data.title.trim()) {
     throw Object.assign(new Error('Title is required'), { status: 400 });
   }
+  const sharedTopicId = data.sharedTopicId || data.shared_topic_id || data.sharedTopic || null;
   return createCustomTopic(userId, {
     ...data,
     title: data.title.trim(),
     language: normalizeLanguage(data.lang || data.language, 'en'),
+    sharedTopicId,
   });
 }
 
