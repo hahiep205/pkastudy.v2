@@ -16,12 +16,23 @@ function normalizeErrorMessage(error, fallback) {
     }
 }
 
+function safeText(value, fallback = '') {
+    if (typeof value === 'string') return value;
+    if (value == null) return fallback;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return fallback;
+    }
+}
+
 function SummaryCard({ label, value, hint, loading }) {
     return (
         <article className="manager-stat-card">
-            <span className="manager-stat-label">{label}</span>
+            <span className="manager-stat-label">{safeText(label, '--')}</span>
             <strong className="manager-stat-value">{loading ? '...' : formatNumber(value)}</strong>
-            <p className="manager-stat-hint">{hint}</p>
+            <p className="manager-stat-hint">{safeText(hint)}</p>
         </article>
     );
 }
@@ -145,7 +156,7 @@ function OverviewDonutChart({ items, total, emptyMessage }) {
     const colors = ['#1cb0f6', '#58cc02', '#d98f3f', '#7f8aa3'];
 
     if (!items.length || !safeTotal) {
-        return <div className="manager-chart-empty manager-chart-empty-compact">{emptyMessage}</div>;
+        return <div className="manager-chart-empty manager-chart-empty-compact">{safeText(emptyMessage, 'Chưa có dữ liệu để hiển thị.')}</div>;
     }
 
     return (
@@ -226,6 +237,18 @@ export default function ManagerOverview() {
                         'Không thể tải tổng quan hệ thống.',
                     ),
                 );
+                setSummary({
+                    totalUsers: 0,
+                    totalCourses: 0,
+                    totalToeicTests: 0,
+                    totalFlashcards: 0,
+                    totalToeicQuestions: 0,
+                    totalToeicAttempts: 0,
+                    totalSrsReviews: 0,
+                    totalVocabModeCompletions: 0,
+                    activeUsersToday: 0,
+                    activityBreakdown: { toeicAttempts: 0, srsReviews: 0 },
+                });
             })
             .finally(() => {
                 if (active) setSummaryLoading(false);
@@ -254,6 +277,12 @@ export default function ManagerOverview() {
                         'Không thể tải dữ liệu đăng ký mới.',
                     ),
                 );
+                setChart({
+                    points: [],
+                    maxCount: 0,
+                    totalRegistrations: 0,
+                    range: null,
+                });
             })
             .finally(() => {
                 if (active) setChartLoading(false);
@@ -367,7 +396,7 @@ export default function ManagerOverview() {
                         <h3>Lỗi tải tổng quan</h3>
                         <span className="manager-chip">Cần kiểm tra</span>
                     </div>
-                    <p className="manager-error-text">{summaryError}</p>
+                    <p className="manager-error-text">{safeText(summaryError, 'Không thể tải tổng quan hệ thống.')}</p>
                 </section>
             ) : null}
 
@@ -406,7 +435,7 @@ export default function ManagerOverview() {
                         </div>
                     </div>
 
-                    {chartError ? <p className="manager-error-text">{chartError}</p> : null}
+                    {chartError ? <p className="manager-error-text">{safeText(chartError, 'Không thể tải dữ liệu đăng ký mới.')}</p> : null}
                     {chartLoading ? <div className="manager-chart-loading">Đang tải biểu đồ đăng ký mới...</div> : null}
                     {!chartLoading && !chartError ? (
                         <OverviewBarChart points={displayedChart.points} maxCount={displayedChart.maxCount} />
