@@ -1,24 +1,23 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { useSupabaseStorage } = require('../lib/supabaseStorage');
 
 const uploadDir = path.join(__dirname, '../uploads/toeic');
-if (!useSupabaseStorage && !fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const diskStorage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => {
-    const timestamp = Date.now();
-    const random = Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${timestamp}-${random}${ext}`);
-  },
-});
 
 const memoryStorage = multer.memoryStorage();
+const isVercelRuntime = Boolean(process.env.VERCEL);
+
+const diskStorage = useSupabaseStorage || isVercelRuntime
+  ? null
+  : multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, cb) => {
+      const timestamp = Date.now();
+      const random = Math.round(Math.random() * 1e9);
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${timestamp}-${random}${ext}`);
+    },
+  });
 
 const allowedMimeTypes = [
   'image/jpeg',
@@ -43,7 +42,7 @@ function fileFilter(req, file, cb) {
 }
 
 const upload = multer({
-  storage: useSupabaseStorage ? memoryStorage : diskStorage,
+  storage: useSupabaseStorage || isVercelRuntime ? memoryStorage : diskStorage,
   fileFilter,
   limits: {
     fileSize: 30 * 1024 * 1024,
