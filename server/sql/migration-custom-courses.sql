@@ -1,29 +1,46 @@
 -- Migration: Custom Courses & Word Progress
--- Run once to add support for user-owned custom topics and per-user word progress tracking
+-- Supabase/Postgres version.
+-- This script is safe to run multiple times.
 
--- 1. Add user_id column to Topics to support custom (user-owned) topics
-ALTER TABLE Topics
-  ADD COLUMN IF NOT EXISTS user_id INT DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS is_custom TINYINT(1) NOT NULL DEFAULT 0;
+-- 1. Add ownership columns for custom topics.
+ALTER TABLE topics
+  ADD COLUMN IF NOT EXISTS owner_user_id text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS user_id text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS is_custom boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS shared_from_topic_id integer DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS slug varchar(120) DEFAULT NULL;
 
--- Add FK if not already there (MySQL will error if already exists, wrap in procedure if needed)
--- Run separately if FK already exists:
-ALTER TABLE Topics
-  ADD CONSTRAINT fk_topics_user FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE;
+-- Foreign key to the shared source topic.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_topics_shared_from_topic'
+  ) THEN
+    ALTER TABLE topics
+      ADD CONSTRAINT fk_topics_shared_from_topic
+      FOREIGN KEY (shared_from_topic_id) REFERENCES topics(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
--- Index for fast lookup of user's custom topics
-ALTER TABLE Topics
-  ADD INDEX IF NOT EXISTS idx_topics_user_id (user_id);
+-- Indexes for fast lookup of user-owned topics.
+CREATE INDEX IF NOT EXISTS idx_topics_owner_user_id ON topics (owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_topics_user_id ON topics (user_id);
+CREATE INDEX IF NOT EXISTS idx_topics_shared_from_topic_id ON topics (shared_from_topic_id);
 
--- 2. Create User_Word_Progress table to track "remembered" state per user per flashcard
-CREATE TABLE IF NOT EXISTS User_Word_Progress (
-  id           INT AUTO_INCREMENT PRIMARY KEY,
-  user_id      INT NOT NULL,
-  flashcard_id INT NOT NULL,
-  is_remembered TINYINT(1) NOT NULL DEFAULT 0,
-  updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_user_word (user_id, flashcard_id),
-  CONSTRAINT fk_uwp_user       FOREIGN KEY (user_id)      REFERENCES Users(id)      ON DELETE CASCADE,
-  CONSTRAINT fk_uwp_flashcard  FOREIGN KEY (flashcard_id) REFERENCES Flashcards(id) ON DELETE CASCADE,
-  INDEX idx_uwp_user_id (user_id)
+-- 2. User word progress table.
+CREATE TABLE IF NOT EXISTS user_word_progress (
+  id bigserial PRIMARY KEY,
+  user_id text NOT NULL,
+  flashcard_id integer NOT NULL,
+  is_remembered boolean NOT NULL DEFAULT false,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT uq_user_word UNIQUE (user_id, flashcard_id),
+  CONSTRAINT fk_uwp_flashcard FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
 );
+
+ALTER TABLE user_word_progress
+  ALTER COLUMN is_remembered TYPE boolean USING (lower(coalesce(is_remembered::text, 'false')) IN ('1', 't', 'true', 'yes', 'y'));
+
+CREATE INDEX IF NOT EXISTS idx_user_word_progress_user_id ON user_word_progress (user_id);

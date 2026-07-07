@@ -114,7 +114,10 @@
         border-radius: var(--radius-md);
     }
 
-    .welcome-pill-row,
+    .welcome-pill-row {
+        display: none;
+    }
+
     .chart-summary {
         grid-template-columns: 1fr;
     }

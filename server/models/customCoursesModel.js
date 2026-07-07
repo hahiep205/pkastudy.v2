@@ -69,6 +69,31 @@ function buildCustomTopicSlug(title, profileId) {
   return `custom-${titleSlug}-${profileSlug}-${suffix}`.slice(0, 120);
 }
 
+function isMissingColumnError(error, columnName) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes(columnName.toLowerCase())
+    && (message.includes('column') || message.includes('does not exist') || message.includes('not found'));
+}
+
+async function withOwnershipColumnFallback(queries) {
+  let lastError = null;
+  for (const query of queries) {
+    try {
+      return await query();
+    } catch (error) {
+      lastError = error;
+      if (
+        !isMissingColumnError(error, 'owner_user_id')
+        && !isMissingColumnError(error, 'user_id')
+        && !isMissingColumnError(error, 'shared_from_topic_id')
+      ) {
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
 async function ensureCustomTopicsCourseId() {
   const admin = ensureSupabaseEnabled();
   const existing = unwrapSingle(await admin
@@ -105,53 +130,39 @@ async function ensureCustomTopicsCourseId() {
 }
 
 async function selectCustomTopicList(admin, profileId) {
-  const baseQuery = admin
+  const buildQuery = (selectColumns, ownershipColumn) => admin
     .from('topics')
-    .select('id, slug, title, description, language, created_at')
-    .eq('owner_user_id', profileId)
+    .select(selectColumns)
+    .eq(ownershipColumn, profileId)
     .order('created_at', { ascending: false });
 
-  const withSharedQuery = admin
-    .from('topics')
-    .select('id, slug, title, description, language, shared_from_topic_id, created_at')
-    .eq('owner_user_id', profileId)
-    .order('created_at', { ascending: false });
+  const queries = [
+    () => unwrapList(buildQuery('id, slug, title, description, language, shared_from_topic_id, created_at', 'owner_user_id')),
+    () => unwrapList(buildQuery('id, slug, title, description, language, shared_from_topic_id, created_at', 'user_id')),
+    () => unwrapList(buildQuery('id, slug, title, description, language, created_at', 'owner_user_id')),
+    () => unwrapList(buildQuery('id, slug, title, description, language, created_at', 'user_id')),
+  ];
 
-  try {
-    return unwrapList(await withSharedQuery);
-  } catch (error) {
-    if (String(error?.message || '').toLowerCase().includes('shared_from_topic_id')) {
-      return unwrapList(await baseQuery);
-    }
-    throw error;
-  }
+  return withOwnershipColumnFallback(queries);
 }
 
 async function selectCustomTopicDetail(admin, profileId, topicId) {
-  const baseQuery = admin
+  const buildQuery = (selectColumns, ownershipColumn) => admin
     .from('topics')
-    .select('id, course_id, slug, title, description, language, sort_order, created_at, updated_at')
+    .select(selectColumns)
     .eq('id', topicId)
-    .eq('owner_user_id', profileId)
+    .eq(ownershipColumn, profileId)
     .limit(1)
     .maybeSingle();
 
-  const withSharedQuery = admin
-    .from('topics')
-    .select('id, course_id, slug, title, description, language, shared_from_topic_id, sort_order, created_at, updated_at')
-    .eq('id', topicId)
-    .eq('owner_user_id', profileId)
-    .limit(1)
-    .maybeSingle();
+  const queries = [
+    async () => unwrapSingle(await buildQuery('id, course_id, slug, title, description, language, shared_from_topic_id, sort_order, created_at, updated_at', 'owner_user_id')),
+    async () => unwrapSingle(await buildQuery('id, course_id, slug, title, description, language, shared_from_topic_id, sort_order, created_at, updated_at', 'user_id')),
+    async () => unwrapSingle(await buildQuery('id, course_id, slug, title, description, language, sort_order, created_at, updated_at', 'owner_user_id')),
+    async () => unwrapSingle(await buildQuery('id, course_id, slug, title, description, language, sort_order, created_at, updated_at', 'user_id')),
+  ];
 
-  try {
-    return unwrapSingle(await withSharedQuery);
-  } catch (error) {
-    if (String(error?.message || '').toLowerCase().includes('shared_from_topic_id')) {
-      return unwrapSingle(await baseQuery);
-    }
-    throw error;
-  }
+  return withOwnershipColumnFallback(queries);
 }
 
 async function getCustomTopicsByUser(userId) {
@@ -258,7 +269,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
     if (resolvedSharedTopicId) {
       sourceTopic = unwrapSingle(await admin
         .from('topics')
-        .select('id, owner_user_id, title, description, language')
+        .select('id, title, description, language')
         .eq('id', resolvedSharedTopicId)
         .limit(1)
         .maybeSingle());
@@ -288,7 +299,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
     const inserted = unwrapSingle(await admin
       .from('topics')
       .insert(topicPayload)
-      .select('id, title, description, language, shared_from_topic_id')
+      .select('id, title, description, language')
       .single());
 
     createdTopicId = inserted.id;
@@ -322,7 +333,7 @@ async function createCustomTopic(userId, { title, description, language, sharedT
       title: inserted.title,
       description: inserted.description,
       language: inserted.language || 'en',
-      sharedFromTopicId: inserted.shared_from_topic_id || null,
+      sharedFromTopicId: null,
       words: copiedWords,
     };
   } catch (error) {
