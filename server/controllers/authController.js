@@ -6,7 +6,11 @@ const {
   createUser,
   createUserFromAuthIdentity,
   createProgressRecordForUser,
+  markSamplePersonalTopicSeeded,
 } = require('../models/userModel');
+const {
+  ensureSamplePersonalTopicForUser,
+} = require('../models/customCoursesModel');
 const { sendVerificationCodeEmail } = require('../services/emailService');
 const {
   createSupabaseAuthUser,
@@ -57,10 +61,12 @@ function buildAuthPayload(user, token) {
       token,
       user: {
         id: user.id,
+        profileId: user.profileId || null,
         email: user.email,
         name: user.name,
         role: user.role || 'user',
         status: user.status || 'active',
+        samplePersonalTopicSeededAt: user.samplePersonalTopicSeededAt || null,
       },
     },
   };
@@ -346,6 +352,36 @@ async function googleLogin(req, res, next) {
   }
 }
 
+async function seedPersonalTopicSample(req, res, next) {
+  try {
+    const user = req.user;
+    if (!user?.profileId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!user.samplePersonalTopicSeededAt) {
+      const userIdentifier = user.profileId || user.id;
+      await ensureSamplePersonalTopicForUser(userIdentifier);
+      const updated = await markSamplePersonalTopicSeeded(userIdentifier);
+      return res.json({
+        data: {
+          seeded: true,
+          samplePersonalTopicSeededAt: updated?.samplePersonalTopicSeededAt || new Date().toISOString(),
+        },
+      });
+    }
+
+    return res.json({
+      data: {
+        seeded: false,
+        samplePersonalTopicSeededAt: user.samplePersonalTopicSeededAt,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function startGoogleLogin(req, res, next) {
   try {
     const { error, value } = googleStartSchema.validate(req.query, {
@@ -469,4 +505,5 @@ module.exports = {
   completeGoogleLogin,
   exchangeSession,
   getCurrentSession,
+  seedPersonalTopicSample,
 };

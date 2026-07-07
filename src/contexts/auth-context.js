@@ -26,6 +26,7 @@ export function normalizeUser(user) {
         email: user.email || null,
         role: user.role || 'user',
         status: user.status || 'active',
+        samplePersonalTopicSeededAt: user.samplePersonalTopicSeededAt || null,
         token: user.token || null,
     };
 }

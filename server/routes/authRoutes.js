@@ -8,6 +8,7 @@ const {
   getCurrentSession,
   startGoogleLogin,
   completeGoogleLogin,
+  seedPersonalTopicSample,
 } = require('../controllers/authController');
 const { authMiddleware } = require('../middlewares/authMiddleware');
 
@@ -22,5 +23,6 @@ router.post('/google/complete', completeGoogleLogin);
 router.post('/session', exchangeSession);
 router.get('/session', authMiddleware, getCurrentSession);
 router.post('/google', googleLogin);
+router.post('/sample-topic', authMiddleware, seedPersonalTopicSample);
 
 module.exports = router;

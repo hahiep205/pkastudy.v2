@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import axiosClient from '../utils/axiosClient';
 import { supabase } from '../supabase';
 import { AuthContext, getInitialUser, guestUser, normalizeUser } from './auth-context';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(getInitialUser);
+    const [seedingSampleTopic, setSeedingSampleTopic] = useState(false);
+    const seedAttemptedRef = useRef(new Set());
 
-    const applyUser = (nextUser) => {
+    const applyUser = useCallback((nextUser) => {
         const normalized = normalizeUser(nextUser);
         setUser(normalized);
         localStorage.setItem('user', JSON.stringify(normalized));
@@ -16,21 +19,22 @@ export function AuthProvider({ children }) {
         }
         window.dispatchEvent(new CustomEvent('auth:user-changed', { detail: { user: normalized } }));
         return normalized;
-    };
+    }, []);
 
-    const clearUser = () => {
+    const clearUser = useCallback(() => {
         setUser(guestUser);
+        seedAttemptedRef.current.clear();
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         window.dispatchEvent(new CustomEvent('auth:user-changed', { detail: { user: guestUser } }));
-    };
+    }, []);
 
-    const login = (userData) => applyUser(userData);
+    const login = useCallback((userData) => applyUser(userData), [applyUser]);
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
         clearUser();
         await supabase.auth.signOut().catch(() => undefined);
-    };
+    }, [clearUser]);
 
     useEffect(() => {
         let active = true;
@@ -46,7 +50,7 @@ export function AuthProvider({ children }) {
 
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
-                    .select('id, legacy_user_id, email, name, role, status')
+                    .select('id, legacy_user_id, email, name, role, status, sample_personal_topic_seeded_at')
                     .eq('id', authUser.id)
                     .maybeSingle();
 
@@ -63,6 +67,7 @@ export function AuthProvider({ children }) {
                         name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || authUser.email,
                         role: profile?.role || 'user',
                         status: profile?.status || 'active',
+                        samplePersonalTopicSeededAt: profile?.sample_personal_topic_seeded_at || null,
                         token: accessToken,
                     });
                     return true;
@@ -120,6 +125,47 @@ export function AuthProvider({ children }) {
             window.removeEventListener('auth:unauthorized', handleUnauthorized);
         };
     }, []);
+
+    useEffect(() => {
+        const profileKey = user?.profileId || user?.authUserId || user?.email || null;
+        if (!user?.token || user?.samplePersonalTopicSeededAt || seedingSampleTopic || !profileKey) {
+            return;
+        }
+
+        if (seedAttemptedRef.current.has(profileKey)) {
+            return;
+        }
+        seedAttemptedRef.current.add(profileKey);
+
+        let cancelled = false;
+        setSeedingSampleTopic(true);
+
+        const seedSampleTopic = async () => {
+            try {
+                const response = await axiosClient.post('/auth/sample-topic');
+                if (cancelled) return;
+                const seededAt =
+                    response?.data?.data?.samplePersonalTopicSeededAt || new Date().toISOString();
+                login({
+                    ...user,
+                    samplePersonalTopicSeededAt: seededAt,
+                });
+            } catch (error) {
+                if (!cancelled) {
+                    console.warn('[Auth] Sample topic seed failed:', error?.message);
+                }
+            } finally {
+                if (!cancelled) {
+                    setSeedingSampleTopic(false);
+                }
+            }
+        };
+
+        void seedSampleTopic();
+        return () => {
+            cancelled = true;
+        };
+    }, [login, seedingSampleTopic, user?.samplePersonalTopicSeededAt, user?.token]);
 
     return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
 }

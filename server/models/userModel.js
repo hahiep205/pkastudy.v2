@@ -18,6 +18,7 @@ function mapProfile(row) {
     name: row.name,
     role: row.role,
     status: row.status,
+    samplePersonalTopicSeededAt: row.sample_personal_topic_seeded_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -40,7 +41,7 @@ async function ensureProfileRecord({ authUserId, email, name, role = 'user', sta
   const existing = authUserId
     ? unwrapSingle(await admin
       .from('profiles')
-      .select('id, legacy_user_id, email, name, role, status, created_at, updated_at')
+      .select('id, legacy_user_id, email, name, role, status, sample_personal_topic_seeded_at, created_at, updated_at')
       .eq('id', authUserId)
       .limit(1)
       .maybeSingle())
@@ -57,7 +58,7 @@ async function ensureProfileRecord({ authUserId, email, name, role = 'user', sta
       role,
       status,
     })
-    .select('id, legacy_user_id, email, name, role, status, created_at, updated_at')
+    .select('id, legacy_user_id, email, name, role, status, sample_personal_topic_seeded_at, created_at, updated_at')
     .single());
 
   await admin
@@ -71,7 +72,7 @@ async function getUserByEmail(email) {
   const admin = ensureSupabaseEnabled();
   const row = unwrapSingle(await admin
     .from('profiles')
-    .select('id, legacy_user_id, email, name, role, status, created_at, updated_at')
+    .select('id, legacy_user_id, email, name, role, status, sample_personal_topic_seeded_at, created_at, updated_at')
     .eq('email', email)
     .limit(1)
     .maybeSingle());
@@ -106,12 +107,27 @@ async function getUserAuthById(userId) {
   const admin = ensureSupabaseEnabled();
   const query = admin
     .from('profiles')
-    .select('id, legacy_user_id, email, name, role, status, created_at, updated_at')
+    .select('id, legacy_user_id, email, name, role, status, sample_personal_topic_seeded_at, created_at, updated_at')
     .limit(1);
 
   const row = isUuid(userId)
     ? unwrapSingle(await query.eq('id', userId).maybeSingle())
     : unwrapSingle(await query.eq('legacy_user_id', Number(userId)).maybeSingle());
+
+  return mapProfile(row);
+}
+
+async function markSamplePersonalTopicSeeded(userId) {
+  const admin = ensureSupabaseEnabled();
+  const user = await getUserAuthById(userId);
+  if (!user?.profileId) return null;
+
+  const row = unwrapSingle(await admin
+    .from('profiles')
+    .update({ sample_personal_topic_seeded_at: new Date().toISOString() })
+    .eq('id', user.profileId)
+    .select('id, legacy_user_id, email, name, role, status, sample_personal_topic_seeded_at, created_at, updated_at')
+    .single());
 
   return mapProfile(row);
 }
@@ -166,6 +182,7 @@ module.exports = {
   createUserFromGoogle,
   getUserAuthById,
   createProgressRecordForUser,
+  markSamplePersonalTopicSeeded,
   ensureDefaultAdminUser,
   ensureDefaultDemoUser,
   ensureProfileRecord,

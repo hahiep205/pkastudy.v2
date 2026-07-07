@@ -35,7 +35,7 @@ export default function Login() {
 
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('id, legacy_user_id, email, name, role, status')
+            .select('id, legacy_user_id, email, name, role, status, sample_personal_topic_seeded_at')
             .eq('id', authUser.id)
             .maybeSingle();
 
@@ -51,6 +51,7 @@ export default function Login() {
             email: profile?.email || authUser.email,
             role: profile?.role || 'user',
             status: profile?.status || 'active',
+            samplePersonalTopicSeededAt: profile?.sample_personal_topic_seeded_at || null,
             token: session.access_token,
         };
     };

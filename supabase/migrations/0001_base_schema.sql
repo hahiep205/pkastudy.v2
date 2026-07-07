@@ -7,6 +7,7 @@ create table if not exists public.profiles (
   name text,
   role text not null default 'user' check (role in ('user', 'admin')),
   status text not null default 'active' check (status in ('active', 'banned')),
+  sample_personal_topic_seeded_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

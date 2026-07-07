@@ -67,7 +67,9 @@ async function authMiddleware(req, res, next) {
       return res.status(403).json({ error: 'Your account has been banned.' });
     }
 
-    req.userId = user.id;
+    req.userId = user.profileId || user.id;
+    req.userLegacyId = user.id || null;
+    req.userProfileId = user.profileId || null;
     req.userRole = user.role;
     req.userStatus = user.status;
     req.user = user;
