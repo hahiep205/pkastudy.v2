@@ -238,42 +238,34 @@ async function ensureTopic(courseId, topic) {
 }
 
 async function insertWords(topicId, words) {
+  const payloadByWord = new Map();
+
   for (const word of words) {
+    const normalizedWord = typeof word.word === 'string' ? word.word.trim() : '';
+    if (!normalizedWord) continue;
+
     const payload = {
       topic_id: topicId,
       external_id: null,
-      word: word.word,
-      transcription: word.transcription,
-      meaning: word.meaning,
-      word_type: word.word_type,
-      example: word.example,
-      example_vi: word.example_vi,
+      word: normalizedWord,
+      transcription: word.transcription || null,
+      meaning: word.meaning || word.mean || '',
+      word_type: word.word_type || word.wordtype || null,
+      example: word.example || null,
+      example_vi: word.example_vi || null,
       language: word.language || 'en',
     };
 
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('flashcards')
-      .select('id')
-      .eq('topic_id', topicId)
-      .eq('word', word.word)
-      .maybeSingle();
+    payloadByWord.set(normalizedWord.toLowerCase(), payload);
+  }
 
-    if (fetchError) {
-      throw fetchError;
-    }
+  const payloads = Array.from(payloadByWord.values());
+  const chunkSize = 500;
 
-    if (existing?.id) {
-      const { error } = await supabaseAdmin
-        .from('flashcards')
-        .update(payload)
-        .eq('id', existing.id);
-      if (error) throw error;
-      continue;
-    }
-
+  for (let index = 0; index < payloads.length; index += chunkSize) {
     const { error } = await supabaseAdmin
       .from('flashcards')
-      .insert(payload);
+      .insert(payloads.slice(index, index + chunkSize));
 
     if (error) throw error;
   }

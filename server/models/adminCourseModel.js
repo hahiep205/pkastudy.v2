@@ -29,24 +29,32 @@ async function getCourseMetrics(courseIds) {
     .in('course_id', courseIds)
     .is('owner_user_id', null));
 
-  const flashcards = topics.length
-    ? unwrapList(await admin.from('flashcards').select('id, topic_id').in('topic_id', topics.map((topic) => topic.id)))
-    : [];
-
   const topicCountByCourseId = new Map();
-  const topicCourseMap = new Map();
+  const topicIdsByCourseId = new Map();
   topics.forEach((topic) => {
     topicCountByCourseId.set(topic.course_id, (topicCountByCourseId.get(topic.course_id) || 0) + 1);
-    topicCourseMap.set(topic.id, topic.course_id);
+    if (!topicIdsByCourseId.has(topic.course_id)) {
+      topicIdsByCourseId.set(topic.course_id, []);
+    }
+    topicIdsByCourseId.get(topic.course_id).push(topic.id);
   });
 
   const vocabCountByCourseId = new Map();
-  flashcards.forEach((flashcard) => {
-    const courseId = topicCourseMap.get(flashcard.topic_id);
-    if (courseId) {
-      vocabCountByCourseId.set(courseId, (vocabCountByCourseId.get(courseId) || 0) + 1);
+  await Promise.all(courseIds.map(async (courseId) => {
+    const topicIds = topicIdsByCourseId.get(courseId) || [];
+    if (!topicIds.length) {
+      vocabCountByCourseId.set(courseId, 0);
+      return;
     }
-  });
+
+    const { count, error } = await admin
+      .from('flashcards')
+      .select('*', { head: true, count: 'exact' })
+      .in('topic_id', topicIds);
+
+    if (error) throw error;
+    vocabCountByCourseId.set(courseId, Number(count || 0));
+  }));
 
   return new Map(courseIds.map((courseId) => [courseId, {
     topicCount: topicCountByCourseId.get(courseId) || 0,

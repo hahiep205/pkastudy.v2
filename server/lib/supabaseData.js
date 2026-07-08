@@ -84,16 +84,16 @@ async function fetchTopicsWithVocabularyCounts(courseId) {
     return [];
   }
 
-  const topicIds = topicRows.map((topic) => topic.id);
-  const flashcards = unwrapList(await admin
-    .from('flashcards')
-    .select('id, topic_id')
-    .in('topic_id', topicIds));
-
   const countByTopicId = new Map();
-  flashcards.forEach((flashcard) => {
-    countByTopicId.set(flashcard.topic_id, (countByTopicId.get(flashcard.topic_id) || 0) + 1);
-  });
+  await Promise.all(topicRows.map(async (topic) => {
+    const { count, error } = await admin
+      .from('flashcards')
+      .select('*', { head: true, count: 'exact' })
+      .eq('topic_id', topic.id);
+
+    if (error) throw error;
+    countByTopicId.set(topic.id, Number(count || 0));
+  }));
 
   return topicRows.map((topic) => ({
     id: topic.id,

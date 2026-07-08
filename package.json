@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "seed:supabase:toeic": "node server/scripts/seed-supabase-production.js toeic"
+    "seed:supabase:toeic": "node server/scripts/seed-supabase-production.js toeic",
+    "seed:supabase:public": "node server/scripts/seed-supabase-production.js public"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
