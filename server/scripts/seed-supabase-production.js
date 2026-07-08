@@ -90,8 +90,10 @@ async function ensureCourse(course) {
 }
 
 async function seedToeicTests() {
+  assertConfigured();
   const { listeningData, readingData } = loadToeicTestSourceData();
 
+  console.log('Seeding TOEIC tests, groups, and questions...');
   await supabaseAdmin.from('toeic_questions').delete().neq('id', 0);
   await supabaseAdmin.from('toeic_question_groups').delete().neq('id', 0);
   await supabaseAdmin.from('toeic_tests').delete().neq('id', 0);
@@ -181,7 +183,10 @@ async function seedToeicTests() {
 
     await insertSections(listeningTest.sections);
     await insertSections(matchingReadingTest?.sections || []);
+    console.log(`  TOEIC test: ${title} (${testId})`);
   }
+
+  console.log(`TOEIC tests seeded: ${(listeningData.tests || []).length}`);
 }
 
 async function ensureTopic(courseId, topic) {
@@ -327,6 +332,8 @@ if (require.main === module) {
 
   const runner = mode === '--users-only' || mode === 'users'
     ? seedUsersOnly
+    : mode === '--toeic-only' || mode === 'toeic'
+      ? seedToeicTests
     : mode === '--public-only' || mode === 'public'
       ? seedPublicCatalog
       : seedSupabaseProduction;
@@ -341,4 +348,5 @@ module.exports = {
   seedSupabaseProduction,
   seedUsersOnly,
   seedPublicCatalog,
+  seedToeicTests,
 };
