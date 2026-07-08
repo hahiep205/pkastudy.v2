@@ -4,7 +4,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import FileFormatModal from '../../components/common/FileFormatModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
-import { mergeGuestReadyCourses } from '../../data/guestToeicCourses';
+import { getGuestReadyCourseManagerFallbacks } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 import {
@@ -154,13 +154,13 @@ export default function ManagerCourses() {
                 if (!active) return;
                 setCoursesData({
                     ...data,
-                    items: mergeGuestReadyCourses(data?.items || []),
+                    items: data?.items?.length ? data.items : getGuestReadyCourseManagerFallbacks(),
                 });
             })
             .catch((err) => {
                 if (!active) return;
                 setCoursesData({
-                    items: mergeGuestReadyCourses([]),
+                    items: getGuestReadyCourseManagerFallbacks(),
                     meta: null,
                     filters: null,
                 });
@@ -202,6 +202,11 @@ export default function ManagerCourses() {
     };
 
     const openEditModal = (course) => {
+        if (course?.isCatalogFallback) {
+            setToast({ message: 'Khóa học này đang là dữ liệu fallback, cần seed/sync vào DB trước khi chỉnh sửa.', type: 'error' });
+            return;
+        }
+
         setEditingCourse(course);
         setForm({
             title: course.title || '',
@@ -226,7 +231,7 @@ export default function ManagerCourses() {
         const data = await axiosClient.get(`/admin/courses?${params.toString()}`);
         setCoursesData({
             ...data,
-            items: mergeGuestReadyCourses(data?.items || []),
+            items: data?.items?.length ? data.items : getGuestReadyCourseManagerFallbacks(),
         });
     };
 
@@ -257,6 +262,11 @@ export default function ManagerCourses() {
 
     const handleDeleteCourse = async () => {
         if (!pendingDelete?.id) return;
+        if (pendingDelete?.isCatalogFallback) {
+            setToast({ message: 'Khóa học fallback chưa có bản ghi DB để xóa.', type: 'error' });
+            setPendingDelete(null);
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -280,6 +290,11 @@ export default function ManagerCourses() {
 
     const handleExportCourse = (course) => {
         if (!course?.id) return;
+        if (course?.isCatalogFallback) {
+            setToast({ message: 'Khóa học fallback chưa có bản ghi DB để xuất file.', type: 'error' });
+            return;
+        }
+
         setExportTargetCourse(course);
     };
 
@@ -466,9 +481,19 @@ export default function ManagerCourses() {
                             </div>
 
                             <div className="manager-table-actions">
-                                <Link to={`/manager/courses/${course.id}/topics`} className="manager-inline-action">
-                                    Xem chi tiết
-                                </Link>
+                                {course.isCatalogFallback ? (
+                                    <button
+                                        type="button"
+                                        className="manager-table-action"
+                                        onClick={() => setToast({ message: 'Khóa học fallback cần được seed/sync vào DB trước khi quản lý chủ đề.', type: 'error' })}
+                                    >
+                                        Xem chi tiết
+                                    </button>
+                                ) : (
+                                    <Link to={`/manager/courses/${course.id}/topics`} className="manager-inline-action">
+                                        Xem chi tiết
+                                    </Link>
+                                )}
                                 <button type="button" className="manager-table-action" onClick={() => openEditModal(course)}>
                                     Sửa
                                 </button>

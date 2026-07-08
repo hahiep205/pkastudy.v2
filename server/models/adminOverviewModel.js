@@ -12,69 +12,84 @@ function formatShortLabel(value) {
   return `${month}/${day}`;
 }
 
+async function countQueryRows(query) {
+  const result = await query;
+  if (result.error) {
+    const error = new Error(result.error.message || 'Database count request failed');
+    error.status = result.status || 500;
+    throw error;
+  }
+
+  return Number(result.count || 0);
+}
+
 async function getAdminOverviewSummary() {
   const admin = ensureSupabaseEnabled();
+  const today = new Date().toISOString().slice(0, 10);
+  const todayStart = `${today}T00:00:00.000Z`;
   const [
-    profiles,
-    userProgress,
-    courses,
-    topics,
-    flashcards,
-    toeicTests,
-    toeicQuestions,
-    toeicAttempts,
-    srsReviews,
-    vocabActivityLogs,
+    totalUsers,
+    courseRowsResult,
+    toeicTestCount,
+    toeicQuestionCount,
+    toeicAttemptCount,
+    srsReviewCount,
+    vocabActivityCount,
+    todayProgressRows,
+    todayToeicRows,
+    todaySrsRows,
+    todayVocabRows,
   ] = await Promise.all([
-    admin.from('profiles').select('id'),
-    admin.from('user_progress').select('user_id, last_study_date'),
+    countQueryRows(admin.from('profiles').select('*', { count: 'exact', head: true })),
     admin.from('courses').select('id, slug'),
-    admin.from('topics').select('id, course_id, owner_user_id'),
-    admin.from('flashcards').select('id, topic_id'),
-    admin.from('toeic_tests').select('id'),
-    admin.from('toeic_questions').select('id'),
-    admin.from('toeic_test_records').select('id, user_id, created_at'),
-    admin.from('srs_reviews').select('id, user_id, last_reviewed_at, created_at'),
-    admin.from('vocab_activity_logs').select('id, user_id, created_at'),
+    countQueryRows(admin.from('toeic_tests').select('*', { count: 'exact', head: true })),
+    countQueryRows(admin.from('toeic_questions').select('*', { count: 'exact', head: true })),
+    countQueryRows(admin.from('toeic_test_records').select('*', { count: 'exact', head: true })),
+    countQueryRows(admin.from('srs_reviews').select('*', { count: 'exact', head: true })),
+    countQueryRows(admin.from('vocab_activity_logs').select('*', { count: 'exact', head: true })),
+    admin.from('user_progress').select('user_id').eq('last_study_date', today),
+    admin.from('toeic_test_records').select('user_id').gte('created_at', todayStart),
+    admin.from('srs_reviews').select('user_id').or(`last_reviewed_at.gte.${todayStart},created_at.gte.${todayStart}`),
+    admin.from('vocab_activity_logs').select('user_id').gte('created_at', todayStart),
   ]);
 
-  const profileRows = unwrapList(profiles);
-  const progressRows = unwrapList(userProgress);
-  const courseRows = unwrapList(courses);
-  const topicRows = unwrapList(topics);
-  const flashcardRows = unwrapList(flashcards);
-  const toeicAttemptRows = unwrapList(toeicAttempts);
-  const srsReviewRows = unwrapList(srsReviews);
-  const vocabRows = unwrapList(vocabActivityLogs);
-
-  const today = new Date().toISOString().slice(0, 10);
-  const activeUsers = new Set();
-  progressRows.forEach((row) => {
-    if (row.last_study_date === today) activeUsers.add(row.user_id);
-  });
-  toeicAttemptRows.forEach((row) => {
-    if (formatDateKey(row.created_at) === today) activeUsers.add(row.user_id);
-  });
-  srsReviewRows.forEach((row) => {
-    if (formatDateKey(row.last_reviewed_at || row.created_at) === today) activeUsers.add(row.user_id);
-  });
-  vocabRows.forEach((row) => {
-    if (formatDateKey(row.created_at) === today) activeUsers.add(row.user_id);
-  });
-
+  const courseRows = unwrapList(courseRowsResult);
   const publicCourseIds = new Set(courseRows.filter((row) => row.slug !== CUSTOM_TOPICS_COURSE_SLUG).map((row) => row.id));
-  const publicTopicIds = new Set(topicRows.filter((row) => publicCourseIds.has(row.course_id) && !row.owner_user_id).map((row) => row.id));
+  const publicTopicRows = publicCourseIds.size
+    ? unwrapList(await admin
+      .from('topics')
+      .select('id')
+      .is('owner_user_id', null)
+      .in('course_id', [...publicCourseIds]))
+    : [];
+  const publicTopicIds = publicTopicRows.map((row) => row.id);
+  const totalFlashcards = publicTopicIds.length
+    ? await countQueryRows(admin
+      .from('flashcards')
+      .select('*', { count: 'exact', head: true })
+      .in('topic_id', publicTopicIds))
+    : 0;
+
+  const activeUsers = new Set();
+  [
+    ...unwrapList(todayProgressRows),
+    ...unwrapList(todayToeicRows),
+    ...unwrapList(todaySrsRows),
+    ...unwrapList(todayVocabRows),
+  ].forEach((row) => {
+    if (row.user_id) activeUsers.add(row.user_id);
+  });
 
   return {
-    totalUsers: profileRows.length,
+    totalUsers,
     activeUsersToday: activeUsers.size,
     totalCourses: publicCourseIds.size,
-    totalFlashcards: flashcardRows.filter((row) => publicTopicIds.has(row.topic_id)).length,
-    totalToeicTests: unwrapList(toeicTests).length,
-    totalToeicQuestions: unwrapList(toeicQuestions).length,
-    totalToeicAttempts: toeicAttemptRows.length,
-    totalSrsReviews: srsReviewRows.length,
-    totalVocabModeCompletions: vocabRows.length,
+    totalFlashcards,
+    totalToeicTests: toeicTestCount,
+    totalToeicQuestions: toeicQuestionCount,
+    totalToeicAttempts: toeicAttemptCount,
+    totalSrsReviews: srsReviewCount,
+    totalVocabModeCompletions: vocabActivityCount,
   };
 }
 

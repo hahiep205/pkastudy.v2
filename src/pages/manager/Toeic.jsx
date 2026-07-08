@@ -7,8 +7,7 @@ import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
 import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 import {
-    getGuestToeicTestSummaries,
-    mergeGuestToeicTests,
+    getGuestToeicManagerFallbacks,
 } from '../../utils/guestToeic';
 import {
     downloadToeicExportFile,
@@ -26,7 +25,7 @@ function createEmptyTestForm() {
     };
 }
 
-const GUEST_TOEIC_TESTS = getGuestToeicTestSummaries();
+const GUEST_TOEIC_TESTS = getGuestToeicManagerFallbacks();
 
 function buildToastErrorMessage(err, fallback) {
     return normalizeErrorMessage(
@@ -105,7 +104,7 @@ export default function ManagerToeic() {
 
     const applyGuestToeicFallback = (testsResponse) => ({
         ...testsResponse,
-        items: mergeGuestToeicTests(testsResponse?.items || [], GUEST_TOEIC_TESTS),
+        items: testsResponse?.items?.length ? testsResponse.items : GUEST_TOEIC_TESTS,
     });
 
     useEffect(() => {
@@ -173,6 +172,11 @@ export default function ManagerToeic() {
     };
 
     const openEditModal = (test) => {
+        if (test?.isCatalogFallback) {
+            setToast({ message: 'Đề TOEIC này đang là dữ liệu fallback, cần seed/sync vào DB trước khi chỉnh sửa.', type: 'error' });
+            return;
+        }
+
         setEditingTest(test);
         setForm({
             title: test.title || '',
@@ -222,6 +226,11 @@ export default function ManagerToeic() {
 
     const handleDeleteTest = async () => {
         if (!pendingDelete?.id) return;
+        if (pendingDelete?.isCatalogFallback) {
+            setToast({ message: 'Đề TOEIC fallback chưa có bản ghi DB để xóa.', type: 'error' });
+            setPendingDelete(null);
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -243,6 +252,11 @@ export default function ManagerToeic() {
 
     const handleExportTest = (test) => {
         if (!test?.id) return;
+        if (test?.isCatalogFallback) {
+            setToast({ message: 'Đề TOEIC fallback chưa có bản ghi DB để export.', type: 'error' });
+            return;
+        }
+
         setExportTargetTest(test);
     };
 
@@ -428,9 +442,19 @@ export default function ManagerToeic() {
                             </div>
 
                             <div className="manager-table-actions">
-                                <Link to={`/manager/toeic/${test.id}`} className="manager-inline-action">
-                                    Xem chi tiết
-                                </Link>
+                                {test.isCatalogFallback ? (
+                                    <button
+                                        type="button"
+                                        className="manager-table-action"
+                                        onClick={() => setToast({ message: 'Đề TOEIC fallback cần được seed/sync vào DB trước khi quản lý câu hỏi.', type: 'error' })}
+                                    >
+                                        Xem chi tiết
+                                    </button>
+                                ) : (
+                                    <Link to={`/manager/toeic/${test.id}`} className="manager-inline-action">
+                                        Xem chi tiết
+                                    </Link>
+                                )}
                                 <button type="button" className="manager-table-action" onClick={() => openEditModal(test)}>
                                     Sửa
                                 </button>

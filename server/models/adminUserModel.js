@@ -3,9 +3,17 @@ const { DEFAULT_ADMIN_EMAIL, ensureDefaultAdminUser } = require('./userModel');
 const { deleteSupabaseAuthUserById } = require('../supabase');
 
 const ROOT_ADMIN_ID = 1;
+let rootAdminReadyPromise = null;
 
 async function ensureRootAdminUser() {
-  await ensureDefaultAdminUser();
+  if (!rootAdminReadyPromise) {
+    rootAdminReadyPromise = ensureDefaultAdminUser().catch((error) => {
+      rootAdminReadyPromise = null;
+      throw error;
+    });
+  }
+
+  await rootAdminReadyPromise;
 }
 
 function isRootAdminUser(user) {
@@ -34,21 +42,32 @@ async function listAdminUsers({ limit, offset, search, role, status }) {
   await ensureRootAdminUser();
   const admin = ensureSupabaseEnabled();
 
-  let rows = unwrapList(await admin
+  let countQuery = admin
+    .from('profiles')
+    .select('*', { count: 'exact', head: true });
+
+  let query = admin
     .from('profiles')
     .select('id, legacy_user_id, email, name, role, status, created_at, updated_at')
-    .order('legacy_user_id', { ascending: true }));
+    .order('legacy_user_id', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (search) {
-    const keyword = search.toLowerCase();
-    rows = rows.filter((row) =>
-      String(row.email || '').toLowerCase().includes(keyword)
-      || String(row.name || '').toLowerCase().includes(keyword));
+    const keyword = `%${search}%`;
+    countQuery = countQuery.or(`email.ilike.${keyword},name.ilike.${keyword}`);
+    query = query.or(`email.ilike.${keyword},name.ilike.${keyword}`);
   }
-  if (role) rows = rows.filter((row) => row.role === role);
-  if (status) rows = rows.filter((row) => row.status === status);
+  if (role) {
+    countQuery = countQuery.eq('role', role);
+    query = query.eq('role', role);
+  }
+  if (status) {
+    countQuery = countQuery.eq('status', status);
+    query = query.eq('status', status);
+  }
 
-  const pagedRows = rows.slice(offset, offset + limit);
+  const [countResult, rowsResult] = await Promise.all([countQuery, query]);
+  const pagedRows = unwrapList(rowsResult);
   const progressRows = pagedRows.length
     ? unwrapList(await admin.from('user_progress').select('user_id, current_xp, level, current_streak, last_study_date').in('user_id', pagedRows.map((row) => row.id)))
     : [];
@@ -56,7 +75,7 @@ async function listAdminUsers({ limit, offset, search, role, status }) {
 
   return {
     items: pagedRows.map((row) => mapAdminUser(row, progressMap.get(row.id))),
-    total: rows.length,
+    total: Number(countResult.count || 0),
   };
 }
 
@@ -84,10 +103,12 @@ async function getAdminUserById(userId) {
 
 async function updateAdminUserRole(userId, role) {
   const admin = ensureSupabaseEnabled();
+  const column = isUuid(userId) ? 'id' : 'legacy_user_id';
+  const value = isUuid(userId) ? userId : Number(userId);
   const result = await admin
     .from('profiles')
     .update({ role })
-    .eq('legacy_user_id', Number(userId))
+    .eq(column, value)
     .select('id');
 
   return unwrapList(result).length > 0;
@@ -95,10 +116,12 @@ async function updateAdminUserRole(userId, role) {
 
 async function updateAdminUserStatus(userId, status) {
   const admin = ensureSupabaseEnabled();
+  const column = isUuid(userId) ? 'id' : 'legacy_user_id';
+  const value = isUuid(userId) ? userId : Number(userId);
   const result = await admin
     .from('profiles')
     .update({ status })
-    .eq('legacy_user_id', Number(userId))
+    .eq(column, value)
     .select('id');
 
   return unwrapList(result).length > 0;

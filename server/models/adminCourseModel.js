@@ -152,12 +152,16 @@ async function getAdminCourseBySlug(slug) {
   const admin = ensureSupabaseEnabled();
   const row = unwrapSingle(await admin
     .from('courses')
-    .select('id, slug')
+    .select('id, slug, title, description, thumbnail_url, language, sort_order, created_at, updated_at')
     .eq('slug', slug)
+    .neq('slug', CUSTOM_TOPICS_COURSE_SLUG)
     .limit(1)
     .maybeSingle());
 
-  return row || null;
+  if (!row) return null;
+  const metrics = await getCourseMetrics([row.id]);
+  const metric = metrics.get(row.id) || {};
+  return mapAdminCourseRow(row, metric.topicCount, metric.vocabularyCount);
 }
 
 async function createAdminCourse({ slug, title, description, thumbnailUrl, language, sortOrder }) {

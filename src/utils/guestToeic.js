@@ -333,6 +333,13 @@ export function getGuestToeicTestSummaries() {
   });
 }
 
+export function getGuestToeicManagerFallbacks() {
+  return getGuestToeicTestSummaries().map((test) => ({
+    ...test,
+    isCatalogFallback: true,
+  }));
+}
+
 export function mergeGuestToeicTests(apiTests = [], guestTests = getGuestToeicTests()) {
   const merged = new Map();
 

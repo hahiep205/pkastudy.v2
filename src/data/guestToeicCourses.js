@@ -255,3 +255,13 @@ export function mergeGuestReadyCourses(courses = []) {
     return aOrder - bOrder;
   });
 }
+
+export function getGuestReadyCourseManagerFallbacks() {
+  return getGuestReadyCourseSummaries().map((course) => ({
+    ...course,
+    id: course.slug,
+    topicCount: course.topic_count,
+    vocabularyCount: course.vocabulary_count,
+    isCatalogFallback: true,
+  }));
+}

@@ -25,7 +25,7 @@ async function getAdminSupport(req, res, next) {
 async function updateAdminSupportStatus(req, res, next) {
   try {
     const data = await reviewAdminSupportTicket(
-      req.userId,
+      req.userProfileId || req.userId,
       req.params.ticketId,
       req.body?.status
     );

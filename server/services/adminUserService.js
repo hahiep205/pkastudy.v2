@@ -88,7 +88,7 @@ async function changeAdminUserRole(actorUserId, userId, nextRole) {
     throw Object.assign(new Error('Root admin account cannot change role.'), { status: 400 });
   }
 
-  if (actorUserId === parsedUserId && normalizedRole !== 'admin') {
+  if (Number(actorUserId) === parsedUserId && normalizedRole !== 'admin') {
     throw Object.assign(new Error('You cannot remove your own admin role.'), { status: 400 });
   }
 
@@ -131,7 +131,7 @@ async function changeAdminUserStatus(actorUserId, userId, nextStatus) {
     throw Object.assign(new Error('Root admin account cannot be banned.'), { status: 400 });
   }
 
-  if (actorUserId === parsedUserId && normalizedStatus !== 'active') {
+  if (Number(actorUserId) === parsedUserId && normalizedStatus !== 'active') {
     throw Object.assign(new Error('You cannot ban your own account.'), { status: 400 });
   }
 
@@ -156,13 +156,12 @@ async function resetAdminUserStudy(actorUserId, userId) {
     throw Object.assign(new Error('Invalid user id'), { status: 400 });
   }
 
-  const actorId = Number.parseInt(actorUserId, 10);
   const user = await getAdminUserById(parsedUserId);
   if (!user) {
     throw Object.assign(new Error('User not found'), { status: 404 });
   }
 
-  const actorUser = await getAdminUserById(actorId);
+  const actorUser = await getAdminUserById(actorUserId);
 
   if (isRootAdminUser(user) && !isRootAdminUser(actorUser)) {
     throw Object.assign(new Error('Only root admin can reset root admin study data.'), { status: 403 });
@@ -178,7 +177,6 @@ async function removeAdminUser(actorUserId, userId) {
     throw Object.assign(new Error('Invalid user id'), { status: 400 });
   }
 
-  const actorId = Number.parseInt(actorUserId, 10);
   const user = await getAdminUserById(parsedUserId);
   if (!user) {
     throw Object.assign(new Error('User not found'), { status: 404 });
@@ -188,7 +186,7 @@ async function removeAdminUser(actorUserId, userId) {
     throw Object.assign(new Error('Root admin account cannot be deleted.'), { status: 400 });
   }
 
-  if (actorId === parsedUserId) {
+  if (Number(actorUserId) === parsedUserId) {
     throw Object.assign(new Error('You cannot delete your own account.'), { status: 400 });
   }
 
