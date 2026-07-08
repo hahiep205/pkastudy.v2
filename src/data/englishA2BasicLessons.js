@@ -1,39 +1,80 @@
 import { TOEIC_BASIC_LESSONS_1_TO_50 } from './toeicBasicLessons.js';
 import { ENGLISH_A1_BASIC_LESSONS_1_TO_50 } from './englishA1BasicLessons.js';
 
+const EXAMPLE_OVERRIDES = {
+    name: {
+        example: 'Please write your name on the form.',
+        example_vi: 'Vui lòng viết tên của bạn vào biểu mẫu.',
+    },
+    age: {
+        example: 'Please write your age on the form.',
+        example_vi: 'Vui lòng viết tuổi của bạn vào biểu mẫu.',
+    },
+    address: {
+        example: 'Please write your address on the form.',
+        example_vi: 'Vui lòng viết địa chỉ của bạn vào biểu mẫu.',
+    },
+    phone: {
+        example: 'Please write your phone number on the form.',
+        example_vi: 'Vui lòng viết số điện thoại của bạn vào biểu mẫu.',
+    },
+    email: {
+        example: 'Please write your email address on the form.',
+        example_vi: 'Vui lòng viết địa chỉ thư điện tử của bạn vào biểu mẫu.',
+    },
+    birthday: {
+        example: 'Please write your birthday on the form.',
+        example_vi: 'Vui lòng viết ngày sinh của bạn vào biểu mẫu.',
+    },
+    country: {
+        example: 'Please write your country on the form.',
+        example_vi: 'Vui lòng viết quốc gia của bạn vào biểu mẫu.',
+    },
+    city: {
+        example: 'Please write your city on the form.',
+        example_vi: 'Vui lòng viết thành phố của bạn vào biểu mẫu.',
+    },
+};
+
 function makeExample(word, mean, wordtype) {
     const normalizedType = String(wordtype || '').toLowerCase();
+    const normalizedWord = String(word || '').trim();
+    const override = EXAMPLE_OVERRIDES[normalizedWord.toLowerCase()];
+    if (override) {
+        return override;
+    }
+
     if (normalizedType.startsWith('v')) {
         return {
-            example: `We ${word} every day.`,
+            example: `We ${normalizedWord} every day.`,
             example_vi: `Chúng tôi ${mean} mỗi ngày.`,
         };
     }
 
     if (normalizedType.startsWith('adj')) {
         return {
-            example: `The room looks ${word}.`,
+            example: `The room looks ${normalizedWord}.`,
             example_vi: `Căn phòng trông ${mean}.`,
         };
     }
 
     if (normalizedType.startsWith('adv')) {
         return {
-            example: `She spoke ${word}.`,
+            example: `She spoke ${normalizedWord}.`,
             example_vi: `Cô ấy nói chuyện ${mean}.`,
         };
     }
 
     if (normalizedType === 'phrase') {
         return {
-            example: `This is a ${word}.`,
-            example_vi: `Đây là ${mean}.`,
+            example: `We use "${normalizedWord}" in everyday English.`,
+            example_vi: `Chúng tôi dùng "${mean}" trong tiếng Anh hằng ngày.`,
         };
     }
 
     return {
-        example: `I need a ${word} today.`,
-        example_vi: `Tôi cần một ${mean} hôm nay.`,
+        example: `We talked about ${normalizedWord} today.`,
+        example_vi: `Chúng tôi đã nói về ${mean} hôm nay.`,
     };
 }
 

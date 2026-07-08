@@ -11,7 +11,6 @@ import {
   getGuestToeicPracticeModes,
   getGuestToeicReadingTests,
   getGuestToeicTests,
-  mergeGuestToeicTests,
   isGuestToeicTestId,
   readGuestToeicHistory,
   submitGuestToeicAnswers,
@@ -28,31 +27,6 @@ function formatTime(s) {
 
 function isGuestToeicMode() {
   return !isAuthenticatedUser(getStoredUser());
-}
-
-function mergeGuestPracticeModes(apiModes = [], guestModes = []) {
-  const merged = new Map();
-
-  guestModes.forEach((mode) => {
-    merged.set(mode.id, { ...mode, topics: [...(mode.topics || [])] });
-  });
-
-  apiModes.forEach((mode) => {
-    const existing = merged.get(mode.id);
-    if (!existing) {
-      merged.set(mode.id, { ...mode, topics: [...(mode.topics || [])] });
-      return;
-    }
-
-    const topicMap = new Map();
-    [...existing.topics, ...(mode.topics || [])].forEach((topic) => {
-      const key = topic.id || `${topic.testId}-${topic.partKey}`;
-      topicMap.set(key, topic);
-    });
-    merged.set(mode.id, { ...existing, ...mode, topics: Array.from(topicMap.values()) });
-  });
-
-  return Array.from(merged.values());
 }
 
 const LISTENING_PRACTICE_TYPES = new Set([
@@ -3315,27 +3289,37 @@ export default function TOEIC() {
     axiosClient
       .get("/toeic/tests")
       .then((res) => {
-        setApiTests(mergeGuestToeicTests(res || [], guestTests));
+        const tests = Array.isArray(res) ? res : [];
+        setApiTests(tests.length > 0 ? tests : guestTests);
         setLoadingTests(false);
       })
       .catch((err) => {
         console.error(err);
+        setApiTests(guestTests);
         setLoadingTests(false);
       });
 
     axiosClient
       .get("/toeic/practice-modes")
       .then((res) => {
-        const modes = res || [];
-        const mergedModes = mergeGuestPracticeModes(modes, guestModes);
+        const modes = Array.isArray(res) ? res : [];
+        const resolvedModes = modes.length > 0 ? modes : guestModes;
         setListeningPracticeModes(
-          mergedModes.filter((m) => m.type === "listening"),
+          resolvedModes.filter((m) => m.type === "listening"),
         );
         setReadingPracticeModes(
-          mergedModes.filter((m) => m.type === "reading"),
+          resolvedModes.filter((m) => m.type === "reading"),
         );
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setListeningPracticeModes(
+          guestModes.filter((mode) => mode.type === "listening"),
+        );
+        setReadingPracticeModes(
+          guestModes.filter((mode) => mode.type === "reading"),
+        );
+      });
   }, [isGuestMode]);
 
   const handleSelectPracticeTopic = async (topic, setTopicState) => {

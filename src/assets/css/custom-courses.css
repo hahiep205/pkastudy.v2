@@ -16,16 +16,20 @@
 }
 
 .cv-custom-mode .cv-word-table-head,
-.cv-custom-mode .cv-word-row {
+.cv-custom-mode .cv-word-row,
+.cv-manage-words-mode .cv-word-table-head,
+.cv-manage-words-mode .cv-word-row {
     grid-template-columns: 1.2fr 1.3fr 1.5fr 1.1fr 2.5fr 0.7fr 0.7fr;
 }
 
-.cv-custom-mode .cv-col-actions {
+.cv-custom-mode .cv-col-actions,
+.cv-manage-words-mode .cv-col-actions {
     display: block;
     text-align: center;
 }
 
-.cv-custom-mode .cv-cell-actions {
+.cv-custom-mode .cv-cell-actions,
+.cv-manage-words-mode .cv-cell-actions {
     display: flex;
     gap: 4px;
     justify-content: center;
@@ -2007,44 +2011,49 @@ body.app-dark-mode .cv-text-import-copy {
     }
 
     /* ── Regular mode: hiện switch cột Đã thuộc, ẩn cột actions rỗng ── */
-    #cv-words-view:not(.cv-custom-mode) .cv-cell-remember {
+    #cv-words-view:not(.cv-manage-words-mode) .cv-cell-remember {
         display: flex !important;
         align-items: flex-start;
         justify-content: center;
         padding-top: 3px;
     }
 
-    #cv-words-view:not(.cv-custom-mode) .cv-cell-actions {
+    #cv-words-view:not(.cv-manage-words-mode) .cv-cell-actions {
         display: none !important;
     }
 
     /* Hiện header "Đã thuộc" (6th span) cho regular mode */
-    #cv-words-view:not(.cv-custom-mode) .cv-word-table-head span:nth-child(6) {
+    #cv-words-view:not(.cv-manage-words-mode) .cv-word-table-head span:nth-child(6) {
         display: block !important;
     }
 
     /* Custom mode: 3 cột  */
     .cv-custom-mode .cv-word-table-head,
-    .cv-custom-mode .cv-word-row {
+    .cv-custom-mode .cv-word-row,
+    .cv-manage-words-mode .cv-word-table-head,
+    .cv-manage-words-mode .cv-word-row {
         grid-template-columns: 1.6fr 1.4fr 80px !important;
     }
 
     /* Hiện header cột Hành động cho custom mode trên mobile */
-    .cv-custom-mode .cv-word-table-head span:nth-child(6) {
+    .cv-custom-mode .cv-word-table-head span:nth-child(6),
+    .cv-manage-words-mode .cv-word-table-head span:nth-child(6) {
         display: flex !important;
         align-items: center;
         justify-content: center;
     }
 
     /* Custom mode: hiện switch trong actions cell trên mobile */
-    .cv-custom-mode .cv-cell-actions {
+    .cv-custom-mode .cv-cell-actions,
+    .cv-manage-words-mode .cv-cell-actions {
         flex-direction: column;
         align-items: center;
         justify-content: flex-start;
         gap: 5px;
     }
 
-    .cv-custom-mode .cv-actions-switch {
+    .cv-custom-mode .cv-actions-switch,
+    .cv-manage-words-mode .cv-actions-switch {
         display: none;
     }
 
@@ -2139,7 +2148,9 @@ body.app-dark-mode .cv-text-import-copy {
 @media (max-width: 420px) {
 
     .cv-custom-mode .cv-word-table-head,
-    .cv-custom-mode .cv-word-row {
+    .cv-custom-mode .cv-word-row,
+    .cv-manage-words-mode .cv-word-table-head,
+    .cv-manage-words-mode .cv-word-row {
         grid-template-columns: 1.5fr 1.3fr 72px !important;
     }
 

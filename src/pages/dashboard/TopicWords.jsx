@@ -526,6 +526,8 @@ export default function TopicWords() {
 
   const courseId = rawCourseId || 'custom';
   const isCustom = courseId === 'custom';
+  const isAdmin = user?.role === 'admin';
+  const canManageTopicWords = isCustom || (!isCustom && isAdmin);
   const useServerSrs = hasServerSrsAccess();
   const isFlappySetup = activeMode === 'flappy-bird-setup';
   const isFlappyPlaying = activeMode === 'flappy-bird';
@@ -694,10 +696,71 @@ const activeWords = !studyWordIds
     }
   };
 
-  const handleSaveWord = (wordData) => {
+  const getEditableFlashcardId = (word) => word?.flashcardId || word?.flashcard_id || word?.dbId || word?.id;
+
+  const mapAdminFlashcardToTopicWord = (flashcard, fallbackWord = {}) => ({
+    ...fallbackWord,
+    flashcardId: flashcard.id,
+    id: fallbackWord.id || String(flashcard.id),
+    word: flashcard.word || '',
+    transcription: flashcard.transcription || '',
+    mean: flashcard.meaning || '',
+    wordtype: flashcard.wordType || '',
+    example: flashcard.example || '',
+    example_vi: flashcard.exampleVi || '',
+    language: flashcard.language || fallbackWord.language || topicLang,
+  });
+
+  const buildAdminFlashcardPayload = (wordData) => ({
+    word: cleanAiText(wordData?.word),
+    transcription: cleanAiText(wordData?.transcription),
+    meaning: cleanAiText(wordData?.mean ?? wordData?.meaning),
+    wordType: cleanAiText(wordData?.wordtype ?? wordData?.wordType),
+    example: cleanAiText(wordData?.example),
+    exampleVi: cleanAiText(wordData?.example_vi ?? wordData?.exampleVi),
+    language: cleanAiText(wordData?.language) || topicLang,
+  });
+
+  const updateBuiltInWordState = (sourceWord, nextWord) => {
+    const sourceKey = getWordKey(sourceWord);
+    setBuiltInWords((currentWords) => currentWords.map((item) => (
+      getWordKey(item) === sourceKey ? nextWord : item
+    )));
+
+    setSelectedWord((currentWord) => (
+      currentWord && getWordKey(currentWord) === sourceKey ? nextWord : currentWord
+    ));
+  };
+
+  const handleSaveWord = async (wordData) => {
     const normalizedWordData = { ...wordData, language: topicLang };
-    if (editingWord) updateWordInTopic(topicId, editingWord.id, normalizedWordData);
-    else addWordToTopic(topicId, normalizedWordData);
+    if (isCustom) {
+      if (editingWord) updateWordInTopic(topicId, editingWord.id, normalizedWordData);
+      else addWordToTopic(topicId, normalizedWordData);
+      return;
+    }
+
+    if (!isAdmin || !editingWord) {
+      setToastMessage('Chi admin moi co quyen cap nhat tu vung cua khoa hoc he thong.');
+      return;
+    }
+
+    const flashcardId = getEditableFlashcardId(editingWord);
+    if (!flashcardId) {
+      setToastMessage('Tu vung nay chua co ID trong database de cap nhat.');
+      return;
+    }
+
+    try {
+      const savedFlashcard = await axiosClient.put(`/admin/flashcards/${flashcardId}`, buildAdminFlashcardPayload(normalizedWordData));
+      const nextWord = mapAdminFlashcardToTopicWord(savedFlashcard, editingWord);
+      updateBuiltInWordState(editingWord, nextWord);
+      setEditingWord(nextWord);
+      setToastMessage('Da cap nhat tu vung trong database.');
+    } catch (error) {
+      setToastMessage(error?.response?.data?.message || error?.message || 'Khong the cap nhat tu vung trong database.');
+      throw error;
+    }
   };
 
   const handleSaveAIWords = (selectedWords) => {
@@ -972,13 +1035,43 @@ const activeWords = !studyWordIds
     return { added: addedCount, skipped: totalSkipped };
   };
 
-  const handleDeleteWord = (wordId) => {
-    deleteWordFromTopic(topicId, wordId);
+  const handleDeleteWord = async (wordOrId) => {
+    if (isCustom) {
+      deleteWordFromTopic(topicId, typeof wordOrId === 'object' ? wordOrId?.id : wordOrId);
+      setPendingDeleteWord(null);
+      return;
+    }
+
+    if (!isAdmin || !wordOrId) {
+      setPendingDeleteWord(null);
+      return;
+    }
+
+    const targetWord = typeof wordOrId === 'object' ? wordOrId : pendingDeleteWord;
+    const flashcardId = getEditableFlashcardId(targetWord);
+    if (!flashcardId) {
+      setToastMessage('Tu vung nay chua co ID trong database de xoa.');
+      setPendingDeleteWord(null);
+      return;
+    }
+
+    try {
+      await axiosClient.delete(`/admin/flashcards/${flashcardId}`);
+      const targetKey = getWordKey(targetWord);
+      setBuiltInWords((currentWords) => currentWords.filter((item) => getWordKey(item) !== targetKey));
+      setSelectedWord((currentWord) => (
+        currentWord && getWordKey(currentWord) === targetKey ? null : currentWord
+      ));
+      setDetailOpen(false);
+      setToastMessage('Da xoa tu vung khoi database.');
+    } catch (error) {
+      setToastMessage(error?.response?.data?.message || error?.message || 'Khong the xoa tu vung trong database.');
+    }
     setPendingDeleteWord(null);
   };
 
   const handleFillMissingWordData = async (word) => {
-    if (!isCustom || !word) return;
+    if (!canManageTopicWords || !word) return;
 
     const wordId = getWordKey(word);
     if (aiFillingWordId === wordId) return;
@@ -1035,7 +1128,19 @@ const activeWords = !studyWordIds
 
       normalized.mean = limitMeaningToFiveWords(normalized.mean);
 
-      await updateWordInTopic(topicId, word.id, normalized);
+      if (isCustom) {
+        await updateWordInTopic(topicId, word.id, normalized);
+      } else {
+        const flashcardId = getEditableFlashcardId(word);
+        if (!flashcardId) {
+          throw new Error('Tu vung nay chua co ID trong database de AI cap nhat.');
+        }
+        const savedFlashcard = await axiosClient.put(`/admin/flashcards/${flashcardId}`, buildAdminFlashcardPayload({
+          ...normalized,
+          language: word.language || topicLang,
+        }));
+        updateBuiltInWordState(word, mapAdminFlashcardToTopicWord(savedFlashcard, word));
+      }
       setToastMessage('AI đã kiểm tra và sửa dữ liệu cho từ vựng.');
     } catch (error) {
       setToastMessage(error?.message || 'Không thể dùng AI để kiểm tra dữ liệu lúc này.');
@@ -1282,7 +1387,7 @@ const activeWords = !studyWordIds
   return (
       <main
         ref={pageRef}
-        className={`dash-main cv-subview${isCustom ? ' cv-custom-mode' : ''}`}
+        className={`dash-main cv-subview${isCustom ? ' cv-custom-mode' : ''}${canManageTopicWords ? ' cv-manage-words-mode' : ''}`}
         id="cv-words-view"
       >
       <ToastNotice message={toastMessage} onHide={() => setToastMessage('')} />
@@ -1436,7 +1541,7 @@ const activeWords = !studyWordIds
                       </div>
 
                       <div className="cv-cell cv-cell-actions">
-                        {isCustom ? (
+                        {canManageTopicWords ? (
                           <>
                             <label className="cv-switch cv-actions-switch" title={isDone ? 'Đã thuộc' : 'Chưa thuộc'}>
                               <input
@@ -1577,7 +1682,7 @@ const activeWords = !studyWordIds
       <ConfirmActionModal
         isOpen={Boolean(pendingDeleteWord)}
         onClose={() => setPendingDeleteWord(null)}
-        onConfirm={() => handleDeleteWord(pendingDeleteWord.id)}
+        onConfirm={() => handleDeleteWord(pendingDeleteWord)}
         title="Xác nhận xóa từ"
         message={pendingDeleteWord ? `Bạn có chắc muốn xóa từ "${pendingDeleteWord.word}" không?` : ''}
         confirmLabel="Xóa từ"
