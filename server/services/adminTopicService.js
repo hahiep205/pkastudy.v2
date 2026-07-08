@@ -8,7 +8,7 @@ const {
   deleteAdminTopic,
   reorderAdminTopics,
 } = require('../models/adminTopicModel');
-const { getAdminCourseById } = require('../models/adminCourseModel');
+const { getAdminCourseById, getAdminCourseBySlug } = require('../models/adminCourseModel');
 const {
   parsePaginationQuery,
   parseSearchQuery,
@@ -63,8 +63,22 @@ function normalizeSortOrder(value, fallback = 0) {
   return parsed;
 }
 
-async function ensureCourseExists(courseId) {
-  const course = await getAdminCourseById(courseId);
+async function resolveCourseByIdentifier(courseId) {
+  const parsedCourseId = Number.parseInt(courseId, 10);
+  if (Number.isFinite(parsedCourseId) && parsedCourseId > 0) {
+    const course = await getAdminCourseById(parsedCourseId);
+    if (!course) {
+      throw Object.assign(new Error('Course not found'), { status: 404 });
+    }
+    return course;
+  }
+
+  const slug = typeof courseId === 'string' ? courseId.trim() : '';
+  if (!slug) {
+    throw Object.assign(new Error('Invalid course id'), { status: 400 });
+  }
+
+  const course = await getAdminCourseBySlug(slug);
   if (!course) {
     throw Object.assign(new Error('Course not found'), { status: 404 });
   }
@@ -79,17 +93,12 @@ async function ensureUniqueTopicSlug(slug, excludeTopicId = null) {
 }
 
 async function fetchAdminTopicsByCourse(courseId, query) {
-  const courseIdNum = Number.parseInt(courseId, 10);
-  if (!Number.isFinite(courseIdNum) || courseIdNum <= 0) {
-    throw Object.assign(new Error('Invalid course id'), { status: 400 });
-  }
-
-  await ensureCourseExists(courseIdNum);
+  const course = await resolveCourseByIdentifier(courseId);
 
   const { page, limit, offset } = parsePaginationQuery(query);
   const search = parseSearchQuery(query);
   const result = await listAdminTopicsByCourse({
-    courseId: courseIdNum,
+    courseId: course.id,
     page,
     limit,
     offset,
@@ -106,7 +115,7 @@ async function fetchAdminTopicsByCourse(courseId, query) {
     filters: {
       search,
     },
-    courseId: courseIdNum,
+    courseId: course.id,
   };
 }
 
@@ -125,23 +134,18 @@ async function fetchAdminTopic(topicId) {
 }
 
 async function createAdminTopicEntry(courseId, payload) {
-  const courseIdNum = Number.parseInt(courseId, 10);
-  if (!Number.isFinite(courseIdNum) || courseIdNum <= 0) {
-    throw Object.assign(new Error('Invalid course id'), { status: 400 });
-  }
-
-  await ensureCourseExists(courseIdNum);
+  const course = await resolveCourseByIdentifier(courseId);
 
   const title = normalizeRequiredText(payload?.title, 'Title');
   const slug = normalizeSlug(payload?.slug, title);
   const description = normalizeOptionalText(payload?.description);
-  const topicCount = await countAdminTopicsByCourse(courseIdNum);
+  const topicCount = await countAdminTopicsByCourse(course.id);
   const sortOrder = normalizeSortOrder(payload?.sortOrder, topicCount);
 
   await ensureUniqueTopicSlug(slug);
 
   return createAdminTopic({
-    courseId: courseIdNum,
+    courseId: course.id,
     slug,
     title,
     description,
@@ -197,12 +201,7 @@ async function deleteAdminTopicEntry(topicId) {
 }
 
 async function reorderAdminTopicEntries(courseId, payload) {
-  const courseIdNum = Number.parseInt(courseId, 10);
-  if (!Number.isFinite(courseIdNum) || courseIdNum <= 0) {
-    throw Object.assign(new Error('Invalid course id'), { status: 400 });
-  }
-
-  await ensureCourseExists(courseIdNum);
+  const course = await resolveCourseByIdentifier(courseId);
 
   const items = payload?.items;
   if (!Array.isArray(items) || items.length === 0) {
@@ -225,7 +224,7 @@ async function reorderAdminTopicEntries(courseId, payload) {
     throw Object.assign(new Error('Duplicate topic ids are not allowed in reorder payload'), { status: 400 });
   }
 
-  const topics = await reorderAdminTopics(courseIdNum, normalizedItems);
+  const topics = await reorderAdminTopics(course.id, normalizedItems);
 
   return {
     items: topics,

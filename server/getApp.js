@@ -1,7 +1,10 @@
-import { createRequire } from 'module';
+const app = require('./app');
 
-const require = createRequire(import.meta.url);
-
-export function getExpressApp() {
-  return require('./app.js');
+function getExpressApp() {
+  return app;
 }
+
+module.exports = {
+  getExpressApp,
+  default: app,
+};

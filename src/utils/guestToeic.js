@@ -395,6 +395,18 @@ export function getGuestToeicTestDetail(testId) {
   return GUEST_TOEIC_TESTS.find((test) => test.id === testId) || null;
 }
 
+export function resolveGuestToeicSeedTestId(testId, apiTests = []) {
+  const match = String(testId || '').match(/^guest-toeic-test-(\d+)$/i);
+  if (!match) return null;
+
+  const index = Number.parseInt(match[1], 10) - 1;
+  if (index < 0) return null;
+
+  const sortedApiTests = [...apiTests].sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0));
+  const resolved = sortedApiTests[index];
+  return resolved?.id != null ? String(resolved.id) : null;
+}
+
 export function readGuestToeicHistory() {
   const storedUser = getStoredUser();
   const history = getUserScopedJson(STORAGE_KEY, [], storedUser);

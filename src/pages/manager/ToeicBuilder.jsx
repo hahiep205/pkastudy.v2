@@ -4,6 +4,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
+import { resolveGuestToeicSeedTestId } from '../../utils/guestToeic';
 import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 
 const PAGE_SIZE = 10;
@@ -225,6 +226,8 @@ export default function ManagerToeicBuilder() {
     const { testId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const [test, setTest] = useState(null);
+    const [resolvedTestId, setResolvedTestId] = useState(testId);
+    const [resolvingTestId, setResolvingTestId] = useState(false);
     const [groups, setGroups] = useState([]);
     const [questionsData, setQuestionsData] = useState({ items: [], meta: null, filters: null });
     const [searchInput, setSearchInput] = useState('');
@@ -266,16 +269,53 @@ export default function ManagerToeicBuilder() {
         setAutoEditHandled(false);
     }, [searchParams]);
 
-    const fetchBuilderData = async (nextPage = page) => {
+    useEffect(() => {
+        let active = true;
+        const trimmedTestId = String(testId || '').trim();
+        const guestAliasMatch = trimmedTestId.match(/^guest-toeic-test-(\d+)$/i);
+
+        setLoading(true);
+        setError('');
+        setResolvedTestId(trimmedTestId);
+        setResolvingTestId(Boolean(guestAliasMatch));
+
+        if (!guestAliasMatch) {
+            return () => {
+                active = false;
+            };
+        }
+
+        axiosClient.get('/admin/toeic/tests?page=1&limit=1000')
+            .then((data) => {
+                if (!active) return;
+
+                const apiTests = Array.isArray(data?.items) ? data.items : [];
+                const resolvedId = resolveGuestToeicSeedTestId(trimmedTestId, apiTests);
+                setResolvedTestId(resolvedId || trimmedTestId);
+            })
+            .catch(() => {
+                if (!active) return;
+                setResolvedTestId(trimmedTestId);
+            })
+            .finally(() => {
+                if (active) setResolvingTestId(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [testId]);
+
+    const fetchBuilderData = async (nextPage = page, activeTestId = resolvedTestId) => {
         const params = new URLSearchParams();
         params.set('page', String(nextPage));
         params.set('limit', String(PAGE_SIZE));
         if (search) params.set('search', search);
         if (partFilter) params.set('part', partFilter);
         const [testData, groupsData, questions] = await Promise.all([
-            axiosClient.get(`/admin/toeic/tests/${testId}`),
-            axiosClient.get(`/admin/toeic/tests/${testId}/groups`),
-            axiosClient.get(`/admin/toeic/tests/${testId}/questions?${params.toString()}`),
+            axiosClient.get(`/admin/toeic/tests/${activeTestId}`),
+            axiosClient.get(`/admin/toeic/tests/${activeTestId}/groups`),
+            axiosClient.get(`/admin/toeic/tests/${activeTestId}/questions?${params.toString()}`),
         ]);
 
         setTest(testData);
@@ -285,10 +325,16 @@ export default function ManagerToeicBuilder() {
 
     useEffect(() => {
         let active = true;
+        if (resolvingTestId) {
+            return () => {
+                active = false;
+            };
+        }
+
         setLoading(true);
         setError('');
 
-            fetchBuilderData(page)
+            fetchBuilderData(page, resolvedTestId)
             .catch((err) => {
                 if (!active) return;
                 setError(buildToastErrorMessage(err, 'Không thể tải dữ liệu TOEIC builder.'));
@@ -300,7 +346,7 @@ export default function ManagerToeicBuilder() {
         return () => {
             active = false;
         };
-    }, [testId, page, search, partFilter]);
+    }, [testId, page, search, partFilter, resolvedTestId, resolvingTestId]);
 
     const questionItems = questionsData?.items || [];
     const meta = questionsData?.meta;
@@ -454,7 +500,7 @@ export default function ManagerToeicBuilder() {
                 await axiosClient.put(`/admin/toeic/groups/${editingGroup.id}`, groupForm);
                 setToast({ message: buildToastSuccessMessage('cập nhật nhóm #' + editingGroup.id), type: 'success' });
             } else {
-                await axiosClient.post(`/admin/toeic/tests/${testId}/groups`, groupForm);
+                await axiosClient.post(`/admin/toeic/tests/${resolvedTestId}/groups`, groupForm);
                 setToast({ message: buildToastSuccessMessage('tạo nhóm câu hỏi mới'), type: 'success' });
             }
             closeGroupModal();
@@ -477,7 +523,7 @@ export default function ManagerToeicBuilder() {
                 await axiosClient.put(`/admin/toeic/questions/${editingQuestion.id}`, payload);
                 setToast({ message: buildToastSuccessMessage('cập nhật câu hỏi #' + editingQuestion.questionNumber), type: 'success' });
             } else {
-                await axiosClient.post(`/admin/toeic/tests/${testId}/questions`, payload);
+                await axiosClient.post(`/admin/toeic/tests/${resolvedTestId}/questions`, payload);
                 setToast({ message: buildToastSuccessMessage('tạo câu hỏi TOEIC mới'), type: 'success' });
             }
 

@@ -252,13 +252,23 @@ async function fetchAdminCourses(query) {
   };
 }
 
-async function fetchAdminCourse(courseId) {
+async function resolveAdminCourseByIdentifier(courseId) {
   const parsedCourseId = Number.parseInt(courseId, 10);
-  if (!Number.isFinite(parsedCourseId) || parsedCourseId <= 0) {
+  if (Number.isFinite(parsedCourseId) && parsedCourseId > 0) {
+    const course = await getAdminCourseById(parsedCourseId);
+    if (!course) {
+      throw Object.assign(new Error('Course not found'), { status: 404 });
+    }
+
+    return course;
+  }
+
+  const slug = typeof courseId === 'string' ? courseId.trim() : '';
+  if (!slug) {
     throw Object.assign(new Error('Invalid course id'), { status: 400 });
   }
 
-  const course = await getAdminCourseById(parsedCourseId);
+  const course = await getAdminCourseBySlug(slug);
   if (!course) {
     throw Object.assign(new Error('Course not found'), { status: 404 });
   }
@@ -266,13 +276,13 @@ async function fetchAdminCourse(courseId) {
   return course;
 }
 
-async function exportAdminCourseEntry(courseId) {
-  const parsedCourseId = Number.parseInt(courseId, 10);
-  if (!Number.isFinite(parsedCourseId) || parsedCourseId <= 0) {
-    throw Object.assign(new Error('Invalid course id'), { status: 400 });
-  }
+async function fetchAdminCourse(courseId) {
+  return resolveAdminCourseByIdentifier(courseId);
+}
 
-  const data = await getAdminCourseExportById(parsedCourseId);
+async function exportAdminCourseEntry(courseId) {
+  const course = await resolveAdminCourseByIdentifier(courseId);
+  const data = await getAdminCourseExportById(course.id);
   if (!data) {
     throw Object.assign(new Error('Course not found'), { status: 404 });
   }
@@ -423,15 +433,7 @@ async function createAdminCourseEntry(payload) {
 }
 
 async function updateAdminCourseEntry(courseId, payload) {
-  const parsedCourseId = Number.parseInt(courseId, 10);
-  if (!Number.isFinite(parsedCourseId) || parsedCourseId <= 0) {
-    throw Object.assign(new Error('Invalid course id'), { status: 400 });
-  }
-
-  const existingCourse = await getAdminCourseById(parsedCourseId);
-  if (!existingCourse) {
-    throw Object.assign(new Error('Course not found'), { status: 404 });
-  }
+  const existingCourse = await resolveAdminCourseByIdentifier(courseId);
 
   const title = normalizeRequiredText(payload?.title, 'Title');
   const slug = normalizeSlug(payload?.slug, title);
@@ -440,9 +442,9 @@ async function updateAdminCourseEntry(courseId, payload) {
   const language = normalizeLanguage(payload?.language);
   const sortOrder = normalizeSortOrder(payload?.sortOrder);
 
-  await ensureUniqueCourseSlug(slug, parsedCourseId);
+  await ensureUniqueCourseSlug(slug, existingCourse.id);
 
-  await updateAdminCourse(parsedCourseId, {
+  await updateAdminCourse(existingCourse.id, {
     slug,
     title,
     description,
@@ -451,21 +453,13 @@ async function updateAdminCourseEntry(courseId, payload) {
     sortOrder,
   });
 
-  return getAdminCourseById(parsedCourseId);
+  return getAdminCourseById(existingCourse.id);
 }
 
 async function deleteAdminCourseEntry(courseId) {
-  const parsedCourseId = Number.parseInt(courseId, 10);
-  if (!Number.isFinite(parsedCourseId) || parsedCourseId <= 0) {
-    throw Object.assign(new Error('Invalid course id'), { status: 400 });
-  }
+  const existingCourse = await resolveAdminCourseByIdentifier(courseId);
 
-  const existingCourse = await getAdminCourseById(parsedCourseId);
-  if (!existingCourse) {
-    throw Object.assign(new Error('Course not found'), { status: 404 });
-  }
-
-  await deleteAdminCourse(parsedCourseId);
+  await deleteAdminCourse(existingCourse.id);
 
   return {
     success: true,
