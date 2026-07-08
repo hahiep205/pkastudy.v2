@@ -11,6 +11,7 @@ import {
   getGuestToeicPracticeModes,
   getGuestToeicReadingTests,
   getGuestToeicTests,
+  mergeGuestToeicTests,
   isGuestToeicTestId,
   readGuestToeicHistory,
   submitGuestToeicAnswers,
@@ -27,17 +28,6 @@ function formatTime(s) {
 
 function isGuestToeicMode() {
   return !isAuthenticatedUser(getStoredUser());
-}
-
-function mergeGuestToeicCatalog(apiTests = [], guestTests = []) {
-  const merged = new Map();
-  guestTests.forEach((test) => {
-    merged.set(test.apiId || test.id, test);
-  });
-  apiTests.forEach((test) => {
-    merged.set(test.apiId || test.id, test);
-  });
-  return Array.from(merged.values());
 }
 
 function mergeGuestPracticeModes(apiModes = [], guestModes = []) {
@@ -3325,7 +3315,7 @@ export default function TOEIC() {
     axiosClient
       .get("/toeic/tests")
       .then((res) => {
-        setApiTests(mergeGuestToeicCatalog(res || [], guestTests));
+        setApiTests(mergeGuestToeicTests(res || [], guestTests));
         setLoadingTests(false);
       })
       .catch((err) => {

@@ -14,80 +14,13 @@ const {
   DEFAULT_DEMO_EMAIL,
   DEFAULT_DEMO_PASSWORD,
 } = require('../models/userModel');
+const {
+  loadPublicCoursesCatalog,
+  loadToeicTestSourceData,
+} = require('../lib/publicCatalog');
 
 const DEFAULT_ADMIN_NAME = 'Admin';
 const DEFAULT_DEMO_NAME = 'User Test';
-
-const PUBLIC_COURSES = [
-  {
-    slug: 'starter-english',
-    title: 'Starter English',
-    description: 'Foundational vocabulary for daily communication.',
-    sort_order: 10,
-    topics: [
-      {
-        slug: 'daily-life',
-        title: 'Daily Life',
-        description: 'Common words for everyday routines.',
-        sort_order: 1,
-        words: [
-          { word: 'wake', transcription: '/weɪk/', word_type: 'verb', meaning: 'to stop sleeping', example: 'I wake at 6 AM every day.', example_vi: 'I wake at 6 AM every day.', language: 'en' },
-          { word: 'brush', transcription: '/brʌʃ/', word_type: 'verb', meaning: 'to clean with a brush', example: 'She brushes her teeth before breakfast.', example_vi: 'She brushes her teeth before breakfast.', language: 'en' },
-          { word: 'cook', transcription: '/kʊk/', word_type: 'verb', meaning: 'to prepare food', example: 'My father cooks dinner on weekends.', example_vi: 'My father cooks dinner on weekends.', language: 'en' },
-          { word: 'clean', transcription: '/kliːn/', word_type: 'verb', meaning: 'to make free from dirt', example: 'We clean the room every Sunday.', example_vi: 'We clean the room every Sunday.', language: 'en' },
-          { word: 'rest', transcription: '/rest/', word_type: 'verb', meaning: 'to relax or sleep', example: 'You should rest after work.', example_vi: 'You should rest after work.', language: 'en' },
-        ],
-      },
-      {
-        slug: 'office-basics',
-        title: 'Office Basics',
-        description: 'Simple office vocabulary for beginners.',
-        sort_order: 2,
-        words: [
-          { word: 'desk', transcription: '/desk/', word_type: 'noun', meaning: 'a table for working', example: 'The laptop is on the desk.', example_vi: 'The laptop is on the desk.', language: 'en' },
-          { word: 'chair', transcription: '/tʃeər/', word_type: 'noun', meaning: 'a seat for one person', example: 'Please sit on the chair.', example_vi: 'Please sit on the chair.', language: 'en' },
-          { word: 'file', transcription: '/faɪl/', word_type: 'noun', meaning: 'a set of documents', example: 'Save the report in the file.', example_vi: 'Save the report in the file.', language: 'en' },
-          { word: 'note', transcription: '/noʊt/', word_type: 'noun', meaning: 'a short written message', example: 'I wrote a note for my teammate.', example_vi: 'I wrote a note for my teammate.', language: 'en' },
-          { word: 'plan', transcription: '/plæn/', word_type: 'noun', meaning: 'an idea for the future', example: 'We made a plan for Monday.', example_vi: 'We made a plan for Monday.', language: 'en' },
-        ],
-      },
-    ],
-  },
-  {
-    slug: 'toeic-basics',
-    title: 'TOEIC Basics',
-    description: 'Core TOEIC words for early practice.',
-    sort_order: 20,
-    topics: [
-      {
-        slug: 'registration-rules',
-        title: 'Registration and Rules',
-        description: 'Words related to sign-up and instructions.',
-        sort_order: 1,
-        words: [
-          { word: 'register', transcription: '/ˈredʒɪstər/', word_type: 'verb', meaning: 'to sign up', example: 'You must register before the class starts.', example_vi: 'You must register before the class starts.', language: 'en' },
-          { word: 'submit', transcription: '/səbˈmɪt/', word_type: 'verb', meaning: 'to send in', example: 'Submit the form by Friday.', example_vi: 'Submit the form by Friday.', language: 'en' },
-          { word: 'require', transcription: '/rɪˈkwaɪər/', word_type: 'verb', meaning: 'to need', example: 'The job requires experience.', example_vi: 'The job requires experience.', language: 'en' },
-          { word: 'policy', transcription: '/ˈpɑːləsi/', word_type: 'noun', meaning: 'a rule or plan', example: 'Read the company policy carefully.', example_vi: 'Read the company policy carefully.', language: 'en' },
-          { word: 'deadline', transcription: '/ˈdedlaɪn/', word_type: 'noun', meaning: 'the final time to do something', example: 'The deadline is next Monday.', example_vi: 'The deadline is next Monday.', language: 'en' },
-        ],
-      },
-      {
-        slug: 'business-tasks',
-        title: 'Business Tasks',
-        description: 'Common office and work actions.',
-        sort_order: 2,
-        words: [
-          { word: 'confirm', transcription: '/kənˈfɜːrm/', word_type: 'verb', meaning: 'to say that something is true', example: 'Please confirm the meeting time.', example_vi: 'Please confirm the meeting time.', language: 'en' },
-          { word: 'deliver', transcription: '/dɪˈlɪvər/', word_type: 'verb', meaning: 'to bring to a place', example: 'The package will deliver today.', example_vi: 'The package will deliver today.', language: 'en' },
-          { word: 'attend', transcription: '/əˈtend/', word_type: 'verb', meaning: 'to go to an event', example: 'She will attend the training session.', example_vi: 'She will attend the training session.', language: 'en' },
-          { word: 'budget', transcription: '/ˈbʌdʒɪt/', word_type: 'noun', meaning: 'planned money for spending', example: 'We need to reduce the budget.', example_vi: 'We need to reduce the budget.', language: 'en' },
-          { word: 'report', transcription: '/rɪˈpɔːrt/', word_type: 'noun', meaning: 'a written account', example: 'The manager reviewed the report.', example_vi: 'The manager reviewed the report.', language: 'en' },
-        ],
-      },
-    ],
-  },
-];
 
 function assertConfigured() {
   if (!supabaseAdmin) {
@@ -130,7 +63,7 @@ async function ensureCourse(course) {
         title: course.title,
         description: course.description,
         language: 'en',
-        sort_order: course.sort_order,
+        sort_order: course.sort_order ?? course.sortOrder ?? null,
       })
       .eq('id', existing.id)
       .select('id')
@@ -147,13 +80,108 @@ async function ensureCourse(course) {
       title: course.title,
       description: course.description,
       language: 'en',
-      sort_order: course.sort_order,
+      sort_order: course.sort_order ?? course.sortOrder ?? null,
     })
     .select('id')
     .single();
 
   if (error) throw error;
   return data.id;
+}
+
+async function seedToeicTests() {
+  const { listeningData, readingData } = loadToeicTestSourceData();
+
+  await supabaseAdmin.from('toeic_questions').delete().neq('id', 0);
+  await supabaseAdmin.from('toeic_question_groups').delete().neq('id', 0);
+  await supabaseAdmin.from('toeic_tests').delete().neq('id', 0);
+
+  for (const listeningTest of listeningData.tests || []) {
+    const testNumber = listeningTest.id.match(/\d+/)?.[0] || '';
+    const matchingReadingTest = (readingData.tests || []).find((test) => test.id.endsWith(testNumber));
+    const title = `TOEIC Test ${testNumber || listeningTest.name}`;
+    const description = 'Đề luyện TOEIC gồm phần Listening và Reading, phù hợp để làm quen cấu trúc bài thi và rèn luyện tốc độ làm bài.';
+
+    const { data: insertedTest, error: testError } = await supabaseAdmin
+      .from('toeic_tests')
+      .insert({
+        title,
+        description,
+      })
+      .select('id')
+      .single();
+
+    if (testError) throw testError;
+
+    const testId = insertedTest.id;
+
+    const insertSections = async (sections = []) => {
+      for (const section of sections) {
+        const sectionAudioUrl = section.audioUrl || null;
+        let currentGroupId = null;
+        let currentGroupKey = null;
+
+        for (const question of section.questions || []) {
+          const part = Number(String(question.toeicPart || section.label).match(/\d+/)?.[0] || 0);
+          const groupKey = question.groupIndex != null
+            ? `group:${question.groupIndex}`
+            : question.sharedPassage
+              ? `passage:${question.sharedPassage}`
+              : sectionAudioUrl || question.audioUrl
+                ? `audio:${sectionAudioUrl || question.audioUrl}`
+                : null;
+          const needsGroup = Boolean(groupKey);
+
+          if (needsGroup && (currentGroupId == null || currentGroupKey !== groupKey)) {
+            const { data: insertedGroup, error: groupError } = await supabaseAdmin
+              .from('toeic_question_groups')
+              .insert({
+                test_id: testId,
+                part,
+                audio_url: sectionAudioUrl,
+                image_url: null,
+                passage_text: question.sharedPassage || null,
+              })
+              .select('id')
+              .single();
+
+            if (groupError) throw groupError;
+
+            currentGroupId = insertedGroup.id;
+            currentGroupKey = groupKey;
+          } else if (!needsGroup) {
+            currentGroupId = null;
+            currentGroupKey = null;
+          }
+
+          const optionsMap = {};
+          for (const option of question.options || []) {
+            optionsMap[option.key] = option.text;
+          }
+
+          const { error: questionError } = await supabaseAdmin
+            .from('toeic_questions')
+            .insert({
+              test_id: testId,
+              group_id: currentGroupId,
+              question_number: question.displayNumber,
+              part,
+              question_text: question.prompt || question.instruction || '',
+              options: optionsMap,
+              correct_answer: question.correctKey || '',
+              explanation: question.explanation || null,
+              audio_url: question.audioUrl || null,
+              image_url: question.imageUrl || null,
+            });
+
+          if (questionError) throw questionError;
+        }
+      }
+    };
+
+    await insertSections(listeningTest.sections);
+    await insertSections(matchingReadingTest?.sections || []);
+  }
 }
 
 async function ensureTopic(courseId, topic) {
@@ -250,7 +278,9 @@ async function seedPublicCatalog() {
   assertConfigured();
 
   console.log('Seeding public courses, topics, and sample flashcards...');
-  for (const course of PUBLIC_COURSES) {
+  const publicCourses = await loadPublicCoursesCatalog();
+
+  for (const course of publicCourses) {
     const courseId = await ensureCourse(course);
     console.log(`  course: ${course.slug} (${courseId})`);
 
@@ -261,6 +291,8 @@ async function seedPublicCatalog() {
       console.log(`      words: ${topic.words.length}`);
     }
   }
+
+  await seedToeicTests();
 }
 
 async function seedUsersOnly() {

@@ -4,6 +4,7 @@ import ConfirmActionModal from '../../components/common/ConfirmActionModal';
 import FileFormatModal from '../../components/common/FileFormatModal';
 import ToastNotice from '../../components/common/ToastNotice';
 import CustomModal from '../../components/customDocs/CustomModal';
+import { mergeGuestReadyCourses } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 import {
@@ -151,11 +152,18 @@ export default function ManagerCourses() {
         axiosClient.get(`/admin/courses?${params.toString()}`)
             .then((data) => {
                 if (!active) return;
-                setCoursesData(data);
+                setCoursesData({
+                    ...data,
+                    items: mergeGuestReadyCourses(data?.items || []),
+                });
             })
             .catch((err) => {
                 if (!active) return;
-                setCoursesData({ items: [], meta: null, filters: null });
+                setCoursesData({
+                    items: mergeGuestReadyCourses([]),
+                    meta: null,
+                    filters: null,
+                });
                 setError(
                     normalizeErrorMessage(
                         err.response?.data?.error || err.response?.data || err.message,
@@ -216,7 +224,10 @@ export default function ManagerCourses() {
         if (search) params.set('search', search);
 
         const data = await axiosClient.get(`/admin/courses?${params.toString()}`);
-        setCoursesData(data);
+        setCoursesData({
+            ...data,
+            items: mergeGuestReadyCourses(data?.items || []),
+        });
     };
 
     const handleSubmitCourse = async () => {

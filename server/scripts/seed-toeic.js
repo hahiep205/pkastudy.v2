@@ -1,13 +1,10 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-const fs = require('fs');
 const mysql = require('mysql2/promise');
-
-const listeningPath = path.join(__dirname, '../../src/data/toeicListeningTests.generated.json');
-const readingPath = path.join(__dirname, '../../src/data/toeicReadingTests.generated.json');
+const { loadToeicTestSourceData } = require('../lib/publicCatalog');
 
 async function connectDB() {
-  return await mysql.createConnection({
+  return mysql.createConnection({
     host: process.env.DB_HOST || '127.0.0.1',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASS || '',
@@ -16,8 +13,7 @@ async function connectDB() {
 }
 
 function parsePartNumber(partLabel) {
-  if (!partLabel) return 0;
-  const match = String(partLabel).match(/\d+/);
+  const match = String(partLabel || '').match(/\d+/);
   return match ? parseInt(match[0], 10) : 0;
 }
 
@@ -25,94 +21,84 @@ async function seedData() {
   let connection;
   try {
     connection = await connectDB();
-    console.log('Connected to DB');
+    const { listeningData, readingData } = loadToeicTestSourceData();
 
-    // Read JSON files
-    const listeningData = JSON.parse(fs.readFileSync(listeningPath, 'utf8'));
-    const readingData = JSON.parse(fs.readFileSync(readingPath, 'utf8'));
-
-    // Clear existing TOEIC tests (since we'll replace the dummy "Full Test 1" with real tests, or add to them)
-    // We'll just delete all tests and recreate
     await connection.execute('DELETE FROM Toeic_Tests');
     console.log('Cleared existing TOEIC tests.');
 
-    const allTests = [];
-    
-    // Process Listening Tests
-    for (const lTest of listeningData.tests) {
-      // Create a corresponding Full Test if we find a matching Reading test
-      const rTest = readingData.tests.find(r => r.id === lTest.id.replace('listening', 'reading'));
-      
-      const title = lTest.name.replace('Listening ', ''); // e.g. "Đề 1"
-      const desc = lTest.desc;
+    for (const listeningTest of listeningData.tests || []) {
+      const testNumber = listeningTest.id.match(/\d+/)?.[0] || '';
+      const matchingReadingTest = (readingData.tests || []).find((test) => test.id.endsWith(testNumber));
+      const title = `TOEIC Test ${testNumber || listeningTest.name}`;
+      const desc = 'Đề luyện TOEIC gồm phần Listening và Reading, phù hợp để làm quen cấu trúc bài thi và rèn luyện tốc độ làm bài.';
 
       const [testResult] = await connection.execute(
         'INSERT INTO Toeic_Tests (title, description) VALUES (?, ?)',
-        [title, desc]
+        [title, desc],
       );
-      const testId = testResult.insertId;
-      console.log(`Created Test: ${title} (ID: ${testId})`);
 
-      // Helper to insert sections
-      const insertSections = async (sections, isReading = false) => {
+      const testId = testResult.insertId;
+
+      const insertSections = async (sections = []) => {
         for (const section of sections) {
           const sectionAudioUrl = section.audioUrl || null;
-
-          // Grouping logic: Questions with the same groupIndex OR sharedPassage in the same section should share a group.
-          // Wait, for Listening, groupIndex is used. For Reading, sharedPassage is used.
-          // We can also group by section if there's a section audio.
-          
-          let currentGroup = null;
           let currentGroupId = null;
-          let currentGroupIdentifier = null; // groupIndex or sharedPassage string
+          let currentGroupKey = null;
 
-          for (const q of section.questions) {
-            const qPart = parsePartNumber(q.toeicPart || section.label);
-            const isGrouped = q.groupIndex != null || q.sharedPassage != null || sectionAudioUrl != null;
-            
-            // If it's grouped, we need to create or reuse a group.
-            // Let's identify the group by groupIndex or sharedPassage
-            const identifier = q.groupIndex != null ? `group-${q.groupIndex}` : (q.sharedPassage ? q.sharedPassage : null);
+          for (const question of section.questions || []) {
+            const part = parsePartNumber(question.toeicPart || section.label);
+            const groupKey = question.groupIndex != null
+              ? `group:${question.groupIndex}`
+              : question.sharedPassage
+                ? `passage:${question.sharedPassage}`
+                : sectionAudioUrl || question.audioUrl
+                  ? `audio:${sectionAudioUrl || question.audioUrl}`
+                  : null;
+            const needsGroup = Boolean(groupKey);
 
-            if (isGrouped && (identifier !== currentGroupIdentifier || currentGroupId === null)) {
-               // Create new group
-               currentGroupIdentifier = identifier;
-               const [groupResult] = await connection.execute(
-                 'INSERT INTO Toeic_Question_Groups (test_id, part, audio_url, image_url, passage_text) VALUES (?, ?, ?, ?, ?)',
-                 [testId, qPart, sectionAudioUrl, null, q.sharedPassage || null] // We can refine image/passage later
-               );
-               currentGroupId = groupResult.insertId;
+            if (needsGroup && (currentGroupId == null || currentGroupKey !== groupKey)) {
+              const [groupResult] = await connection.execute(
+                'INSERT INTO Toeic_Question_Groups (test_id, part, audio_url, image_url, passage_text) VALUES (?, ?, ?, ?, ?)',
+                [
+                  testId,
+                  part,
+                  sectionAudioUrl,
+                  null,
+                  question.sharedPassage || null,
+                ],
+              );
+              currentGroupId = groupResult.insertId;
+              currentGroupKey = groupKey;
+            } else if (!needsGroup) {
+              currentGroupId = null;
+              currentGroupKey = null;
             }
 
             const optionsMap = {};
-            if (Array.isArray(q.options)) {
-              q.options.forEach(opt => {
-                optionsMap[opt.key] = opt.text;
-              });
+            for (const option of question.options || []) {
+              optionsMap[option.key] = option.text;
             }
 
             await connection.execute(
               'INSERT INTO Toeic_Questions (test_id, group_id, question_number, part, question_text, options, correct_answer, audio_url, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [
                 testId,
-                isGrouped ? currentGroupId : null,
-                q.displayNumber,
-                qPart,
-                q.prompt || q.instruction || null,
+                currentGroupId,
+                question.displayNumber,
+                part,
+                question.prompt || question.instruction || null,
                 JSON.stringify(optionsMap),
-                q.correctKey || '',
-                q.audioUrl || null,
-                q.imageUrl || null
-              ]
+                question.correctKey || '',
+                question.audioUrl || null,
+                question.imageUrl || null,
+              ],
             );
           }
         }
       };
 
-      await insertSections(lTest.sections, false);
-      if (rTest) {
-        await insertSections(rTest.sections, true);
-      }
+      await insertSections(listeningTest.sections);
+      await insertSections(matchingReadingTest?.sections || []);
     }
 
     console.log('TOEIC Seeding completed successfully!');

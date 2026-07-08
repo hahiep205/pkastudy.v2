@@ -71,85 +71,70 @@ async function main() {
 
   const checks = [
     {
-      name: 'Phase 6 RLS policies',
-      ...checkIncludes(path.join(root, 'supabase', 'migrations', '0006_rls_policies.sql'), [
-        'profiles_select_own_or_admin',
-        'user_progress_select_own_or_admin',
-        'flashcards_select_policy',
-        'toeic_test_records_policy',
-        'vocab_activity_logs_policy',
+      name: 'Production baseline migration',
+      ...checkIncludes(path.join(root, 'supabase', 'migrations', '0014_reset_public_schema.sql'), [
+        'create table',
+        'profiles',
+        'toeic_tests',
+        'support_tickets',
       ]),
     },
     {
-      name: 'Phase 7 storage setup',
-      ...checkIncludes(path.join(root, 'supabase', 'migrations', '0007_storage_setup.sql'), [
-        'toeic-media',
-        'storage',
-      ]),
-    },
-    {
-      name: 'Phase 7 upload middleware',
-      ...checkIncludes(path.join(root, 'server', 'middlewares', 'uploadMiddleware.js'), [
-        'useSupabaseStorage',
-        'memoryStorage',
-      ]),
-    },
-    {
-      name: 'Phase 7 storage helper',
+      name: 'Storage helper',
       ...checkIncludes(path.join(root, 'server', 'lib', 'supabaseStorage.js'), [
         'uploadToeicFile',
         'useSupabaseStorage',
       ]),
     },
     {
-      name: 'Phase 8 SRS RPC',
-      ...checkIncludes(path.join(root, 'supabase', 'migrations', '0005_srs_rpc.sql'), [
-        'submit_srs_review_batch',
-        'enqueue_immediate_reviews',
+      name: 'Upload middleware',
+      ...checkIncludes(path.join(root, 'server', 'middlewares', 'uploadMiddleware.js'), [
+        'useSupabaseStorage',
+        'memoryStorage',
       ]),
     },
     {
-      name: 'Phase 9 direct auth login',
+      name: 'Direct auth login',
       ...checkIncludes(path.join(root, 'src', 'pages', 'Login.jsx'), [
         'supabase.auth.signInWithPassword',
         'supabase.auth.signInWithOAuth',
       ]),
     },
     {
-      name: 'Phase 9 direct auth register',
+      name: 'Direct auth register',
       ...checkIncludes(path.join(root, 'src', 'pages', 'Register.jsx'), [
         'supabase.auth.signUp',
       ]),
     },
     {
-      name: 'Phase 9 auth context sync',
+      name: 'Auth context sync',
       ...checkIncludes(path.join(root, 'src', 'contexts', 'AuthContext.jsx'), [
         "supabase.auth.getUser",
         "from('profiles')",
       ]),
     },
     {
-      name: 'Phase 9 runtime API resolution',
+      name: 'Runtime API resolution',
       ...checkIncludes(path.join(root, 'src', 'utils', 'axiosClient.js'), [
         'resolveApiBaseUrl',
         'window.location',
       ]),
     },
     {
-      name: 'Phase 10 legacy compare lazy load',
+      name: 'Legacy compare lazy load',
       ...checkIncludes(path.join(root, 'server', 'scripts', 'verify-supabase-data.js'), [
         'getMysqlPool',
         'VERIFY_WITH_MYSQL',
       ]),
     },
     {
-      name: 'Phase 10 migration docs',
-      ...checkIncludes(path.join(root, 'docs', 'supabase-migration-phase-6-10.md'), [
-        'Phase 10 - Backend Cleanup',
+      name: 'Migration baseline docs',
+      ...checkIncludes(path.join(root, 'docs', 'supabase-phase10-runbook.md'), [
+        '0014_reset_public_schema.sql',
       ]),
     },
     {
-      name: 'Phase 10 runtime has no MySQL imports',
+      name: 'Runtime has no MySQL imports',
       ok: legacyImportHits.length === 0,
       details: legacyImportHits.length ? `found legacy imports in ${legacyImportHits.length} runtime file(s)` : '',
     },
@@ -166,7 +151,7 @@ async function main() {
     return;
   }
 
-  process.stdout.write('Phase 6-10 verification passed.\n');
+  process.stdout.write('Baseline verification passed.\n');
 }
 
 main().catch((error) => {

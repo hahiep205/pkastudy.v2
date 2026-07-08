@@ -3,6 +3,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
+const { loadPublicCoursesCatalog } = require('../lib/publicCatalog');
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
@@ -11,7 +12,6 @@ const DATA_DIR = process.env.PKASTUDY_DATA_DIR
   ? path.resolve(process.env.PKASTUDY_DATA_DIR)
   : DEFAULT_DATA_DIR;
 
-const LESSONS_PATH = path.join(DATA_DIR, 'toeicBasicLessons.js');
 const LISTENING_JSON_PATH = path.join(DATA_DIR, 'toeicListeningTests.generated.json');
 const READING_JSON_PATH = path.join(DATA_DIR, 'toeicReadingTests.generated.json');
 
@@ -30,18 +30,12 @@ function parsePartNumber(partLabel) {
   return match ? Number.parseInt(match[0], 10) : 0;
 }
 
-async function loadToeicLessons() {
-  const moduleUrl = pathToFileURL(LESSONS_PATH).href;
-  const imported = await import(moduleUrl);
-  return imported.TOEIC_BASIC_LESSONS_1_TO_50 || [];
-}
-
 function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
 function assertSourceFilesExist() {
-  [LESSONS_PATH, LISTENING_JSON_PATH, READING_JSON_PATH].forEach((filePath) => {
+  [LISTENING_JSON_PATH, READING_JSON_PATH].forEach((filePath) => {
     if (!fs.existsSync(filePath)) {
       throw new Error(`Missing source file: ${filePath}`);
     }
@@ -50,6 +44,7 @@ function assertSourceFilesExist() {
 
 async function upsertToeicCourse(connection, course) {
   const courseDescription = 'Bộ tài liệu từ vựng TOEIC theo chủ đề, phù hợp cho lộ trình tự học và luyện thi hằng ngày.';
+  const sortOrder = Number(course.sort_order ?? course.sortOrder ?? 1);
   const [existing] = await connection.execute(
     'SELECT id FROM Courses WHERE slug = ? LIMIT 1',
     [course.id]
@@ -58,15 +53,15 @@ async function upsertToeicCourse(connection, course) {
   if (existing.length > 0) {
     const courseId = existing[0].id;
     await connection.execute(
-      'UPDATE Courses SET title = ?, description = ?, language = ? WHERE id = ?',
-      [course.title, courseDescription, course.lang || 'en', courseId]
+      'UPDATE Courses SET title = ?, description = ?, language = ?, sort_order = ? WHERE id = ?',
+      [course.title, courseDescription, course.lang || 'en', sortOrder, courseId]
     );
     return courseId;
   }
 
   const [insertResult] = await connection.execute(
     'INSERT INTO Courses (slug, title, description, language, sort_order) VALUES (?, ?, ?, ?, ?)',
-    [course.id, course.title, courseDescription, course.lang || 'en', 1]
+    [course.id, course.title, courseDescription, course.lang || 'en', sortOrder]
   );
 
   return insertResult.insertId;
@@ -190,26 +185,22 @@ async function main() {
   try {
     assertSourceFilesExist();
 
-    const toeicLessons = await loadToeicLessons();
+    const publicCourses = await loadPublicCoursesCatalog();
     const listeningData = loadJson(LISTENING_JSON_PATH);
     const readingData = loadJson(READING_JSON_PATH);
-    const toeicCourse = {
-      id: 'toeic-basic',
-      title: '600 Essential Words for the TOEIC',
-      lang: 'en',
-      topics: toeicLessons,
-    };
 
     connection = await connectDB();
     await connection.beginTransaction();
 
-    await reseedVocabulary(connection, toeicCourse);
+    for (const course of publicCourses) {
+      await reseedVocabulary(connection, course);
+    }
     await reseedToeicTests(connection, listeningData, readingData);
 
     await connection.commit();
 
     console.log(`Seed completed from ${DATA_DIR}`);
-    console.log(`Vocabulary topics: ${(toeicCourse.topics || []).length}`);
+    console.log(`Vocabulary courses: ${publicCourses.length}`);
     console.log(`Listening tests: ${(listeningData.tests || []).length}`);
     console.log(`Reading tests: ${(readingData.tests || []).length}`);
   } catch (error) {

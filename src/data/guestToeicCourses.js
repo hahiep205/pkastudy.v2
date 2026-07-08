@@ -1,10 +1,10 @@
-import { TOEIC_BASIC_LESSONS_1_TO_50 } from "./toeicBasicLessons";
-import { ENGLISH_A1_BASIC_LESSONS_1_TO_50 } from "./englishA1BasicLessons";
-import { ENGLISH_A2_BASIC_LESSONS_1_TO_50 } from "./englishA2BasicLessons";
-import { ENGLISH_B1_BASIC_LESSONS_1_TO_50 } from "./englishB1BasicLessons";
-import { ENGLISH_B2_BASIC_LESSONS_1_TO_50 } from "./englishB2BasicLessons";
-import { ENGLISH_C1_BASIC_LESSONS_1_TO_50 } from "./englishC1BasicLessons";
-import { ENGLISH_PHRASES_100_LESSONS } from "./englishPhrases100Lessons";
+import { TOEIC_BASIC_LESSONS_1_TO_50 } from "./toeicBasicLessons.js";
+import { ENGLISH_A1_BASIC_LESSONS_1_TO_50 } from "./englishA1BasicLessons.js";
+import { ENGLISH_A2_BASIC_LESSONS_1_TO_50 } from "./englishA2BasicLessons.js";
+import { ENGLISH_B1_BASIC_LESSONS_1_TO_50 } from "./englishB1BasicLessons.js";
+import { ENGLISH_B2_BASIC_LESSONS_1_TO_50 } from "./englishB2BasicLessons.js";
+import { ENGLISH_C1_BASIC_LESSONS_1_TO_50 } from "./englishC1BasicLessons.js";
+import { ENGLISH_PHRASES_100_LESSONS } from "./englishPhrases100Lessons.js";
 
 // Synced from server/scripts/seed-additional-courses.js
 const VERY_EASY_TOEIC_TOPICS = [
@@ -210,6 +210,16 @@ export function getGuestReadyCourseSummaries() {
         (sum, topic) => sum + (topic.words?.length || 0),
         0,
       ),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export function getGuestReadyCoursesCatalog() {
+  return Object.values(GUEST_TOEIC_COURSE_MAP)
+    .map((course) => ({
+      ...course,
+      sort_order: course.sortOrder,
+      topics: normalizeTopics(course.topics),
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }

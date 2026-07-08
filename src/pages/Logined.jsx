@@ -59,8 +59,8 @@ export default function Logined() {
                         <Link to="/dashboard/courses" className="lp-btn lp-btn--secondary">
                             Học tiếp
                         </Link>
-                        <button type="button" className="lp-btn lp-btn--ghost-white" onClick={handleOpenAI}>
-                            Mở AI
+                        <button type="button" className="lp-btn lp-btn--primary" onClick={handleOpenAI}>
+                            Mở AI hỗ trợ
                         </button>
                     </div>
 
@@ -73,68 +73,8 @@ export default function Logined() {
                     </div>
                 </div>
 
-                <div className="logined-hero-panel">
-                    <div className="logined-panel-card logined-panel-card--top">
-                        <span className="logined-panel-label">Hôm nay</span>
-                        <strong>Giữ nhịp học đều trong 15 phút</strong>
-                        <p>Ôn flashcard, làm một bài luyện ngắn, rồi chốt lại bằng AI trợ lý.</p>
-                    </div>
-
-                    <div className="logined-progress-grid">
-                        <article className="logined-metric-card">
-                            <span>Focus</span>
-                            <strong>3 bước</strong>
-                            <p>Flashcard, quiz, review</p>
-                        </article>
-                        <article className="logined-metric-card">
-                            <span>Lộ trình</span>
-                            <strong>1 ngày</strong>
-                            <p>Tiếp tục từ bài gần nhất</p>
-                        </article>
-                        <article className="logined-metric-card">
-                            <span>Hỗ trợ</span>
-                            <strong>AI</strong>
-                            <p>Giải thích nhanh khi bí</p>
-                        </article>
-                    </div>
-                </div>
             </section>
 
-            <section className="logined-actions">
-                <div className="lp-container">
-                    <div className="logined-section-head">
-                        <span className="logined-eyebrow logined-eyebrow--soft">Lối tắt nhanh</span>
-                        <h2 className="lp-heading">Chọn việc tiếp theo cho phiên học của bạn</h2>
-                        <p className="lp-subheading">
-                            Những điểm vào quan trọng nhất đã được gom sẵn để bạn không phải tìm lại từ đầu.
-                        </p>
-                    </div>
-
-                    <div className="logined-actions-grid">
-                        <ActionCard
-                            tone="blue"
-                            to="/dashboard"
-                            cta="Đi ngay"
-                            title="Mở bảng điều khiển học tập"
-                            desc="Xem tổng quan tiến trình, streak và các mục cần ưu tiên trong ngày."
-                        />
-                        <ActionCard
-                            tone="green"
-                            to="/dashboard/courses"
-                            cta="Tiếp tục"
-                            title="Vào danh sách bài học"
-                            desc="Chọn một chủ đề đang học dở hoặc mở bộ từ vựng phù hợp cấp độ."
-                        />
-                        <ActionCard
-                            tone="gold"
-                            to="/dashboard/settings"
-                            cta="Tuỳ chỉnh"
-                            title="Điều chỉnh trải nghiệm"
-                            desc="Sửa hồ sơ, giao diện và các thiết lập cá nhân để học thoải mái hơn."
-                        />
-                    </div>
-                </div>
-            </section>
         </main>
     );
 }

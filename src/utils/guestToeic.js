@@ -272,6 +272,36 @@ function buildAnswerMap(answerEntries = []) {
   return map;
 }
 
+function getGuestToeicTestStats(test) {
+  const questions = Array.isArray(test?.fullTest?.questions) ? test.fullTest.questions : [];
+  const groupKeys = new Set();
+  const partKeys = new Set();
+
+  questions.forEach((question) => {
+    const partKey = String(question?.toeicPart || question?.partLabel || '').trim();
+    if (partKey) {
+      partKeys.add(partKey);
+    }
+
+    const groupKey = question?.groupIndex != null
+      ? `group:${question.groupIndex}`
+      : question?.sharedPassage
+        ? `passage:${question.sharedPassage}`
+        : question?.audioUrl
+          ? `audio:${question.audioUrl}`
+          : question?.imageUrl
+            ? `image:${question.imageUrl}`
+            : `question:${question?.id || groupKeys.size}`;
+    groupKeys.add(groupKey);
+  });
+
+  return {
+    questionCount: questions.length,
+    groupCount: groupKeys.size,
+    partsUsed: partKeys.size,
+  };
+}
+
 export function isGuestToeicTestId(testId) {
   return GUEST_TOEIC_TESTS.some((test) => test.id === testId);
 }
@@ -283,7 +313,44 @@ export function getGuestToeicTests() {
     title: test.title,
     name: test.name,
     desc: test.desc,
+    description: test.desc,
   }));
+}
+
+export function getGuestToeicTestSummaries() {
+  return GUEST_TOEIC_TESTS.map((test) => {
+    const stats = getGuestToeicTestStats(test);
+
+    return {
+      id: test.id,
+      title: test.title,
+      description: test.desc,
+      createdAt: null,
+      questionCount: stats.questionCount,
+      groupCount: stats.groupCount,
+      partsUsed: stats.partsUsed,
+    };
+  });
+}
+
+export function mergeGuestToeicTests(apiTests = [], guestTests = getGuestToeicTests()) {
+  const merged = new Map();
+
+  apiTests.forEach((test) => {
+    const key = test?.id;
+    if (key != null) {
+      merged.set(key, test);
+    }
+  });
+
+  guestTests.forEach((test) => {
+    const key = test?.id;
+    if (key != null && !merged.has(key)) {
+      merged.set(key, test);
+    }
+  });
+
+  return Array.from(merged.values());
 }
 
 export function getGuestToeicListeningTests() {

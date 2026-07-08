@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUnseenLevelUp, markLevelUpSeen } from '../utils/xpSystem';
-import { checkStreak } from '../utils/streakSystem';
 import { getDueCount } from '../utils/srsStorage';
 import { useAuth } from '../contexts/useAuth';
 import { isAuthenticatedUser } from '../utils/userStorage';
@@ -13,10 +12,6 @@ const badgeStyle = { fontSize: '4rem', display: 'block', marginBottom: 16, anima
 const titleStyle = { fontSize: '1.5rem', fontWeight: 800, color: '#fff', margin: '0 0 4px' };
 const subtitleStyle = { fontSize: '14px', color: 'rgba(255,255,255,0.6)', margin: '0 0 20px' };
 const btnStyle = { padding: '12px 32px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', transition: 'transform .2s' };
-
-const streakOverlay = { ...overlay };
-const streakCard = { ...card, background: 'linear-gradient(135deg,#1a1a2e,#2d1810)' };
-const streakLostCard = { ...card, background: 'linear-gradient(135deg,#1a1a2e,#2d1015)' };
 
 const toastStyle = { position: 'fixed', bottom: 24, right: 24, zIndex: 9998, background: 'linear-gradient(135deg,#1e293b,#334155)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '14px 20px', color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', animation: 'slideUp .4s ease', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' };
 
@@ -86,24 +81,6 @@ function LevelUpModal({ data, onClose }) {
   );
 }
 
-function StreakModal({ streak, lost, onClose }) {
-  return (
-    <div style={streakOverlay} onClick={onClose}>
-      <div style={lost ? streakLostCard : streakCard} onClick={(e) => e.stopPropagation()}>
-        {!lost && <Confetti />}
-        <span style={badgeStyle}>{lost ? '💔' : '🔥'}</span>
-        <h2 style={titleStyle}>{lost ? 'Streak đã mất!' : `Streak: ${streak} ngày!`}</h2>
-        <p style={subtitleStyle}>
-          {lost ? 'Đừng lo, hãy bắt đầu lại từ hôm nay!' : 'Giữ vững phong độ nhé!'}
-        </p>
-        <button style={btnStyle} onClick={onClose}>
-          {lost ? 'Bắt đầu lại' : 'Tiếp tục học!'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function SrsToast({ count, onClose, onReview }) {
   if (!count) return null;
   return (
@@ -145,18 +122,12 @@ export default function NotificationManager() {
   const isGuestUser = !isAuthenticatedUser(user);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => isNotificationsEnabled());
   const [levelUp, setLevelUp] = useState(null);
-  const [streakInfo, setStreakInfo] = useState(null);
   const [srsCount, setSrsCount] = useState(0);
 
   useEffect(() => {
     injectKeyframes();
 
     if (!isGuestUser) {
-      const sResult = checkStreak();
-      if (sResult.isNewDay) {
-        setStreakInfo({ streak: sResult.streak, lost: sResult.streakLost });
-      }
-
       const lu = getUnseenLevelUp();
       if (lu) setLevelUp(lu);
     }
@@ -186,7 +157,6 @@ export default function NotificationManager() {
   useEffect(() => {
     if (notificationsEnabled) return;
     setLevelUp(null);
-    setStreakInfo(null);
     setSrsCount(0);
   }, [notificationsEnabled]);
 
@@ -194,7 +164,6 @@ export default function NotificationManager() {
     markLevelUpSeen();
     setLevelUp(null);
   };
-  const closeStreak = () => setStreakInfo(null);
   const closeSrs = () => setSrsCount(0);
   const goReview = () => {
     setSrsCount(0);
@@ -206,8 +175,7 @@ export default function NotificationManager() {
       {!notificationsEnabled ? null : (
         <>
           {levelUp && <LevelUpModal data={levelUp} onClose={closeLevelUp} />}
-          {streakInfo && !levelUp && <StreakModal streak={streakInfo.streak} lost={streakInfo.lost} onClose={closeStreak} />}
-          {srsCount > 0 && !levelUp && !streakInfo && (
+          {srsCount > 0 && !levelUp && (
             <SrsToast count={srsCount} onClose={closeSrs} onReview={goReview} />
           )}
         </>

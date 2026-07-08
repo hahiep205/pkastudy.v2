@@ -7,6 +7,10 @@ import CustomModal from '../../components/customDocs/CustomModal';
 import axiosClient from '../../utils/axiosClient';
 import { normalizeErrorMessage } from '../../utils/normalizeErrorMessage';
 import {
+    getGuestToeicTestSummaries,
+    mergeGuestToeicTests,
+} from '../../utils/guestToeic';
+import {
     downloadToeicExportFile,
     downloadToeicSampleFile,
     IMPORT_FILE_ACCEPT,
@@ -21,6 +25,8 @@ function createEmptyTestForm() {
         description: '',
     };
 }
+
+const GUEST_TOEIC_TESTS = getGuestToeicTestSummaries();
 
 function buildToastErrorMessage(err, fallback) {
     return normalizeErrorMessage(
@@ -97,6 +103,11 @@ export default function ManagerToeic() {
     const [isSampleModalOpen, setIsSampleModalOpen] = useState(false);
     const importInputRef = useRef(null);
 
+    const applyGuestToeicFallback = (testsResponse) => ({
+        ...testsResponse,
+        items: mergeGuestToeicTests(testsResponse?.items || [], GUEST_TOEIC_TESTS),
+    });
+
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
             setPage(1);
@@ -119,11 +130,11 @@ export default function ManagerToeic() {
         axiosClient.get(`/admin/toeic/tests?${params.toString()}`)
             .then((data) => {
                 if (!active) return;
-                setTestsData(data);
+                setTestsData(applyGuestToeicFallback(data));
             })
             .catch((err) => {
                 if (!active) return;
-                setTestsData({ items: [], meta: null, filters: null });
+                setTestsData(applyGuestToeicFallback({ items: [], meta: null, filters: null }));
                 setError(
                     normalizeErrorMessage(
                         err.response?.data?.error || err.response?.data || err.message,
@@ -181,7 +192,7 @@ export default function ManagerToeic() {
         if (search) params.set('search', search);
 
         const data = await axiosClient.get(`/admin/toeic/tests?${params.toString()}`);
-        setTestsData(data);
+        setTestsData(applyGuestToeicFallback(data));
     };
 
     const handleSubmitTest = async () => {
@@ -408,7 +419,11 @@ export default function ManagerToeic() {
                                 </div>
                                 <div>
                                     <span>Ngày tạo</span>
-                                    <strong>{new Date(test.createdAt).toLocaleDateString('vi-VN')}</strong>
+                                    <strong>
+                                        {test.createdAt
+                                            ? new Date(test.createdAt).toLocaleDateString('vi-VN')
+                                            : 'Hệ thống'}
+                                    </strong>
                                 </div>
                             </div>
 
