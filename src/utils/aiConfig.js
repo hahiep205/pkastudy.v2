@@ -1,13 +1,35 @@
-const DEFAULT_AI_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const DEFAULT_AI_MODEL = 'openai/gpt-oss-120b';
 
-export const AI_API_URL =
-  import.meta.env.AI_API_URL ||
-  DEFAULT_AI_API_URL;
+function isLocalhostUrl(url) {
+  return /^(https?:\/\/)?(localhost|127\.0\.0\.1|::1)(:\d+)?(\/|$)/i.test(url || '');
+}
 
-export const AI_BEARER =
-  import.meta.env.AI_BEARER ||
-  '';
+function resolveAiProxyUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '');
+
+  if (configuredBaseUrl) {
+    if (import.meta.env.PROD && isLocalhostUrl(configuredBaseUrl)) {
+      return undefined;
+    }
+
+    return `${configuredBaseUrl}/ai/chat/completions`;
+  }
+
+  if (typeof window !== 'undefined') {
+    const { hostname, origin } = window.location;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return 'http://localhost:4000/api/ai/chat/completions';
+    }
+
+    return `${origin}/api/ai/chat/completions`;
+  }
+
+  return '/api/ai/chat/completions';
+}
+
+export const AI_API_URL =
+  resolveAiProxyUrl() || '/api/ai/chat/completions';
 
 export const AI_MODEL =
   import.meta.env.AI_MODEL ||

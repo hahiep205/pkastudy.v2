@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createWorker } from 'tesseract.js';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
-import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
+import { AI_API_URL, AI_MODEL } from '../../utils/aiConfig';
 import {
   buildSmartVocabularyPrompt,
   collectVocabularyCandidatesFromText,
@@ -470,7 +470,6 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${AI_BEARER}`,
         },
         body: JSON.stringify({
           model: AI_MODEL,
@@ -491,7 +490,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
               }),
             },
           ],
-          max_tokens: 1800,
+          max_tokens: 2400,
           temperature: 0.1,
           stream: false,
         }),

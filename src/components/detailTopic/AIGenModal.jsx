@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
-import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
+import { AI_API_URL, AI_MODEL } from '../../utils/aiConfig';
 
 const LANG_CONFIG = {
     en: {
@@ -587,7 +587,6 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang, existin
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${AI_BEARER}`
                 },
                 body: JSON.stringify({
                     model: AI_MODEL,
@@ -596,7 +595,7 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang, existin
                         { role: 'system', content: uniqueSystemPrompt },
                         { role: 'user', content: prompt }
                     ],
-                    max_tokens: 3000,
+                    max_tokens: 3200,
                     temperature: 0.2,
                     stream: false
                 })

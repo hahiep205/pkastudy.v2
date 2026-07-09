@@ -4,7 +4,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
-import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
+import { AI_API_URL, AI_MODEL } from '../../utils/aiConfig';
 import {
   MAX_PREVIEW_WORDS,
   MAX_SELECTABLE_WORDS,
@@ -175,7 +175,6 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${AI_BEARER}`,
         },
         body: JSON.stringify({
           model: AI_MODEL,

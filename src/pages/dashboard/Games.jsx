@@ -3,16 +3,16 @@ import { useLocation } from 'react-router-dom';
 import flappyLogo from '../../assets/images/logo-flappybird.png';
 import FlappyBirdExperience, { BIRD_OPTIONS, GAME_CARD, GAME_ID } from '../../components/games/FlappyBirdExperience';
 import CourseTopicPicker from '../../components/games/CourseTopicPicker';
+import VocabularyRainExperience from '../../components/games/VocabularyRainExperience';
 import SpacedRepetitionSection from '../../components/games/SpacedRepetitionSection';
 import Quiz from '../../components/Quiz';
 import Typing from '../../components/Typing';
 import Listening from '../../components/Listening';
 import Match from '../../components/Match';
 import Flashcard from '../../components/Flashcard';
-import { useAuth } from '../../contexts/useAuth';
 import { useCourseProgress } from '../../hooks/useCourseProgress';
 import { useCustomCourses } from '../../hooks/useCustomCourses';
-import { getGuestReadyCourseTopics, mergeGuestReadyCourses } from '../../data/guestToeicCourses';
+import { getGuestReadyCourseTopics } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { getDashboardUserKey, recordStudyModeCompletion } from '../../utils/dashboardProgress';
 import { recordGamePlay } from '../../utils/userStats';
@@ -26,7 +26,6 @@ import {
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
-import { isAuthenticatedUser } from '../../utils/userStorage';
 import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
 
 const VOCAB_GAMES = [
@@ -35,10 +34,12 @@ const VOCAB_GAMES = [
   { id: 'listen', name: 'Luyện nghe', icon: '🎧', desc: 'Nghe phát âm, điền lại từ', color: '#10b981' },
   { id: 'match', name: 'Nối từ', icon: '🔗', desc: 'Ghép từ vựng với nghĩa đúng', color: '#ec4899' },
   { id: 'flashcard', name: 'Flashcard', icon: '🃏', desc: 'Lật thẻ, ôn lại từ nhanh chóng', color: '#8b5cf6' },
+  { id: 'rain', name: 'Mưa từ vựng', icon: '🌧️', desc: 'Chọn đúng từ đang rơi theo nghĩa hiển thị', color: '#0ea5e9' },
 ];
 
 const VOCAB_GAMES_DISPLAY = [
   VOCAB_GAMES.find((game) => game.id === 'flashcard'),
+  VOCAB_GAMES.find((game) => game.id === 'rain'),
   { ...VOCAB_GAMES.find((game) => game.id === 'quiz'), name: 'Quiz' },
   { ...VOCAB_GAMES.find((game) => game.id === 'listen'), name: 'Listening' },
   { ...VOCAB_GAMES.find((game) => game.id === 'typing'), name: 'Typing' },
@@ -134,7 +135,9 @@ function TopicPicker({ dueReviewWords, gameInfo, onSelect, onBack }) {
                 });
               }
             });
-          } catch (e) { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
         setApiTopics(allTopics);
       })
@@ -381,7 +384,6 @@ function FlappyBirdPicker({ selectedBird, onPickBird, onContinue, onBack }) {
 }
 
 export default function Games() {
-  const { user } = useAuth();
   const location = useLocation();
   const [activeGameId, setActiveGameId] = useState(null);
   const [isSrsScreenOpen, setIsSrsScreenOpen] = useState(false);
@@ -393,7 +395,6 @@ export default function Games() {
   const [phase, setPhase] = useState('hub');
   const [studyWordIds, setStudyWordIds] = useState(null);
   const [dueReviewWords, setDueReviewWords] = useState([]);
-  const [catalogSummary, setCatalogSummary] = useState({ topics: 0, words: 0, tests: 0 });
   const { remembered, replaceRememberedInTopic } = useCourseProgress();
   const pageRef = useRef(null);
   const useServerSrs = hasServerSrsAccess();
@@ -469,36 +470,6 @@ export default function Games() {
       cancelled = true;
     };
   }, [useServerSrs]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const useGuestCatalog = !isAuthenticatedUser(user);
-
-    async function loadCatalogSummary() {
-      try {
-        const courses = await axiosClient.get('/courses');
-        const courseList = mergeGuestReadyCourses(Array.isArray(courses) ? courses : []);
-        const topics = courseList.reduce((sum, course) => sum + Number(course.topic_count || 0), 0);
-        const words = courseList.reduce((sum, course) => sum + Number(course.vocabulary_count || 0), 0);
-        const tests = await axiosClient.get('/toeic/tests');
-        const testList = Array.isArray(tests) ? tests : [];
-
-        if (!cancelled) {
-          setCatalogSummary({ topics, words, tests: testList.length });
-        }
-      } catch (error) {
-        console.error('Failed to load game catalog summary.', error);
-        if (!cancelled) {
-          setCatalogSummary({ topics: 0, words: 0, tests: 0 });
-        }
-      }
-    }
-
-    loadCatalogSummary();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   useEffect(() => {
     if (location.hash === '#games-srs-label') {
@@ -595,6 +566,8 @@ export default function Games() {
     ? {
       topicLang: selectedTopic.lang,
       words: activeWords,
+      topicTitle: selectedTopic.title,
+      sourceTitle: selectedTopic.source,
       allTopicWords: selectedTopic.words,
       initialLearnedWordIds: activeWords.filter((word) => remembered[word.id]).map((word) => word.id),
       onSessionComplete: () => trackStudySessionComplete(vocabGame?.id),
@@ -739,6 +712,7 @@ export default function Games() {
       listen: <Listening {...studyModeProps} />,
       match: <Match {...studyModeProps} />,
       flashcard: <Flashcard {...studyModeProps} onSaveLearnedWords={studyModeProps.onSaveLearnedWords} />,
+      rain: <VocabularyRainExperience {...studyModeProps} />,
     };
 
     return (

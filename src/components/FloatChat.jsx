@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import hljs from 'highlight.js';
 import '../assets/css/chatbot.css';
 import aiImg from '../assets/images/ai.png';
-import { AI_API_URL, AI_BEARER, AI_MODEL } from '../utils/aiConfig';
+import { AI_API_URL, AI_MODEL } from '../utils/aiConfig';
 
 marked.setOptions({
     highlight: function (code, lang) {
@@ -94,7 +94,6 @@ export default function FloatChat() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${AI_BEARER}`
                 },
                 body: JSON.stringify({
                     model: AI_MODEL,
@@ -102,9 +101,9 @@ export default function FloatChat() {
                         { role: 'system', content: SYSTEM_PROMPT },
                         ...currentHistory
                     ],
-                    max_tokens: 2048,
-                    temperature: 0.85,
-                    top_p: 0.95,
+                    max_tokens: 1024,
+                    temperature: 0.7,
+                    top_p: 0.9,
                     stream: true
                 })
             });

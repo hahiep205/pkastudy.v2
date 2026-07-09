@@ -35,7 +35,7 @@ import {
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
 import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
-import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
+import { AI_API_URL, AI_MODEL } from '../../utils/aiConfig';
 
 const SVG_ICONS = {
   VOICE: (
@@ -237,7 +237,6 @@ Word type: ${cleanAiText(wordtype) || '(empty)'}`;
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${AI_BEARER}`,
     },
     body: JSON.stringify({
       model: AI_MODEL,
@@ -248,7 +247,7 @@ Word type: ${cleanAiText(wordtype) || '(empty)'}`;
         },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 120,
+      max_tokens: 200,
       temperature: 0,
       stream: false,
     }),
@@ -309,7 +308,6 @@ async function auditWordsWithAI(words, langName) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${AI_BEARER}`,
     },
     body: JSON.stringify({
       model: AI_MODEL,
@@ -320,7 +318,7 @@ async function auditWordsWithAI(words, langName) {
         },
         { role: 'user', content: buildAuditWordsPrompt(words, langName) },
       ],
-      max_tokens: 2200,
+      max_tokens: 3200,
       temperature: 0,
       stream: false,
     }),
@@ -1073,7 +1071,6 @@ const activeWords = !studyWordIds
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${AI_BEARER}`,
         },
         body: JSON.stringify({
           model: AI_MODEL,
@@ -1081,7 +1078,7 @@ const activeWords = !studyWordIds
             { role: 'system', content: aiMeta.systemPrompt },
             { role: 'user', content: buildAuditWordPrompt(word, aiMeta.name) },
           ],
-          max_tokens: 800,
+          max_tokens: 1000,
           temperature: 0,
           stream: false,
         }),

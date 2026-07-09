@@ -11,6 +11,7 @@ const srsRoutes = require('./routes/srsRoutes');
 const toeicRoutes = require('./routes/toeicRoutes');
 const wordProgressRoutes = require('./routes/wordProgressRoutes');
 const supportRoutes = require('./routes/supportRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 const { useSupabaseStorage } = require('./lib/supabaseStorage');
 const { notFoundHandler, globalErrorHandler } = require('./middlewares/errorHandler');
 
@@ -69,6 +70,7 @@ app.use('/api/word-progress', wordProgressRoutes);
 app.use('/api/toeic-upload', toeicUploadRoutes);
 app.use('/api/toeic', toeicRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
