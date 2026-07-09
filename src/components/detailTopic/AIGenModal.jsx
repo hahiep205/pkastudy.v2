@@ -3,10 +3,7 @@
 import { useState } from 'react';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
-
-const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
-const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
+import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
 
 const LANG_CONFIG = {
     en: {

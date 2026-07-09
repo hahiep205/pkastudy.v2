@@ -35,7 +35,6 @@ export default function Quiz({
     onSessionComplete,
     onExit,
     onBackToTopic,
-    onStudyWrongWords,
 }) {
     const distractorsPool = allTopicWords || words;
     const [questions, setQuestions] = useState(() => buildQuizQuestions(words, distractorsPool));
@@ -43,7 +42,6 @@ export default function Quiz({
     const [answersByWordId, setAnswersByWordId] = useState({});
     const [isCompleted, setIsCompleted] = useState(false);
     const sessionLockedRef = useRef(false);
-    const advanceTimeoutRef = useRef(null);
 
     useEffect(() => {
         const nextQuestions = buildQuizQuestions(words, distractorsPool);
@@ -52,7 +50,6 @@ export default function Quiz({
         setAnswersByWordId({});
         setIsCompleted(false);
         sessionLockedRef.current = false;
-        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
     }, [words, distractorsPool]);
 
     useEffect(() => {
@@ -63,14 +60,12 @@ export default function Quiz({
             if (!event.target.closest(EXIT_CLICK_SELECTOR)) return;
             event.preventDefault();
             event.stopPropagation();
-            if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
             onExit?.();
         };
 
         document.addEventListener('click', handleExitClick, true);
         return () => {
             document.removeEventListener('click', handleExitClick, true);
-            if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
         };
     }, [onExit, words.length]);
 
@@ -98,13 +93,10 @@ export default function Quiz({
     };
 
     const handleNext = () => {
-        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
         setCurrentIndex((prev) => Math.min(prev + 1, totalQuestions - 1));
     };
 
     const handleComplete = () => {
-        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
-        
         // Auto mark correct words as learned for SRS injection
         const correctWordIds = questions
             .filter((q) => answersByWordId[q.wordId]?.isCorrect)
@@ -134,25 +126,13 @@ export default function Quiz({
                 isCorrect: choice.isCorrect,
             },
         }));
-
-        // Auto advance logic
-        const delay = choice.isCorrect ? 1000 : 2000;
-        advanceTimeoutRef.current = setTimeout(() => {
-            if (isLastQuestion) {
-                handleComplete();
-            } else {
-                handleNext();
-            }
-        }, delay);
     };
 
     const handlePrevious = () => {
-        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
         setCurrentIndex((prev) => Math.max(prev - 1, 0));
     };
 
     const handlePlayAgain = () => {
-        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
         const nextQuestions = buildQuizQuestions(words, distractorsPool);
         setQuestions(nextQuestions);
         setCurrentIndex(0);
@@ -160,12 +140,6 @@ export default function Quiz({
         setIsCompleted(false);
         sessionLockedRef.current = false;
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleRequizWrongWords = () => {
-        if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
-        const wrongWordIds = questions.filter(q => !answersByWordId[q.wordId]?.isCorrect).map(q => q.wordId);
-        onStudyWrongWords?.(wrongWordIds);
     };
 
     if (!words.length) {
@@ -329,11 +303,6 @@ export default function Quiz({
                         </div>
 
                         <div className="flashcard-completion-actions">
-                            {false && (
-                                <button type="button" className="btn btn-secondary" onClick={handleRequizWrongWords}>
-                                    Học lại từ sai
-                                </button>
-                            )}
                             <button type="button" className="btn btn-secondary" onClick={handlePlayAgain}>
                                 Làm lại toàn bộ
                             </button>

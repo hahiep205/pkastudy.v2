@@ -4,6 +4,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
+import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
 import {
   MAX_PREVIEW_WORDS,
   MAX_SELECTABLE_WORDS,
@@ -16,9 +17,6 @@ import {
   getTopicLanguageMeta,
 } from '../../utils/customTopicAi';
 
-const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
-const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
 const MAX_FILE_SIZE = 1024 * 1024;
 
 if (pdfjsLib?.GlobalWorkerOptions && pdfjsLib.GlobalWorkerOptions.workerSrc !== pdfWorkerUrl) {
@@ -56,9 +54,7 @@ async function extractTextFromPdf(file) {
   const pages = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    // eslint-disable-next-line no-await-in-loop
     const page = await pdf.getPage(pageNumber);
-    // eslint-disable-next-line no-await-in-loop
     const textContent = await page.getTextContent();
     const pageText = textContent.items.map((item) => item.str || '').join(' ');
     if (cleanText(pageText)) {

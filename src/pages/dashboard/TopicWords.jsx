@@ -34,12 +34,8 @@ import {
   submitSrsReviewBatch,
 } from '../../utils/srsApi';
 import { xpStudyModeComplete } from '../../utils/xpSystem';
-import { isAuthenticatedUser } from '../../utils/userStorage';
 import { recordVocabularyActivity } from '../../utils/vocabActivityApi';
-
-const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
-const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
+import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
 
 const SVG_ICONS = {
   VOICE: (
@@ -308,19 +304,6 @@ Current values:
 ${currentValues}`;
 }
 
-function normalizeImagePreviewItem(parsed, fallbackWordData = {}) {
-  const pick = (...values) => values.map(cleanAiText).find(Boolean) || '';
-  const result = {
-    word: pick(parsed?.word, parsed?.headword, parsed?.term) || cleanAiText(fallbackWordData.word),
-    mean: pick(parsed?.mean, parsed?.meaning, parsed?.definition, parsed?.sense) || cleanAiText(fallbackWordData.mean),
-    wordtype: pick(parsed?.wordtype, parsed?.word_type, parsed?.part_of_speech, parsed?.pos, parsed?.type) || cleanAiText(fallbackWordData.wordtype),
-  };
-
-  if (!result.word) return null;
-  result.mean = limitMeaningToFiveWords(result.mean);
-  return result;
-}
-
 async function auditWordsWithAI(words, langName) {
   const resp = await fetch(AI_API_URL, {
     method: 'POST',
@@ -516,7 +499,7 @@ export default function TopicWords() {
   const [studyWordIds, setStudyWordIds] = useState(null);
   const [builtInWords, setBuiltInWords] = useState([]);
   const [builtInStatus, setBuiltInStatus] = useState('idle');
-  const [builtInError, setBuiltInError] = useState('');
+  const [_builtInError, setBuiltInError] = useState('');
   const [aiFillingWordId, setAiFillingWordId] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
   const [isExcelImportModalOpen, setExcelImportModalOpen] = useState(false);

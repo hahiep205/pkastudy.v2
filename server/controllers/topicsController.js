@@ -1,6 +1,6 @@
 const Joi = require('joi');
 const { fetchFlashcardsByTopicSlug } = require('../services/topicsService');
-const { setPublicCache } = require('../lib/httpCache');
+const { setNoStore } = require('../lib/httpCache');
 
 const topicSlugSchema = Joi.string()
   .trim()
@@ -15,7 +15,7 @@ async function getTopicFlashcards(req, res, next) {
     }
 
     const flashcards = await fetchFlashcardsByTopicSlug(value);
-    setPublicCache(res, 300, 600);
+    setNoStore(res);
     res.json({ data: flashcards });
   } catch (error) {
     next(error);

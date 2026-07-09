@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import hljs from 'highlight.js';
 import '../assets/css/chatbot.css';
 import aiImg from '../assets/images/ai.png';
+import { AI_API_URL, AI_BEARER, AI_MODEL } from '../utils/aiConfig';
 
 marked.setOptions({
     highlight: function (code, lang) {
@@ -17,9 +18,6 @@ marked.setOptions({
     }
 });
 
-const API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const API_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
-const MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
 
 const SYSTEM_PROMPT = `Bạn là trợ lý AI gia sư của PKA Study — nền tảng học ngoại ngữ thông minh dành cho sinh viên và người học.
 
@@ -92,14 +90,14 @@ export default function FloatChat() {
         setInputText('');
 
         try {
-            const response = await fetch(API_URL, {
+            const response = await fetch(AI_API_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${API_BEARER}`
+                    'Authorization': `Bearer ${AI_BEARER}`
                 },
                 body: JSON.stringify({
-                    model: MODEL,
+                    model: AI_MODEL,
                     messages: [
                         { role: 'system', content: SYSTEM_PROMPT },
                         ...currentHistory

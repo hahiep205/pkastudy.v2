@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createWorker } from 'tesseract.js';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
+import { AI_API_URL, AI_BEARER, AI_MODEL } from '../../utils/aiConfig';
 import {
   buildSmartVocabularyPrompt,
   collectVocabularyCandidatesFromText,
@@ -11,9 +12,6 @@ import {
   parseJsonList,
 } from '../../utils/customTopicAi';
 
-const AI_API_URL = import.meta.env.VITE_BEE_AI_API_URL || 'https://platform.beeknoee.com/api/v1/chat/completions';
-const AI_BEARER = import.meta.env.VITE_BEE_AI_BEARER || '';
-const AI_MODEL = import.meta.env.VITE_BEE_AI_MODEL || 'openai/gpt-oss-120b';
 const OCR_LANG_MAP = {
   en: ['eng'],
   ja: ['jpn', 'eng'],
