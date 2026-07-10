@@ -47,10 +47,82 @@ async function fetchUpstream(upstreamUrl, apiKey, body) {
   };
 }
 
+async function fetchUpstreamWithFallback(upstreamUrl, apiKey, body, fallbackModel) {
+  const primaryBody = { ...(body || {}) };
+  if (!primaryBody.model && process.env.AI_MODEL) {
+    primaryBody.model = process.env.AI_MODEL;
+  }
+
+  const primaryResponse = await fetchUpstream(upstreamUrl, apiKey, primaryBody);
+  const normalizedPrimaryModel = String(primaryBody.model || '').trim();
+  const normalizedFallbackModel = String(fallbackModel || '').trim();
+  const canFallback =
+    Boolean(normalizedFallbackModel) &&
+    normalizedFallbackModel !== normalizedPrimaryModel &&
+    primaryResponse.status >= 400;
+
+  if (!canFallback) {
+    return primaryResponse;
+  }
+
+  const fallbackResponse = await fetchUpstream(upstreamUrl, apiKey, {
+    ...primaryBody,
+    model: normalizedFallbackModel,
+  });
+
+  return fallbackResponse.status < 400 ? fallbackResponse : primaryResponse;
+}
+
+async function fetchStreamingUpstreamWithFallback(upstreamUrl, apiKey, body, fallbackModel) {
+  const primaryBody = { ...(body || {}) };
+  if (!primaryBody.model && process.env.AI_MODEL) {
+    primaryBody.model = process.env.AI_MODEL;
+  }
+
+  const primaryResponse = await fetch(upstreamUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(primaryBody),
+  });
+
+  const normalizedFallbackModel = String(fallbackModel || '').trim();
+  const normalizedPrimaryModel = String(primaryBody.model || '').trim();
+  const canFallback =
+    Boolean(normalizedFallbackModel) &&
+    normalizedFallbackModel !== normalizedPrimaryModel &&
+    primaryResponse.status >= 400;
+
+  if (!canFallback) {
+    return primaryResponse;
+  }
+
+  try {
+    await primaryResponse.text();
+  } catch {
+    /* ignore */
+  }
+
+  return fetch(upstreamUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      ...primaryBody,
+      model: normalizedFallbackModel,
+    }),
+  });
+}
+
 async function proxyAiChatCompletion(req, res, next) {
   try {
     const upstreamUrl = process.env.AI_UPSTREAM_URL;
     const apiKey = process.env.AI_UPSTREAM_KEY;
+    const fallbackModel = process.env.AI_MODEL_OLD;
 
     if (!upstreamUrl || !apiKey) {
       return res.status(500).json({
@@ -65,7 +137,11 @@ async function proxyAiChatCompletion(req, res, next) {
 
     if (shouldCache) {
       const cacheKey = `ai:${buildCacheKey(requestBody)}`;
-      const cachedResult = await getOrSet(cacheKey, NON_STREAM_CACHE_TTL_MS, () => fetchUpstream(upstreamUrl, apiKey, requestBody));
+      const cachedResult = await getOrSet(
+        cacheKey,
+        NON_STREAM_CACHE_TTL_MS,
+        () => fetchUpstreamWithFallback(upstreamUrl, apiKey, requestBody, fallbackModel),
+      );
 
       res.status(cachedResult.status);
       if (cachedResult.contentType) {
@@ -75,14 +151,7 @@ async function proxyAiChatCompletion(req, res, next) {
       return res.send(cachedResult.bodyText);
     }
 
-    const upstreamResponse = await fetch(upstreamUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const upstreamResponse = await fetchStreamingUpstreamWithFallback(upstreamUrl, apiKey, requestBody, fallbackModel);
 
     res.status(upstreamResponse.status);
 
