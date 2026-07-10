@@ -108,3 +108,41 @@ export function playIncorrectSound() {
         },
     ]);
 }
+
+export function playSoftCorrectSound() {
+    playPattern([
+        {
+            offset: 0,
+            frequency: 523.25,
+            duration: 0.14,
+            gain: 0.07,
+            options: { type: 'sine', filterFrequency: 2500, sustainLevel: 0.5, sustainPoint: 0.3 },
+        },
+        {
+            offset: 0.07,
+            frequency: 659.25,
+            duration: 0.16,
+            gain: 0.08,
+            options: { type: 'triangle', filterFrequency: 2800, sustainLevel: 0.48, sustainPoint: 0.34 },
+        },
+    ]);
+}
+
+export function playSoftIncorrectSound() {
+    playPattern([
+        {
+            offset: 0,
+            frequency: 261.63,
+            duration: 0.08,
+            gain: 0.075,
+            options: { type: 'sine', filterFrequency: 1400, sustainLevel: 0.4, sustainPoint: 0.22 },
+        },
+        {
+            offset: 0.075,
+            frequency: 220,
+            duration: 0.11,
+            gain: 0.065,
+            options: { type: 'triangle', filterFrequency: 1200, sustainLevel: 0.35, sustainPoint: 0.24 },
+        },
+    ]);
+}

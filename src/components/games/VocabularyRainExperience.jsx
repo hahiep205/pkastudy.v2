@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { playCorrectSound, playIncorrectSound } from '../../utils/feedbackAudio';
-import { getSpeechLang } from '../../utils/studyModes';
+import { playSoftCorrectSound, playSoftIncorrectSound } from '../../utils/feedbackAudio';
 import '../../assets/css/rain-game.css';
 /* eslint-disable react-hooks/exhaustive-deps */
 
@@ -8,6 +7,7 @@ const MIN_PLAYABLE_WORDS = 2;
 const START_LIVES = 3;
 const MAX_ROUNDS = 12;
 const MIN_ROUNDS = 6;
+const MISS_ADVANCE_DELAY = 220;
 
 function shuffle(items) {
   const next = [...items];
@@ -67,7 +67,6 @@ function formatTime(ms) {
 }
 
 export default function VocabularyRainExperience({
-  topicLang = 'en',
   words = [],
   topicTitle = '',
   sourceTitle = '',
@@ -77,6 +76,7 @@ export default function VocabularyRainExperience({
 }) {
   const playableWords = useMemo(() => dedupeWords(words), [words]);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280));
+  const [boardWidth, setBoardWidth] = useState(960);
   const [boardHeight, setBoardHeight] = useState(540);
   const [status, setStatus] = useState('ready');
   const [boardDrops, setBoardDrops] = useState([]);
@@ -85,7 +85,6 @@ export default function VocabularyRainExperience({
   const [wrongCount, setWrongCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
-  const [roundNo, setRoundNo] = useState(0);
   const [currentTarget, setCurrentTarget] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [result, setResult] = useState(null);
@@ -108,7 +107,6 @@ export default function VocabularyRainExperience({
   }, [playableWords.length]);
 
   const deviceProfile = useMemo(() => getDeviceProfile(viewportWidth), [viewportWidth]);
-  const speechLang = useMemo(() => getSpeechLang(topicLang), [topicLang]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -125,13 +123,17 @@ export default function VocabularyRainExperience({
 
     const observer = new ResizeObserver(() => {
       if (boardRef.current) {
-        setBoardHeight(boardRef.current.getBoundingClientRect().height || 540);
+        const rect = boardRef.current.getBoundingClientRect();
+        setBoardHeight(rect.height || 540);
+        setBoardWidth(rect.width || 960);
       }
     });
 
     if (boardRef.current) {
       observer.observe(boardRef.current);
-      setBoardHeight(boardRef.current.getBoundingClientRect().height || 540);
+      const rect = boardRef.current.getBoundingClientRect();
+      setBoardHeight(rect.height || 540);
+      setBoardWidth(rect.width || 960);
     }
 
     return () => observer.disconnect();
@@ -154,6 +156,24 @@ export default function VocabularyRainExperience({
   const syncDrops = (nextDrops) => {
     dropsRef.current = nextDrops;
     setBoardDrops(nextDrops);
+  };
+
+  const getDropBounds = () => {
+    const estimatedWidth = Math.max(deviceProfile.wordWidth, Math.min(boardWidth * 0.28, 220));
+    const estimatedHeight = Math.max(48, Math.round(estimatedWidth * 0.28));
+    const scale = deviceProfile.fontScale || 1;
+    return {
+      halfWidth: (estimatedWidth * scale) / 2,
+      halfHeight: (estimatedHeight * scale) / 2,
+    };
+  };
+
+  const clampDropPosition = (x, y) => {
+    const { halfWidth, halfHeight } = getDropBounds();
+    return {
+      x: Math.max(halfWidth, Math.min(boardWidth - halfWidth, x)),
+      y: Math.max(halfHeight, Math.min(boardHeight - halfHeight, y)),
+    };
   };
 
   const beginGame = () => {
@@ -205,20 +225,23 @@ export default function VocabularyRainExperience({
     const distractors = shuffle(playableWords.filter((word) => word.id !== target.id)).slice(0, Math.max(0, deviceProfile.dropCount - 1));
     const spawnItems = shuffle([target, ...distractors]).slice(0, deviceProfile.dropCount);
     const laneOrder = shuffle(Array.from({ length: deviceProfile.laneCount }, (_, index) => index));
-    const heightOffset = Math.max(90, Math.min(boardHeight * 0.18, 160));
+    const baseY = Math.max(44, Math.min(boardHeight * 0.14, 96));
+    const rowGap = Math.max(28, Math.min(boardHeight * 0.07, 48));
 
     const nextDrops = spawnItems.map((word, index) => {
       const lane = laneOrder[index % laneOrder.length] ?? 0;
-      const left = ((lane + 0.5) / deviceProfile.laneCount) * 100;
+      const left = ((lane + 0.5) / deviceProfile.laneCount) * boardWidth;
       const isCorrect = word.id === target.id;
-      const drift = (Math.random() - 0.5) * 18;
+      const drift = (Math.random() - 0.5) * 26;
+      const startY = baseY + (index * rowGap);
+      const clamped = clampDropPosition(left, startY, word);
 
       return {
         key: `${target.id}-${word.id}-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         word,
         isCorrect,
-        x: left,
-        y: -heightOffset - (index * 56),
+        x: clamped.x,
+        y: clamped.y,
         speed: deviceProfile.speedMin + Math.random() * (deviceProfile.speedMax - deviceProfile.speedMin),
         drift,
       };
@@ -226,13 +249,12 @@ export default function VocabularyRainExperience({
 
     roundLockedRef.current = false;
     gameStartedAtRef.current = gameStartedAtRef.current || performance.now();
-    setRoundNo((prev) => prev + 1);
     setCurrentTarget(target);
     setFeedback({
       tone: 'info',
       text: `Tìm từ có nghĩa: ${target.mean}`,
     });
-    syncDrops(nextDrops);
+    syncDrops([...(dropsRef.current || []), ...nextDrops]);
   };
 
   const scheduleNextRound = () => {
@@ -252,7 +274,7 @@ export default function VocabularyRainExperience({
     }, 450);
   };
 
-  const handleCorrect = () => {
+  const handleCorrect = (drop) => {
     if (status !== 'playing' || roundLockedRef.current || !currentTarget) return;
 
     const nextStreak = streak + 1;
@@ -260,7 +282,7 @@ export default function VocabularyRainExperience({
     const elapsed = performance.now() - gameStartedAtRef.current;
 
     roundLockedRef.current = true;
-    playCorrectSound();
+    playSoftCorrectSound();
     setScore((prev) => prev + bonus);
     setCorrectCount((prev) => prev + 1);
     setBestStreak((prev) => Math.max(prev, nextStreak));
@@ -269,7 +291,7 @@ export default function VocabularyRainExperience({
       tone: 'success',
       text: `Đúng rồi! +${bonus} điểm`,
     });
-    syncDrops([]);
+    syncDrops(dropsRef.current.filter((item) => item.key !== drop?.key));
 
     if (correctCount + 1 >= targetRounds) {
       finishSession({
@@ -292,11 +314,11 @@ export default function VocabularyRainExperience({
     if (status !== 'playing' || roundLockedRef.current) return;
 
     if (drop.isCorrect) {
-      handleCorrect();
+      handleCorrect(drop);
       return;
     }
 
-    playIncorrectSound();
+    playSoftIncorrectSound();
     setFeedback({
       tone: 'warn',
       text: `Sai rồi: ${drop.word.mean}`,
@@ -327,7 +349,6 @@ export default function VocabularyRainExperience({
     wrongCountRef.current = 0;
     setStreak(0);
     setBestStreak(0);
-    setRoundNo(0);
     setCurrentTarget(null);
     setFeedback(null);
     setResult(null);
@@ -355,7 +376,6 @@ export default function VocabularyRainExperience({
     wrongCountRef.current = 0;
     setStreak(0);
     setBestStreak(0);
-    setRoundNo(0);
     setCurrentTarget(null);
     setFeedback(null);
     setResult(null);
@@ -392,24 +412,32 @@ export default function VocabularyRainExperience({
 
       for (const drop of prevDrops) {
         const nextY = drop.y + (drop.speed * dt);
-        if (nextY > boardHeight + 110) {
+        const { halfWidth, halfHeight } = getDropBounds();
+        const minX = halfWidth;
+        const maxX = boardWidth - halfWidth;
+        const minY = halfHeight;
+        const maxY = boardHeight - halfHeight;
+        if (nextY > maxY) {
           if (drop.isCorrect && !roundLockedRef.current) {
             missedCorrect = drop.word;
           }
           continue;
         }
 
+        const nextX = Math.max(minX, Math.min(maxX, drop.x + (drop.drift * dt * 0.18)));
+        const nextClampedY = Math.max(minY, Math.min(maxY, nextY));
+
         nextDrops.push({
           ...drop,
-          y: nextY,
-          x: drop.x + (drop.drift * dt * 0.18),
+          y: nextClampedY,
+          x: nextX,
         });
       }
 
       if (missedCorrect && !roundLockedRef.current) {
         roundLockedRef.current = true;
-        syncDrops([]);
-        playIncorrectSound();
+        syncDrops(nextDrops);
+        playSoftIncorrectSound();
         const nextWrongCount = wrongCountRef.current + 1;
         wrongCountRef.current = nextWrongCount;
         const isGameOver = nextWrongCount >= START_LIVES;
@@ -431,11 +459,9 @@ export default function VocabularyRainExperience({
           return;
         }
 
-        clearFeedback();
         feedbackTimerRef.current = window.setTimeout(() => {
           if (roundLockedRef.current) return;
           roundLockedRef.current = false;
-          syncDrops([]);
           if (deckIndexRef.current >= targetRounds) {
             finishSession({
               status: 'result',
@@ -445,7 +471,7 @@ export default function VocabularyRainExperience({
             return;
           }
           startRound();
-        }, 500);
+        }, MISS_ADVANCE_DELAY);
         animationRef.current = window.requestAnimationFrame(tick);
         return;
       }
@@ -496,7 +522,7 @@ export default function VocabularyRainExperience({
             <span aria-hidden="true">←</span>
             <span>Quay lại</span>
           </button>
-          <div className="rain-ready-brand">SkyWords</div>
+          <div className="rain-ready-brand">Mưa từ vựng</div>
           <div className="rain-ready-spacer" />
         </div>
 
@@ -539,12 +565,6 @@ export default function VocabularyRainExperience({
     return (
       <section className="rain-game-shell rain-game-shell--result">
         <div className="rain-result-card">
-          <div className="rain-result-brand">
-            <span className={`rain-result-icon ${resultPayload.status === 'gameover' ? 'is-danger' : 'is-success'}`}>
-              {resultPayload.status === 'gameover' ? '⚠️' : '☀️'}
-            </span>
-            <strong>{resultPayload.status === 'gameover' ? 'Mưa đã dừng' : 'SkyWords'}</strong>
-          </div>
           <h2>{resultPayload.status === 'gameover' ? 'Ôi, mưa đã tạnh sớm' : 'Trời đã hửng nắng!'}</h2>
           <p className="rain-result-copy">
             {resultPayload.status === 'gameover'
@@ -595,13 +615,9 @@ export default function VocabularyRainExperience({
           <span>Quay lại</span>
         </button>
         <div className="rain-game-context">
-          <span className="rain-game-kicker">SkyWords</span>
+          <span className="rain-game-kicker">Mưa từ vựng</span>
           <h2>{topicTitle || 'Đang luyện tập'}</h2>
-          <p>
-            {sourceTitle ? `Nguồn: ${sourceTitle}` : 'Chọn từ rơi đúng với nghĩa đang hiển thị'}
-            {' · '}
-            {speechLang}
-          </p>
+          <p>Chọn từ rơi đúng với nghĩa đang hiển thị.</p>
         </div>
         <div className="rain-game-hud">
           <div className="rain-hud-chip">
@@ -632,9 +648,9 @@ export default function VocabularyRainExperience({
             <button
               key={drop.key}
               type="button"
-              className={`rain-drop${drop.isCorrect ? ' is-correct' : ''}`}
+              className="rain-drop"
               style={{
-                left: `${drop.x}%`,
+                left: `${drop.x}px`,
                 top: `${drop.y}px`,
                 transform: `translate(-50%, -50%) scale(${deviceProfile.fontScale})`,
                 minWidth: `${deviceProfile.wordWidth}px`,
@@ -650,18 +666,9 @@ export default function VocabularyRainExperience({
         </div>
 
         <div className={`rain-target-panel ${feedback?.tone ? `is-${feedback.tone}` : ''}`}>
-          <div className="rain-target-head">
-            <div>
-              <span className="rain-target-kicker">Nghĩa cần tìm</span>
-              <strong>{currentTarget?.mean || 'Đang nạp...'}</strong>
-            </div>
-            <div className="rain-target-meta">
-              <span>Vòng {Math.min(roundNo, targetRounds)}/{targetRounds}</span>
-              <span>Streak {streak} · Best {bestStreak}</span>
-            </div>
-          </div>
-
           <div className="rain-target-body">
+            <span className="rain-target-kicker">Nghĩa cần tìm</span>
+            <strong className="rain-target-meaning">{currentTarget?.mean || 'Đang nạp...'}</strong>
             <p>{feedback?.text || 'Chạm vào từ đang rơi đúng với nghĩa phía trên.'}</p>
             <div className="rain-target-mini-card">
               <span className="rain-target-mini-label">Từ đang tìm</span>
