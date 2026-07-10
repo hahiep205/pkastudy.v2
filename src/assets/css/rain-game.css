@@ -1,15 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700;800&family=Nunito+Sans:wght@700;800&display=swap');
+
 .rain-game-shell {
   position: relative;
   width: 100%;
-  min-height: calc(100vh - 120px);
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 18px;
+  gap: 12px;
+  padding: 12px 12px 178px;
   color: #0f4f78;
+  font-family: 'Quicksand', 'Nunito Sans', system-ui, sans-serif;
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.92), transparent 48%),
-    linear-gradient(180deg, #dff2ff 0%, #eaf6ff 45%, #f8fcff 100%);
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.96), transparent 42%),
+    linear-gradient(180deg, #cfe9fb 0%, #dff2ff 44%, #f7fbff 100%);
   overflow: hidden;
 }
 
@@ -33,6 +36,10 @@
 .rain-game-shell--result {
   align-items: center;
   justify-content: center;
+}
+
+.rain-game-shell--playing {
+  justify-content: flex-start;
 }
 
 .rain-ready-topbar {
@@ -77,12 +84,104 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
-  gap: 14px;
+  gap: 12px;
+}
+
+.rain-game-topbar--floating {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 0;
+  backdrop-filter: blur(16px);
 }
 
 .rain-game-context {
   min-width: 0;
   text-align: center;
+}
+
+.rain-game-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0b5f93;
+  letter-spacing: 0.01em;
+}
+
+.rain-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.48);
+  color: #0b5f93;
+  box-shadow: 0 8px 18px rgba(15, 79, 120, 0.06);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.rain-icon-btn:hover,
+.rain-icon-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
+}
+
+.rain-hud-anchor {
+  display: flex;
+  justify-content: center;
+  margin-top: -2px;
+  pointer-events: none;
+}
+
+.rain-hud-pill {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  box-shadow: 0 10px 24px rgba(15, 79, 120, 0.14);
+  backdrop-filter: blur(16px);
+}
+
+.rain-hud-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+  padding: 0 10px;
+}
+
+.rain-hud-stat span {
+  font-family: 'Nunito Sans', 'Quicksand', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(11, 95, 147, 0.54);
+}
+
+.rain-hud-stat strong {
+  margin-top: 2px;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 800;
+  color: #0b5f93;
+}
+
+.rain-hud-stat--streak strong {
+  color: #b87414;
+}
+
+.rain-hud-divider {
+  width: 1px;
+  margin: 3px 3px;
+  background: rgba(11, 95, 147, 0.12);
 }
 
 .rain-game-kicker,
@@ -175,19 +274,18 @@
 .rain-game-board-wrap {
   width: min(1120px, 100%);
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.82fr);
-  gap: 16px;
-  align-items: stretch;
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .rain-game-board {
   position: relative;
-  min-height: clamp(420px, 68vh, 760px);
+  min-height: min(72dvh, 760px);
   overflow: hidden;
   border-radius: 30px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(220, 240, 255, 0.78) 46%, rgba(232, 246, 255, 0.92) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(214, 237, 253, 0.82) 48%, rgba(231, 246, 255, 0.96) 100%);
   border: 1px solid rgba(144, 204, 246, 0.34);
   box-shadow: 0 28px 70px rgba(72, 133, 182, 0.16);
 }
@@ -305,14 +403,16 @@
   z-index: 4;
   display: inline-flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 11px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(111, 188, 241, 0.3);
-  background: rgba(255, 255, 255, 0.94);
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-height: 50px;
+  padding: 11px 15px;
+  border-radius: 18px;
+  border: 1px solid rgba(111, 188, 241, 0.14);
+  background: rgba(255, 255, 255, 0.97);
   color: #0b5f93;
-  box-shadow: 0 12px 24px rgba(57, 132, 181, 0.16);
+  box-shadow: 0 10px 20px rgba(57, 132, 181, 0.14);
   cursor: pointer;
   transition:
     transform 0.18s ease,
@@ -327,7 +427,7 @@
 
 .rain-drop:hover,
 .rain-drop:focus-visible {
-  border-color: rgba(59, 153, 223, 0.6);
+  border-color: rgba(59, 153, 223, 0.28);
   box-shadow: 0 18px 32px rgba(57, 132, 181, 0.22);
   transform: translate(-50%, -50%) scale(1.04) !important;
 }
@@ -335,11 +435,7 @@
 .rain-drop strong {
   font-size: 15px;
   line-height: 1.1;
-}
-
-.rain-drop span {
-  font-size: 12px;
-  color: rgba(11, 95, 147, 0.62);
+  font-weight: 600;
 }
 
 .rain-bottom-glow {
@@ -359,17 +455,24 @@
 }
 
 .rain-target-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(640px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 100%;
-  padding: 18px;
+  align-items: center;
+  gap: 10px;
+  min-height: 132px;
+  padding: 18px 18px 16px;
   transition:
     transform 0.24s ease,
     box-shadow 0.24s ease,
     border-color 0.24s ease,
     background 0.24s ease;
+  backdrop-filter: blur(16px);
 }
 
 .rain-target-panel.is-success {
@@ -387,43 +490,75 @@
   box-shadow: 0 26px 60px rgba(248, 113, 113, 0.08);
 }
 
-.rain-target-body {
+.rain-target-kicker-wrap {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, #f8fbff 0%, #eef8ff 100%);
-  border: 1px solid rgba(141, 206, 247, 0.24);
+  align-items: center;
+  gap: 6px;
+  text-align: center;
 }
 
-.rain-target-body p {
-  font-size: 15px;
-  font-weight: 600;
+.rain-target-kicker-wrap .rain-target-kicker {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  color: #74808b;
+  font-family: 'Nunito Sans', 'Quicksand', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.06em;
 }
 
 .rain-target-meaning {
-  font-size: clamp(22px, 4vw, 32px);
-  line-height: 1.1;
-  color: #0b5f93;
+  font-size: clamp(24px, 4vw, 38px);
+  line-height: 1.05;
+  color: #2b3440;
+  letter-spacing: -0.02em;
 }
 
-.rain-target-mini-card {
-  padding: 14px 16px;
+.rain-target-hearts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.rain-target-mini-card strong {
+.rain-heart {
   font-size: 18px;
+  color: #b8c1ca;
+  line-height: 1;
 }
 
+.rain-heart.is-active {
+  color: #cf2a27;
+}
+
+.rain-progress-bar {
+  width: min(100%, 240px);
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e3e7ed;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.rain-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #24a3e8 0%, #1d8fd6 100%);
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.36);
+}
+
+.rain-target-body,
 .rain-target-footer,
+.rain-target-mini-card {
+  display: none;
+}
+
 .rain-result-actions {
   display: flex;
   flex-wrap: nowrap;
   gap: 10px;
 }
 
-.rain-target-footer .btn,
 .rain-result-actions .btn {
   flex: 1 1 50%;
   min-width: 0;
@@ -655,28 +790,28 @@
 
 @media (max-width: 1024px) {
   .rain-game-shell {
-    padding: 14px;
+    padding: 10px 10px 166px;
   }
 
   .rain-game-topbar {
-    grid-template-columns: 1fr;
-    justify-items: center;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
   }
 
   .rain-back-btn {
     justify-self: start;
   }
 
-  .rain-game-hud {
-    justify-content: center;
-  }
-
-  .rain-game-board-wrap {
-    grid-template-columns: 1fr;
+  .rain-game-brand {
+    font-size: 17px;
   }
 
   .rain-game-board {
-    min-height: 520px;
+    min-height: 560px;
+  }
+
+  .rain-target-panel {
+    width: min(600px, calc(100vw - 20px));
   }
 
   .rain-ready-topbar {
@@ -690,20 +825,78 @@
 }
 
 @media (max-width: 767px) {
+  .rain-game-shell {
+    padding: 8px 8px 150px;
+  }
+
+  .rain-game-topbar {
+    gap: 8px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .rain-game-brand {
+    width: 100%;
+    font-size: 15px;
+  }
+
+  .rain-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .rain-hud-pill {
+    padding: 4px 8px;
+    transform: translateY(-3px);
+  }
+
+  .rain-hud-stat {
+    min-width: 58px;
+    padding: 0 8px;
+  }
+
+  .rain-hud-stat span {
+    font-size: 8px;
+  }
+
+  .rain-hud-stat strong {
+    font-size: 15px;
+  }
+
   .rain-game-board {
-    min-height: 460px;
+    min-height: 470px;
     border-radius: 24px;
   }
 
-  .rain-target-panel,
-  .rain-result-card,
-  .rain-ready-card,
-  .rain-empty-state {
-    border-radius: 24px;
+  .rain-drop {
+    min-width: 108px;
+    padding: 10px 13px;
+    border-radius: 16px;
   }
 
-  .rain-result-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .rain-drop strong {
+    font-size: 13px;
+  }
+
+  .rain-target-panel {
+    width: calc(100vw - 16px);
+    bottom: 8px;
+    min-height: 122px;
+    padding: 12px 12px 10px;
+  }
+
+  .rain-target-meaning {
+    font-size: 26px;
+  }
+
+  .rain-heart {
+    font-size: 15px;
+  }
+
+  .rain-progress-bar {
+    width: min(100%, 220px);
+    height: 7px;
   }
 
   .rain-ready-avatar {
@@ -715,36 +908,65 @@
 
 @media (max-width: 560px) {
   .rain-game-shell {
-    padding: 10px;
-    gap: 14px;
+    padding: 8px 8px 144px;
+    gap: 10px;
+  }
+
+  .rain-game-topbar {
+    gap: 8px;
+  }
+
+  .rain-back-btn {
+    padding: 8px 10px;
+  }
+
+  .rain-game-kicker {
+    font-size: 10px;
+    padding: 4px 10px;
+  }
+
+  .rain-game-brand {
+    font-size: 15px;
+  }
+
+  .rain-hud-pill {
+    width: min(100%, 232px);
+    justify-content: center;
+  }
+
+  .rain-hud-stat {
+    min-width: 0;
+    padding: 0 7px;
+  }
+
+  .rain-hud-stat strong {
+    font-size: 14px;
   }
 
   .rain-game-board {
-    min-height: 400px;
+    min-height: 430px;
   }
 
   .rain-drop {
-    padding: 10px 12px;
-    border-radius: 14px;
+    min-width: 100px;
+    padding: 9px 12px;
+    border-radius: 18px;
   }
 
   .rain-drop strong {
-    font-size: 14px;
+    font-size: 12px;
   }
 
-  .rain-target-panel,
-  .rain-result-card,
-  .rain-ready-card,
-  .rain-empty-state {
-    padding: 16px;
+  .rain-target-panel {
+    min-height: 118px;
   }
 
-  .rain-target-body p {
-    font-size: 14px;
+  .rain-target-meaning {
+    font-size: 24px;
   }
 
-  .rain-result-grid {
-    grid-template-columns: 1fr;
+  .rain-target-kicker-wrap .rain-target-kicker {
+    font-size: 9px;
   }
 
   .rain-floating-feedback {
@@ -753,5 +975,59 @@
     transform: none;
     bottom: 10px;
     border-radius: 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .rain-game-topbar {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .rain-back-btn {
+    justify-self: start;
+  }
+
+  .rain-game-context {
+    text-align: left;
+  }
+
+  .rain-game-brand {
+    justify-content: center;
+    min-height: 34px;
+    font-size: 14px;
+  }
+
+  .rain-game-board {
+    min-height: 380px;
+    border-radius: 22px;
+  }
+
+  .rain-drop {
+    min-width: 96px;
+    padding: 8px 10px;
+    border-radius: 16px;
+  }
+
+  .rain-drop strong {
+    font-size: 12px;
+  }
+
+  .rain-target-panel {
+    width: calc(100vw - 14px);
+    min-height: 114px;
+    padding: 11px 11px 9px;
+  }
+
+  .rain-target-meaning {
+    font-size: 22px;
+  }
+
+  .rain-progress-bar {
+    width: min(100%, 200px);
+  }
+
+  .rain-heart {
+    font-size: 15px;
   }
 }

@@ -4428,8 +4428,14 @@ body.app-dark-mode .flappy-resume-overlay span {
     }
 
     .games-grid {
-        grid-template-columns: 1fr;
-        justify-items: center;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .games-grid > * {
+        width: 100%;
+        min-width: 0;
     }
 
     .flappy-play-shell {
@@ -4481,12 +4487,33 @@ body.app-dark-mode .flappy-resume-overlay span {
 
     .game-card-image-button {
         width: 100%;
-        max-width: 420px;
+        max-width: none;
         border-radius: 22px;
     }
 
     .game-card-image {
         border-radius: 22px;
+    }
+
+    #page-games .games-vocab-card {
+        aspect-ratio: 1 / 1.05;
+        padding: 16px 14px 14px;
+    }
+
+    #page-games .games-vocab-icon {
+        font-size: 1.6rem;
+    }
+
+    #page-games .games-vocab-name {
+        font-size: .9rem;
+    }
+
+    #page-games .games-vocab-desc {
+        font-size: .74rem;
+    }
+
+    #page-games .games-vocab-play {
+        font-size: .72rem;
     }
 
     .flappy-score-pill,
@@ -4559,5 +4586,20 @@ body.app-dark-mode .flappy-resume-overlay span {
         right: 12px;
         bottom: 68px;
         justify-content: center;
+    }
+}
+
+@media (max-width: 420px) {
+    .games-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .game-card-image-button,
+    #page-games .games-vocab-card {
+        max-width: 100%;
+    }
+
+    #page-games .games-vocab-card {
+        aspect-ratio: 1 / .9;
     }
 }

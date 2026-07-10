@@ -39,7 +39,6 @@ const VOCAB_GAMES = [
 
 const VOCAB_GAMES_DISPLAY = [
   VOCAB_GAMES.find((game) => game.id === 'flashcard'),
-  VOCAB_GAMES.find((game) => game.id === 'rain'),
   { ...VOCAB_GAMES.find((game) => game.id === 'quiz'), name: 'Quiz' },
   { ...VOCAB_GAMES.find((game) => game.id === 'listen'), name: 'Listening' },
   { ...VOCAB_GAMES.find((game) => game.id === 'typing'), name: 'Typing' },
@@ -785,6 +784,19 @@ export default function Games() {
             id="game-card-flappy"
           >
             <img className="game-card-image" src={flappyLogo} alt={GAME_CARD.title} />
+          </button>
+
+          <button
+            type="button"
+            className="games-vocab-card"
+            id="game-card-rain"
+            onClick={() => handleVocabGameClick(VOCAB_GAMES.find((game) => game.id === 'rain'))}
+            style={{ '--game-color': '#0ea5e9' }}
+          >
+            <span className="games-vocab-icon">🌧️</span>
+            <span className="games-vocab-name">Mưa từ vựng</span>
+            <span className="games-vocab-desc">Chọn đúng từ đang rơi theo nghĩa hiển thị</span>
+            <span className="games-vocab-play">Chơi ngay →</span>
           </button>
         </div>
 
