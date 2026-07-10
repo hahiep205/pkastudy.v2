@@ -3,11 +3,13 @@
 .rain-game-shell {
   position: relative;
   width: 100%;
-  min-height: 100dvh;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 12px 12px 178px;
+  padding: 12px;
   color: #0f4f78;
   font-family: 'Quicksand', 'Nunito Sans', system-ui, sans-serif;
   background:
@@ -40,6 +42,20 @@
 
 .rain-game-shell--playing {
   justify-content: flex-start;
+  padding-bottom: 0;
+}
+
+.rain-game-shell--ready {
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.rain-game-shell--ready::before {
+  display: none;
 }
 
 .rain-ready-topbar {
@@ -274,16 +290,19 @@
 .rain-game-board-wrap {
   width: min(1120px, 100%);
   margin: 0 auto;
-  display: block;
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  gap: 0;
 }
 
 .rain-game-board {
   position: relative;
-  min-height: min(72dvh, 760px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
-  border-radius: 30px;
+  border-radius: 30px 30px 0 0;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(214, 237, 253, 0.82) 48%, rgba(231, 246, 255, 0.96) 100%);
   border: 1px solid rgba(144, 204, 246, 0.34);
@@ -455,12 +474,10 @@
 }
 
 .rain-target-panel {
-  position: fixed;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
-  z-index: 60;
-  width: min(640px, calc(100vw - 24px));
+  position: relative;
+  z-index: 6;
+  width: 100%;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -473,6 +490,9 @@
     border-color 0.24s ease,
     background 0.24s ease;
   backdrop-filter: blur(16px);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  margin-top: -1px;
 }
 
 .rain-target-panel.is-success {
@@ -758,6 +778,181 @@
   border-color: rgba(248, 113, 113, 0.36);
 }
 
+.rain-pause-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.rain-pause-modal {
+  width: min(420px, 100%);
+  padding: 24px 22px 20px;
+  text-align: center;
+  border-radius: 28px;
+  border: 1px solid rgba(141, 206, 247, 0.32);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 30px 70px rgba(15, 79, 120, 0.2);
+}
+
+.rain-pause-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #eff8ff 0%, #dff2ff 100%);
+  color: #0b5f93;
+  font-size: 28px;
+}
+
+.rain-pause-modal h3 {
+  margin: 0 0 8px;
+  color: #0c3556;
+  font-size: 24px;
+}
+
+.rain-pause-modal p {
+  margin: 0;
+  color: rgba(12, 53, 86, 0.72);
+  line-height: 1.6;
+}
+
+.rain-pause-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.rain-pause-actions .btn {
+  flex: 1 1 50%;
+  min-width: 0;
+  justify-content: center;
+}
+
+.games-page.is-game-active {
+  overflow: hidden;
+}
+
+.games-page.is-game-active .rain-game-shell {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.games-page.is-game-active .rain-game-shell--playing {
+  flex: 1 1 auto;
+  padding-bottom: 0;
+}
+
+.games-page.is-game-active .rain-game-shell--ready,
+.games-page.is-game-active .rain-game-shell--result {
+  flex: 1 1 auto;
+}
+
+.games-page.is-game-active .rain-hud-anchor {
+  flex: 0 0 auto;
+}
+
+.games-page.is-game-active .rain-game-board-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.games-page.is-game-active .rain-game-board {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.games-page.is-game-active .rain-target-panel {
+  flex: 0 0 auto;
+}
+
+@media (min-width: 769px) {
+  #page-games.study-modes-surface {
+    overflow: hidden;
+    padding-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #page-games.study-modes-surface > .cv-subview-header {
+    flex: 0 0 auto;
+    margin-bottom: 12px;
+  }
+
+  #page-games.study-modes-surface > .rain-game-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #page-games.study-modes-surface .rain-game-shell--ready {
+    padding-top: 4px;
+    padding-bottom: 0;
+    justify-content: flex-start;
+  }
+
+  #page-games.study-modes-surface .rain-ready-card {
+    width: min(100%, 400px);
+    padding: 14px 14px 12px;
+  }
+
+  #page-games.study-modes-surface .rain-ready-avatar {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 8px;
+    font-size: 26px;
+  }
+
+  #page-games.study-modes-surface .rain-ready-illustration {
+    width: 108px;
+    height: 108px;
+    margin: 10px auto 8px;
+  }
+
+  #page-games.study-modes-surface .rain-ready-card h2 {
+    margin-top: 6px;
+    margin-bottom: 3px;
+    font-size: clamp(20px, 2.2vw, 28px);
+  }
+
+  #page-games.study-modes-surface .rain-ready-subtitle {
+    line-height: 1.4;
+    font-size: 13px;
+  }
+
+  #page-games.study-modes-surface .rain-ready-instructions {
+    margin: 12px 0 14px;
+    gap: 7px;
+  }
+
+  #page-games.study-modes-surface .rain-ready-note,
+  #page-games.study-modes-surface .rain-ready-warning {
+    padding: 9px 11px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .rain-game-board-wrap {
+    justify-content: flex-start;
+  }
+
+  .rain-game-board {
+    flex: 0 0 auto;
+    height: clamp(520px, 58dvh, 680px);
+  }
+
+  .rain-target-panel {
+    min-height: 128px;
+  }
+}
+
 @keyframes rainDrizzle {
   from { transform: translate3d(0, -8px, 0); }
   to { transform: translate3d(-24px, 26px, 0); }
@@ -790,7 +985,19 @@
 
 @media (max-width: 1024px) {
   .rain-game-shell {
-    padding: 10px 10px 166px;
+    padding: 10px;
+  }
+
+  .rain-game-shell--ready {
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-top: 8px;
+  }
+
+  .rain-game-shell--ready {
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-top: 8px;
   }
 
   .rain-game-topbar {
@@ -811,22 +1018,35 @@
   }
 
   .rain-target-panel {
-    width: min(600px, calc(100vw - 20px));
+    width: 100%;
   }
 
   .rain-ready-topbar {
     grid-template-columns: 1fr;
     justify-items: center;
+    margin-top: 0;
+    margin-bottom: -4px;
   }
 
   .rain-ready-brand {
     order: -1;
   }
+
+  .rain-ready-card {
+    width: min(520px, 100%);
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 767px) {
   .rain-game-shell {
-    padding: 8px 8px 150px;
+    padding: 8px;
+  }
+
+  .rain-game-shell--ready {
+    align-items: stretch;
+    justify-content: flex-start;
+    padding-top: 4px;
   }
 
   .rain-game-topbar {
@@ -865,25 +1085,23 @@
   }
 
   .rain-game-board {
-    min-height: 470px;
-    border-radius: 24px;
+    min-height: 430px;
+    border-radius: 24px 24px 0 0;
   }
 
   .rain-drop {
-    min-width: 108px;
-    padding: 10px 13px;
+    min-width: 100px;
+    padding: 9px 11px;
     border-radius: 16px;
   }
 
   .rain-drop strong {
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .rain-target-panel {
-    width: calc(100vw - 16px);
-    bottom: 8px;
-    min-height: 122px;
-    padding: 12px 12px 10px;
+    min-height: 112px;
+    padding: 11px 11px 9px;
   }
 
   .rain-target-meaning {
@@ -904,12 +1122,25 @@
     height: 76px;
     font-size: 30px;
   }
+
+  .rain-ready-topbar {
+    margin-bottom: -6px;
+  }
+
+  .rain-ready-card {
+    width: min(100%, 480px);
+    padding-top: 18px;
+  }
 }
 
 @media (max-width: 560px) {
   .rain-game-shell {
-    padding: 8px 8px 144px;
+    padding: 8px;
     gap: 10px;
+  }
+
+  .rain-game-shell--ready {
+    padding-top: 2px;
   }
 
   .rain-game-topbar {
@@ -929,44 +1160,65 @@
     font-size: 15px;
   }
 
+  .rain-hud-anchor {
+    margin-top: -6px;
+  }
+
   .rain-hud-pill {
-    width: min(100%, 232px);
+    width: min(100%, 214px);
     justify-content: center;
+    padding: 4px 8px;
+    box-shadow: 0 8px 20px rgba(15, 79, 120, 0.12);
   }
 
   .rain-hud-stat {
     min-width: 0;
-    padding: 0 7px;
+    padding: 0 6px;
+  }
+
+  .rain-hud-stat span {
+    font-size: 8px;
+    letter-spacing: 0.06em;
   }
 
   .rain-hud-stat strong {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .rain-game-board {
-    min-height: 430px;
+    min-height: 500px;
   }
 
   .rain-drop {
-    min-width: 100px;
-    padding: 9px 12px;
-    border-radius: 18px;
+    min-width: 88px;
+    padding: 7px 9px;
+    border-radius: 16px;
   }
 
   .rain-drop strong {
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .rain-target-panel {
-    min-height: 118px;
+    min-height: 102px;
+    padding: 10px 10px 8px;
   }
 
   .rain-target-meaning {
-    font-size: 24px;
+    font-size: 23px;
   }
 
   .rain-target-kicker-wrap .rain-target-kicker {
     font-size: 9px;
+  }
+
+  .rain-ready-topbar {
+    margin-bottom: -10px;
+  }
+
+  .rain-ready-card {
+    width: min(100%, 420px);
+    padding: 14px 14px 12px;
   }
 
   .rain-floating-feedback {
@@ -998,33 +1250,67 @@
     font-size: 14px;
   }
 
-  .rain-game-board {
-    min-height: 380px;
-    border-radius: 22px;
+  .rain-game-shell--ready {
+    padding-top: 0;
   }
 
-  .rain-drop {
-    min-width: 96px;
-    padding: 8px 10px;
-    border-radius: 16px;
+  .rain-ready-topbar {
+    margin-bottom: -12px;
+    gap: 6px;
   }
 
-  .rain-drop strong {
+  .rain-ready-card {
+    width: min(100%, 400px);
+    padding: 12px 12px 10px;
+  }
+
+  .rain-hud-anchor {
+    margin-top: -8px;
+  }
+
+  .rain-hud-pill {
+    width: min(100%, 198px);
+    padding: 3px 7px;
+  }
+
+  .rain-hud-stat {
+    padding: 0 5px;
+  }
+
+  .rain-hud-stat span {
+    font-size: 7px;
+  }
+
+  .rain-hud-stat strong {
     font-size: 12px;
   }
 
+  .rain-game-board {
+    min-height: 320px;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .rain-drop {
+    min-width: 82px;
+    padding: 7px 8px;
+    border-radius: 15px;
+  }
+
+  .rain-drop strong {
+    font-size: 13px;
+  }
+
   .rain-target-panel {
-    width: calc(100vw - 14px);
-    min-height: 114px;
-    padding: 11px 11px 9px;
+    min-height: 102px;
+    padding: 8px 8px 7px;
   }
 
   .rain-target-meaning {
-    font-size: 22px;
+    font-size: 21px;
   }
 
   .rain-progress-bar {
-    width: min(100%, 200px);
+    width: min(100%, 188px);
   }
 
   .rain-heart {

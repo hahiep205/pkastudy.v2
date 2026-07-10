@@ -5,7 +5,7 @@ import '../../assets/css/rain-game.css';
 
 const MIN_PLAYABLE_WORDS = 2;
 const START_LIVES = 3;
-const MAX_ACTIVE_DROPS = 7;
+const TARGET_TIME_LIMIT_MS = 30000;
 const SPAWN_INTERVAL_DESKTOP = 560;
 const SPAWN_INTERVAL_TABLET = 620;
 const SPAWN_INTERVAL_MOBILE = 680;
@@ -57,7 +57,7 @@ function getDeviceProfile(width) {
     return { laneCount: 5, speedMin: 80, speedMax: 124, fontScale: 0.95, wordWidth: 140 };
   }
 
-  return { laneCount: 4, speedMin: 68, speedMax: 108, fontScale: 0.9, wordWidth: 132 };
+  return { laneCount: 4, speedMin: 64, speedMax: 102, fontScale: 0.88, wordWidth: 96 };
 }
 
 function formatTime(ms) {
@@ -106,6 +106,8 @@ export default function VocabularyRainExperience({
   const wrongCountRef = useRef(0);
   const currentTargetRef = useRef(null);
   const activeTargetIdRef = useRef(null);
+  const targetStartedAtRef = useRef(0);
+  const timedOutTargetIdRef = useRef(null);
 
   const deviceProfile = useMemo(() => getDeviceProfile(viewportWidth), [viewportWidth]);
   const targetRounds = useMemo(() => {
@@ -171,10 +173,26 @@ export default function VocabularyRainExperience({
     setBoardDrops(nextDrops);
   };
 
-  const getDropBounds = () => {
+  const getMaxActiveDrops = () => {
+    if (viewportWidth <= 560) return 5;
+    if (viewportWidth <= 768) return 6;
+    return 7;
+  };
+
+  const getDropBounds = (wordText = '') => {
     const width = boardWidthRef.current || 960;
-    const estimatedWidth = Math.max(deviceProfileRef.current.wordWidth, Math.min(width * 0.28, 220));
-    const estimatedHeight = Math.max(48, Math.round(estimatedWidth * 0.3));
+    const isMobile = viewportWidth <= 560;
+    const textLength = String(wordText || '').trim().length;
+    const textDrivenWidth = isMobile
+      ? 18 + (textLength * 7.8)
+      : 24 + (textLength * 8.6);
+    const minLayoutWidth = deviceProfileRef.current.wordWidth + (isMobile ? 26 : 34);
+    const estimatedWidth = Math.max(
+      minLayoutWidth,
+      textDrivenWidth,
+      Math.min(width * (isMobile ? 0.20 : 0.28), isMobile ? 180 : 240),
+    );
+    const estimatedHeight = Math.max(isMobile ? 50 : 48, Math.round(estimatedWidth * (isMobile ? 0.36 : 0.3)));
     const scale = deviceProfileRef.current.fontScale || 1;
     return {
       halfWidth: (estimatedWidth * scale) / 2,
@@ -182,12 +200,12 @@ export default function VocabularyRainExperience({
     };
   };
 
-  const clampDropPosition = (x, y) => {
-    const { halfWidth, halfHeight } = getDropBounds();
+  const clampDropPosition = (x, y, bounds) => {
+    const { halfWidth, halfHeight } = bounds || getDropBounds();
     const width = boardWidthRef.current || 960;
     const height = boardHeightRef.current || 540;
-    const safeX = viewportWidth <= 560 ? 18 : viewportWidth <= 768 ? 14 : 10;
-    const safeY = viewportWidth <= 560 ? 14 : 10;
+    const safeX = viewportWidth <= 560 ? 20 : viewportWidth <= 768 ? 14 : 10;
+    const safeY = viewportWidth <= 560 ? 34 : viewportWidth <= 768 ? 18 : 10;
     return {
       x: Math.max(halfWidth + safeX, Math.min(width - halfWidth - safeX, x)),
       y: Math.max(halfHeight + safeY, Math.min(height - halfHeight - safeY, y)),
@@ -218,15 +236,15 @@ export default function VocabularyRainExperience({
 
   const buildDrop = (word, isCorrect, startY) => {
     const profile = deviceProfileRef.current;
-    const { halfHeight } = getDropBounds();
     const width = boardWidthRef.current || 960;
     const laneCount = Math.max(1, profile.laneCount);
     const laneIndex = Math.floor(Math.random() * laneCount);
     const laneCenter = ((laneIndex + 0.5) / laneCount) * width;
-    const spread = Math.max(18, Math.min(width * 0.08, 92));
+    const spread = Math.max(12, Math.min(width * 0.05, viewportWidth <= 560 ? 62 : 92));
     const rawX = laneCenter + ((Math.random() - 0.5) * spread);
-    const rawY = typeof startY === 'number' ? startY : halfHeight + 10;
-    const clamped = clampDropPosition(rawX, rawY);
+    const bounds = getDropBounds(word?.word);
+    const rawY = typeof startY === 'number' ? startY : bounds.halfHeight + (viewportWidth <= 560 ? 16 : 10);
+    const clamped = clampDropPosition(rawX, rawY, bounds);
     const speedBase = profile.speedMin + (Math.random() * (profile.speedMax - profile.speedMin));
 
     return {
@@ -235,6 +253,8 @@ export default function VocabularyRainExperience({
       isCorrect,
       x: clamped.x,
       y: clamped.y,
+      halfWidth: bounds.halfWidth,
+      halfHeight: bounds.halfHeight,
       speed: isCorrect ? speedBase * 0.98 : speedBase,
       drift: (Math.random() - 0.5) * (width >= 768 ? 18 : 12),
     };
@@ -243,7 +263,7 @@ export default function VocabularyRainExperience({
   const spawnCorrectTarget = (target) => {
     if (!target) return null;
     const nextDrop = buildDrop(target, true);
-    const nextDrops = [...(dropsRef.current || []), nextDrop].slice(-MAX_ACTIVE_DROPS);
+    const nextDrops = [...(dropsRef.current || []), nextDrop].slice(-getMaxActiveDrops());
     syncDrops(nextDrops);
     return nextDrop;
   };
@@ -253,7 +273,7 @@ export default function VocabularyRainExperience({
     if (!pool.length) return null;
     const word = shuffle(pool)[0];
     const nextDrop = buildDrop(word, false);
-    const nextDrops = [...(dropsRef.current || []), nextDrop].slice(-MAX_ACTIVE_DROPS);
+    const nextDrops = [...(dropsRef.current || []), nextDrop].slice(-getMaxActiveDrops());
     syncDrops(nextDrops);
     return nextDrop;
   };
@@ -261,13 +281,9 @@ export default function VocabularyRainExperience({
   const setActiveTarget = (target) => {
     currentTargetRef.current = target || null;
     activeTargetIdRef.current = target?.id ?? null;
+    targetStartedAtRef.current = target ? performance.now() : 0;
+    timedOutTargetIdRef.current = null;
     setCurrentTarget(target || null);
-    if (target) {
-      setFeedback({
-        tone: 'info',
-        text: `Tìm từ có nghĩa: ${target.mean}`,
-      });
-    }
   };
 
   const finishSession = (nextResult) => {
@@ -286,6 +302,8 @@ export default function VocabularyRainExperience({
 
     currentTargetRef.current = null;
     activeTargetIdRef.current = null;
+    targetStartedAtRef.current = 0;
+    timedOutTargetIdRef.current = null;
     syncDrops([]);
     setResult({ ...nextResult, elapsed });
     setStatus(nextResult.status);
@@ -314,6 +332,21 @@ export default function VocabularyRainExperience({
   const beginGame = () => {
     if (!playableWords.length) return;
     setStatus('playing');
+  };
+
+  const handlePauseGame = () => {
+    if (status !== 'playing') return;
+    setStatus('paused');
+  };
+
+  const handleResumeGame = () => {
+    if (status !== 'paused') return;
+    setStatus('playing');
+  };
+
+  const handleExitGame = () => {
+    handleRestart();
+    (onBackToTopic || onExit)?.();
   };
 
   const handleCorrect = (drop) => {
@@ -395,6 +428,8 @@ export default function VocabularyRainExperience({
     setCurrentTarget(null);
     currentTargetRef.current = null;
     activeTargetIdRef.current = null;
+    targetStartedAtRef.current = 0;
+    timedOutTargetIdRef.current = null;
     setFeedback(null);
     setResult(null);
     gameStartedAtRef.current = 0;
@@ -416,6 +451,9 @@ export default function VocabularyRainExperience({
       animationRef.current = null;
     }
 
+    const isFreshStart = gameStartedAtRef.current === 0;
+
+    if (isFreshStart) {
     deckRef.current = shuffle(playableWords);
     deckIndexRef.current = 0;
     sessionNotifiedRef.current = false;
@@ -442,6 +480,7 @@ export default function VocabularyRainExperience({
     setActiveTarget(firstTarget);
     spawnCorrectTarget(firstTarget);
     spawnDistractor(firstTarget);
+    }
 
     const scheduleSpawnTick = () => {
       clearSpawnTimer();
@@ -458,7 +497,7 @@ export default function VocabularyRainExperience({
         const hasTargetDrop = activeDrops.some((drop) => drop.isCorrect && drop.word.id === target.id);
         if (!hasTargetDrop) {
           spawnCorrectTarget(target);
-        } else if (activeDrops.length < MAX_ACTIVE_DROPS) {
+        } else if (activeDrops.length < getMaxActiveDrops()) {
           spawnDistractor(target);
         }
 
@@ -484,6 +523,43 @@ export default function VocabularyRainExperience({
       const dt = Math.min(0.032, (now - lastTickRef.current) / 1000);
       lastTickRef.current = now;
 
+      const target = currentTargetRef.current;
+      if (
+        target
+        && targetStartedAtRef.current
+        && timedOutTargetIdRef.current !== target.id
+        && (now - targetStartedAtRef.current) >= TARGET_TIME_LIMIT_MS
+      ) {
+        timedOutTargetIdRef.current = target.id;
+        playSoftIncorrectSound();
+
+        const nextWrongCount = wrongCountRef.current + 1;
+        wrongCountRef.current = nextWrongCount;
+        setWrongCount(nextWrongCount);
+        setStreak(0);
+        setFeedback({
+          tone: nextWrongCount >= START_LIVES ? 'danger' : 'warn',
+          text: `Hết 30 giây: ${target.word}`,
+        });
+
+        const nextDropsAfterTimeout = dropsRef.current.filter((drop) => drop.word.id !== target.id);
+        syncDrops(nextDropsAfterTimeout);
+
+        if (nextWrongCount >= START_LIVES) {
+          finishSession({
+            status: 'gameover',
+            title: 'Game over',
+            reason: 'timeout',
+          });
+          animationRef.current = window.requestAnimationFrame(tick);
+          return;
+        }
+
+        advanceToNextTarget({ spawnNow: true });
+        animationRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+
       const prevDrops = dropsRef.current;
       if (!prevDrops.length) {
         animationRef.current = window.requestAnimationFrame(tick);
@@ -491,22 +567,19 @@ export default function VocabularyRainExperience({
       }
 
       const nextDrops = [];
-      let missedTarget = null;
 
       for (const drop of prevDrops) {
         const nextY = drop.y + (drop.speed * dt);
-        const { halfWidth, halfHeight } = getDropBounds();
-        const safeX = viewportWidth <= 560 ? 18 : viewportWidth <= 768 ? 14 : 10;
-        const safeY = viewportWidth <= 560 ? 14 : 10;
+        const halfWidth = drop.halfWidth || getDropBounds(drop.word?.word).halfWidth;
+        const halfHeight = drop.halfHeight || getDropBounds(drop.word?.word).halfHeight;
+        const safeX = viewportWidth <= 560 ? 20 : viewportWidth <= 768 ? 14 : 10;
+        const safeY = viewportWidth <= 560 ? 18 : 10;
         const minX = halfWidth + safeX;
         const maxX = boardWidthRef.current - halfWidth - safeX;
         const minY = halfHeight + safeY;
         const maxY = boardHeightRef.current - halfHeight - safeY;
 
         if (nextY > maxY) {
-          if (drop.isCorrect && drop.word.id === activeTargetIdRef.current) {
-            missedTarget = drop.word;
-          }
           continue;
         }
 
@@ -518,33 +591,6 @@ export default function VocabularyRainExperience({
           x: nextX,
           y: nextClampedY,
         });
-      }
-
-      if (missedTarget && status === 'playing') {
-        playSoftIncorrectSound();
-        const nextWrongCount = wrongCountRef.current + 1;
-        wrongCountRef.current = nextWrongCount;
-        setWrongCount(nextWrongCount);
-        setStreak(0);
-        setFeedback({
-          tone: nextWrongCount >= START_LIVES ? 'danger' : 'warn',
-          text: `Bỏ lỡ từ đúng: ${missedTarget.word}`,
-        });
-        syncDrops(nextDrops);
-
-        if (nextWrongCount >= START_LIVES) {
-          finishSession({
-            status: 'gameover',
-            title: 'Game over',
-            reason: 'missed',
-          });
-          animationRef.current = window.requestAnimationFrame(tick);
-          return;
-        }
-
-        advanceToNextTarget({ spawnNow: true });
-        animationRef.current = window.requestAnimationFrame(tick);
-        return;
       }
 
       syncDrops(nextDrops);
@@ -626,7 +672,7 @@ export default function VocabularyRainExperience({
     );
   }
 
-  const resultPayload = result || (status === 'playing'
+  const resultPayload = result || (status === 'playing' || status === 'paused'
     ? null
     : {
         status,
@@ -637,7 +683,7 @@ export default function VocabularyRainExperience({
   const progressValue = targetRounds > 0 ? Math.min(100, (correctCount / targetRounds) * 100) : 0;
   const remainingLives = Math.max(0, START_LIVES - wrongCount);
 
-  if (resultPayload && status !== 'playing') {
+  if (resultPayload && status !== 'playing' && status !== 'paused') {
     const elapsedMs = result?.elapsed || 0;
 
     return (
@@ -705,10 +751,11 @@ export default function VocabularyRainExperience({
         <button
           type="button"
           className="rain-icon-btn"
-          aria-label="Tạm dừng"
-          title="Tạm dừng"
+          aria-label={status === 'paused' ? 'Tiếp tục' : 'Tạm dừng'}
+          title={status === 'paused' ? 'Tiếp tục' : 'Tạm dừng'}
+          onClick={status === 'paused' ? handleResumeGame : handlePauseGame}
         >
-          <span aria-hidden="true">❚❚</span>
+          <span aria-hidden="true">{status === 'paused' ? '▶' : '❚❚'}</span>
         </button>
       </header>
 
@@ -754,32 +801,50 @@ export default function VocabularyRainExperience({
 
           <div className="rain-bottom-glow" />
         </div>
+
+        <section className={`rain-target-panel ${feedback?.tone ? `is-${feedback.tone}` : ''}`}>
+          <div className="rain-target-kicker-wrap">
+            <span className="rain-target-kicker">Tìm từ có nghĩa là:</span>
+            <strong className="rain-target-meaning">{currentTarget?.mean || 'Đang nạp...'}</strong>
+          </div>
+
+          <div className="rain-target-hearts" aria-label={`Còn ${remainingLives} lượt sai`}>
+            {Array.from({ length: START_LIVES }, (_, index) => (
+              <span
+                key={`heart-${index}`}
+                className={`rain-heart${index < remainingLives ? ' is-active' : ''}`}
+                aria-hidden="true"
+              >
+                ♥
+              </span>
+            ))}
+          </div>
+
+          <div className="rain-progress-bar" aria-hidden="true">
+            <div className="rain-progress-fill" style={{ width: `${progressValue}%` }} />
+          </div>
+        </section>
       </div>
 
-      <section className={`rain-target-panel ${feedback?.tone ? `is-${feedback.tone}` : ''}`}>
-        <div className="rain-target-kicker-wrap">
-          <span className="rain-target-kicker">Tìm từ có nghĩa là:</span>
-          <strong className="rain-target-meaning">{currentTarget?.mean || 'Đang nạp...'}</strong>
+      {status === 'paused' ? (
+        <div className="rain-pause-overlay">
+          <div className="rain-pause-modal" role="dialog" aria-modal="true" aria-labelledby="rain-pause-title">
+            <div className="rain-pause-icon" aria-hidden="true">⏸</div>
+            <h3 id="rain-pause-title">Đã tạm dừng</h3>
+            <p>Trò chơi đang dừng lại. Bạn có thể tiếp tục hoặc thoát ra ngoài.</p>
+            <div className="rain-pause-actions">
+              <button type="button" className="btn btn-primary" onClick={handleResumeGame}>
+                Tiếp tục
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={handleExitGame}>
+                Thoát
+              </button>
+            </div>
+          </div>
         </div>
+      ) : null}
 
-        <div className="rain-target-hearts" aria-label={`Còn ${remainingLives} lượt sai`}>
-          {Array.from({ length: START_LIVES }, (_, index) => (
-            <span
-              key={`heart-${index}`}
-              className={`rain-heart${index < remainingLives ? ' is-active' : ''}`}
-              aria-hidden="true"
-            >
-              ♥
-            </span>
-          ))}
-        </div>
-
-        <div className="rain-progress-bar" aria-hidden="true">
-          <div className="rain-progress-fill" style={{ width: `${progressValue}%` }} />
-        </div>
-      </section>
-
-      {feedback ? <div className={`rain-floating-feedback is-${feedback.tone}`}>{feedback.text}</div> : null}
+      {feedback && feedback.tone !== 'info' ? <div className={`rain-floating-feedback is-${feedback.tone}`}>{feedback.text}</div> : null}
     </section>
   );
 }

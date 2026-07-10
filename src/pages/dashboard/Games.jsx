@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import flappyLogo from '../../assets/images/logo-flappybird.png';
+import flappyLogo from '../../assets/images/logo-flappybird-course.png';
+import rainLogo from '../../assets/images/logo-rain-vocab.png';
 import FlappyBirdExperience, { BIRD_OPTIONS, GAME_CARD, GAME_ID } from '../../components/games/FlappyBirdExperience';
 import CourseTopicPicker from '../../components/games/CourseTopicPicker';
 import VocabularyRainExperience from '../../components/games/VocabularyRainExperience';
@@ -788,15 +789,13 @@ export default function Games() {
 
           <button
             type="button"
-            className="games-vocab-card"
+            className="games-vocab-card games-vocab-card-image-only"
             id="game-card-rain"
             onClick={() => handleVocabGameClick(VOCAB_GAMES.find((game) => game.id === 'rain'))}
             style={{ '--game-color': '#0ea5e9' }}
+            aria-label="Mưa từ vựng"
           >
-            <span className="games-vocab-icon">🌧️</span>
-            <span className="games-vocab-name">Mưa từ vựng</span>
-            <span className="games-vocab-desc">Chọn đúng từ đang rơi theo nghĩa hiển thị</span>
-            <span className="games-vocab-play">Chơi ngay →</span>
+            <img className="games-vocab-card-banner" src={rainLogo} alt="Mưa từ vựng" />
           </button>
         </div>
 

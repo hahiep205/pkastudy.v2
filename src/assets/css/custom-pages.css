@@ -2995,6 +2995,177 @@ body.app-dark-mode .settings2-role-card small {
     border-radius: 28px;
 }
 
+.games-fun-launcher {
+    position: relative;
+    overflow: hidden;
+}
+
+.games-fun-launcher-overlay {
+    position: absolute;
+    inset: auto 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 22px 20px 18px;
+    color: #fff;
+    background: linear-gradient(180deg, rgba(8, 15, 36, 0) 0%, rgba(8, 15, 36, .72) 48%, rgba(8, 15, 36, .88) 100%);
+}
+
+.games-fun-launcher-badge {
+    align-self: flex-start;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .18);
+    border: 1px solid rgba(255, 255, 255, .18);
+    backdrop-filter: blur(8px);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.games-fun-launcher strong {
+    font-size: 1.18rem;
+    line-height: 1.08;
+    font-weight: 900;
+}
+
+.games-fun-launcher span:last-child {
+    font-size: .84rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, .9);
+    max-width: 260px;
+}
+
+.games-fun-launcher:hover .games-fun-launcher-overlay {
+    background: linear-gradient(180deg, rgba(8, 15, 36, 0) 0%, rgba(8, 15, 36, .8) 52%, rgba(8, 15, 36, .95) 100%);
+}
+
+.games-fun-picker-overlay {
+    z-index: 9400;
+}
+
+.games-fun-picker-box {
+    width: min(100%, 640px);
+    max-width: 640px;
+    border-radius: 30px;
+    overflow: hidden;
+}
+
+.games-fun-picker-header {
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.games-fun-picker-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(28, 176, 246, .1);
+    color: var(--blue, #1cb0f6);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+}
+
+.games-fun-picker-header h3 {
+    margin: 0;
+    color: var(--dark-blue);
+    font-size: 1.22rem;
+    line-height: 1.2;
+}
+
+.games-fun-picker-body {
+    padding-top: 6px;
+}
+
+.games-fun-choice-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.games-fun-choice {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 22px;
+    border: 1.5px solid rgba(15, 23, 42, .08);
+    background: linear-gradient(180deg, #fff, #f7fbff);
+    text-align: left;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, .05);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.games-fun-choice:hover {
+    transform: translateY(-2px);
+    border-color: rgba(28, 176, 246, .28);
+    box-shadow: 0 14px 28px rgba(28, 176, 246, .1);
+}
+
+.games-fun-choice.is-selected {
+    border-color: var(--fun-game-color, #1cb0f6);
+    background: linear-gradient(180deg, rgba(28, 176, 246, .1), rgba(28, 176, 246, .04));
+    box-shadow: 0 16px 32px rgba(28, 176, 246, .14);
+}
+
+.games-fun-choice-image {
+    width: 120px;
+    min-width: 120px;
+    height: 90px;
+    border-radius: 18px;
+    object-fit: cover;
+    box-shadow: 0 10px 18px rgba(15, 23, 42, .12);
+}
+
+.games-fun-choice-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.games-fun-choice-badge {
+    align-self: flex-start;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(28, 176, 246, .1);
+    color: var(--blue, #1cb0f6);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.games-fun-choice-copy strong {
+    color: var(--dark-blue);
+    font-size: 1.05rem;
+    line-height: 1.2;
+}
+
+.games-fun-choice-copy span:last-child {
+    color: var(--gray-text);
+    font-size: .88rem;
+    line-height: 1.5;
+}
+
+.games-fun-picker-footer {
+    gap: 12px;
+}
+
+.games-fun-picker-footer > button {
+    flex: 1;
+}
+
+.games-fun-picker-start {
+    min-width: 0;
+}
+
 .game-card {
     display: flex;
     flex-direction: column;
@@ -4495,6 +4666,45 @@ body.app-dark-mode .flappy-resume-overlay span {
         border-radius: 22px;
     }
 
+    .games-fun-launcher-overlay {
+        padding: 18px 16px 16px;
+    }
+
+    .games-fun-launcher strong {
+        font-size: 1.02rem;
+    }
+
+    .games-fun-launcher span:last-child {
+        font-size: .77rem;
+        max-width: 100%;
+    }
+
+    .games-fun-picker-box {
+        max-width: min(100%, 560px);
+        border-radius: 24px;
+    }
+
+    .games-fun-choice {
+        gap: 12px;
+        padding: 10px;
+        border-radius: 18px;
+    }
+
+    .games-fun-choice-image {
+        width: 104px;
+        min-width: 104px;
+        height: 80px;
+        border-radius: 14px;
+    }
+
+    .games-fun-choice-copy strong {
+        font-size: 1rem;
+    }
+
+    .games-fun-choice-copy span:last-child {
+        font-size: .82rem;
+    }
+
     #page-games .games-vocab-card {
         aspect-ratio: 1 / 1.05;
         padding: 16px 14px 14px;
@@ -4597,6 +4807,36 @@ body.app-dark-mode .flappy-resume-overlay span {
     .game-card-image-button,
     #page-games .games-vocab-card {
         max-width: 100%;
+    }
+
+    .games-grid {
+        gap: 12px;
+    }
+
+    .games-fun-picker-footer {
+        flex-direction: column;
+    }
+
+    .games-fun-choice {
+        flex-direction: column;
+    }
+
+    .games-fun-choice-image {
+        width: 100%;
+        min-width: 0;
+        height: 120px;
+    }
+
+    .games-fun-launcher-overlay {
+        padding: 16px 14px 14px;
+    }
+
+    .games-fun-launcher strong {
+        font-size: .96rem;
+    }
+
+    .games-fun-launcher span:last-child {
+        font-size: .72rem;
     }
 
     #page-games .games-vocab-card {

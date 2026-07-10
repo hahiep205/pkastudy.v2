@@ -21,7 +21,9 @@ import Listening from '../../components/Listening';
 import Typing from '../../components/Typing';
 import Match from '../../components/Match';
 import flappyLogo from '../../assets/images/logo-flappybird-course.png';
+import rainLogo from '../../assets/images/logo-rain-vocab.png';
 import FlappyBirdExperience, { BIRD_OPTIONS, GAME_CARD } from '../../components/games/FlappyBirdExperience';
+import VocabularyRainExperience from '../../components/games/VocabularyRainExperience';
 import { getDashboardUserKey, recordFlashcardSessionProgress, recordStudyModeCompletion } from '../../utils/dashboardProgress';
 import { recordGamePlay } from '../../utils/userStats';
 import { getSpeechLang } from '../../utils/studyModes';
@@ -402,7 +404,28 @@ const VOCAB_GAMES_DISPLAY = [
   { id: 'flappy-bird', name: GAME_CARD.title, icon: '🐦', desc: GAME_CARD.description, color: '#0ea5e9' },
 ].filter(Boolean);
 
-const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match', 'flappy-bird']);
+const IMMERSIVE_MODES = new Set(['flashcard', 'quiz', 'listen', 'typing', 'match', 'flappy-bird', 'rain-vocab']);
+
+const FUN_GAME_CHOICES = [
+  {
+    id: 'flappy-bird',
+    title: 'Flappy Bird',
+    desc: 'Chơi Flappy Bird với bộ topic hiện tại.',
+    badge: 'Arcade học từ vựng',
+    image: flappyLogo,
+    alt: 'Flappy Bird',
+    color: '#0f83c4',
+  },
+  {
+    id: 'rain-vocab',
+    title: 'Mưa từ vựng',
+    desc: 'Chọn đúng từ đang rơi theo nghĩa hiển thị bên dưới.',
+    badge: 'Rain game',
+    image: rainLogo,
+    alt: 'Mưa từ vựng',
+    color: '#0ea5e9',
+  },
+];
 
 function getWordKey(word) {
   return word.id ?? word.flashcardId;
@@ -493,6 +516,8 @@ export default function TopicWords() {
   const [pickerWord, setPickerWord] = useState(null);
   const [pendingDeleteWord, setPendingDeleteWord] = useState(null);
   const [activeMode, setActiveMode] = useState(null);
+  const [isFunGameChooserOpen, setIsFunGameChooserOpen] = useState(false);
+  const [selectedFunGameId, setSelectedFunGameId] = useState('flappy-bird');
   const [selectedFlappyBird, setSelectedFlappyBird] = useState(BIRD_OPTIONS[0]?.id || 'yellow');
   const [studyWordIds, setStudyWordIds] = useState(null);
   const [builtInWords, setBuiltInWords] = useState([]);
@@ -511,7 +536,7 @@ export default function TopicWords() {
   const canManageTopicWords = isCustom || (!isCustom && isAdmin);
   const useServerSrs = hasServerSrsAccess();
   const isFlappySetup = activeMode === 'flappy-bird-setup';
-  const isFlappyPlaying = activeMode === 'flappy-bird';
+  const isFlappyPlaying = activeMode === 'flappy-bird' || activeMode === 'rain-vocab';
   const isFlappyLayoutActive = isFlappySetup || isFlappyPlaying;
 
   useEffect(() => {
@@ -1253,7 +1278,14 @@ const activeWords = !studyWordIds
 
     setStudyWordIds(null);
     if (modeName === 'flappy-bird') {
-      setActiveMode('flappy-bird-setup');
+      setSelectedFunGameId('flappy-bird');
+      setIsFunGameChooserOpen(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (modeName === 'rain-vocab') {
+      setActiveMode('rain-vocab');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -1266,6 +1298,24 @@ const activeWords = !studyWordIds
 
     if (activeMode === modeName) setActiveMode(null);
     else setActiveMode(modeName);
+  };
+
+  const handleCloseFunGameChooser = () => {
+    setIsFunGameChooserOpen(false);
+  };
+
+  const handleStartFunGame = () => {
+    const selectedGame = FUN_GAME_CHOICES.find((game) => game.id === selectedFunGameId) || FUN_GAME_CHOICES[0];
+    setIsFunGameChooserOpen(false);
+
+    if (selectedGame?.id === 'rain-vocab') {
+      setActiveMode('rain-vocab');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setActiveMode('flappy-bird-setup');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const initialLearnedWordIds = activeWords
@@ -1350,6 +1400,12 @@ const activeWords = !studyWordIds
         }}
       />
     );
+  } else if (activeMode === 'rain-vocab') {
+    modeView = (
+      <VocabularyRainExperience
+        {...studyModeProps}
+      />
+    );
   }
 
   if (isFlappyLayoutActive && modeView) {
@@ -1415,13 +1471,20 @@ const activeWords = !studyWordIds
               {VOCAB_GAMES_DISPLAY.map((game) => (
                 <button
                   key={game.id}
-                  className={`games-vocab-card${game.id === 'flappy-bird' ? ' games-vocab-card-image-only' : ''}${activeMode === game.id || (game.id === 'flappy-bird' && (activeMode === 'flappy-bird' || activeMode === 'flappy-bird-setup')) ? ' active' : ''}`}
+                  className={`games-vocab-card${game.id === 'flappy-bird' ? ' games-vocab-card-image-only games-fun-launcher' : ''}${activeMode === game.id || (game.id === 'flappy-bird' && (activeMode === 'flappy-bird' || activeMode === 'flappy-bird-setup')) ? ' active' : ''}`}
                   id={`game-card-${game.id}`}
                   onClick={() => handleModeClick(game.id)}
                   style={{ '--game-color': game.color }}
                 >
                   {game.id === 'flappy-bird' ? (
-                    <img className="games-vocab-card-banner" src={flappyLogo} alt={game.name} />
+                    <>
+                      <img className="games-vocab-card-banner" src={flappyLogo} alt={game.name} />
+                      <span className="games-fun-launcher-overlay">
+                        <span className="games-fun-launcher-badge">Chọn trò chơi</span>
+                        <strong>Flappy Bird</strong>
+                        <span>Mở menu để chọn Flappy Bird hoặc Mưa từ vựng</span>
+                      </span>
+                    </>
                   ) : (
                     <span className="games-vocab-icon">{game.icon}</span>
                   )}
@@ -1432,6 +1495,56 @@ const activeWords = !studyWordIds
               ))}
             </div>
           </section>
+
+          {isFunGameChooserOpen ? (
+            <div className="cv-modal-overlay cv-modal-active games-fun-picker-overlay" onClick={handleCloseFunGameChooser}>
+              <div className="cv-modal-box games-fun-picker-box" onClick={(event) => event.stopPropagation()}>
+                <div className="cv-modal-header games-fun-picker-header">
+                  <div>
+                    <span className="games-fun-picker-eyebrow">Game ôn từ</span>
+                    <h3>Chọn trò chơi bạn muốn bắt đầu</h3>
+                  </div>
+                  <button type="button" className="cv-modal-close" onClick={handleCloseFunGameChooser} aria-label="Đóng">
+                    ×
+                  </button>
+                </div>
+
+                <div className="cv-modal-body games-fun-picker-body">
+                  <div className="games-fun-choice-grid">
+                    {FUN_GAME_CHOICES.map((game) => {
+                      const isSelected = selectedFunGameId === game.id;
+
+                      return (
+                        <button
+                          key={game.id}
+                          type="button"
+                          className={`games-fun-choice${isSelected ? ' is-selected' : ''}`}
+                          onClick={() => setSelectedFunGameId(game.id)}
+                          style={{ '--fun-game-color': game.color }}
+                        >
+                          <img className="games-fun-choice-image" src={game.image} alt={game.alt} />
+                          <span className="games-fun-choice-copy">
+                            <span className="games-fun-choice-badge">{game.badge}</span>
+                            <strong>{game.title}</strong>
+                            <span>{game.desc}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="cv-modal-footer games-fun-picker-footer">
+                  <button type="button" className="btn btn-secondary" onClick={handleCloseFunGameChooser}>
+                    Hủy
+                  </button>
+                  <button type="button" className="btn btn-primary games-fun-picker-start" onClick={handleStartFunGame}>
+                    Bắt đầu chơi
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="cv-stats-bar">
             <h3 className="cv-section-title cv-stats-title" id="cv-vocab-title">Danh sách từ vựng</h3>
