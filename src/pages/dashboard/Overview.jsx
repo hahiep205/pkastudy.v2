@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/useAuth';
 import {
     completeDashboardTask,
     getDashboardUserKey,
+    getTodayKey,
     readDashboardProgress,
     subscribeDashboardProgress,
     syncDashboardProgressWithServer,
@@ -24,6 +25,7 @@ export default function Overview() {
     const { remembered } = useCourseProgress();
     const { customCourses } = useCustomCourses();
     const canvasRef = useRef(null);
+    const dailyCheckinLockRef = useRef(false);
     const [allCourses, setAllCourses] = useState([]);
     const [stats, setStats] = useState({ streak: 0, words: 0, xp: 0 });
     const [chartPeriod, setChartPeriod] = useState('week');
@@ -91,11 +93,13 @@ export default function Overview() {
     const grandDone = builtInDone + customDone;
 
     const tasks = dashboardProgress.tasks;
+    const todayKey = getTodayKey();
+    const claimedDailyTasks = dashboardProgress.dailyTaskClaimedAt || {};
     const tasksView = tasks.map((task) => {
         if (task.id === 'vocab-modes') {
             return {
                 ...task,
-                desc: `Hoàn thành ${(dashboardProgress.completedStudyModesToday || []).length}/6 mode: Flashcard, Quiz, Listening, Typing, Match, Flappy Bird · +24 EXP`,
+                desc: `Hoàn thành ${(dashboardProgress.completedStudyModesToday || []).length}/7 mode: Flashcard, Quiz, Listening, Typing, Match, Flappy Bird, Mưa từ vựng · +24 EXP`,
             };
         }
 
@@ -103,6 +107,13 @@ export default function Overview() {
             return {
                 ...task,
                 desc: 'Đạt tối thiểu 200 điểm trong 1 bài TOEIC Full Test hôm nay · +50 EXP',
+            };
+        }
+
+        if (task.id === 'daily-checkin' && claimedDailyTasks[task.id] === todayKey) {
+            return {
+                ...task,
+                isDone: true,
             };
         }
 
@@ -261,8 +272,18 @@ export default function Overview() {
 
     const handleTaskAction = (task) => {
         if (task.id === 'daily-checkin') {
-            const result = completeDashboardTask(userKey, task.id);
-            setDashboardProgress(result.progress);
+            if (dailyCheckinLockRef.current || claimedDailyTasks[task.id] === todayKey) {
+                return;
+            }
+            dailyCheckinLockRef.current = true;
+            try {
+                const result = completeDashboardTask(userKey, task.id);
+                setDashboardProgress(result.progress);
+            } finally {
+                window.setTimeout(() => {
+                    dailyCheckinLockRef.current = false;
+                }, 0);
+            }
             return;
         }
 
@@ -424,7 +445,7 @@ export default function Overview() {
                                 <button
                                     className={`btn btn-small ${task.isDone ? 'btn-secondary' : 'btn-primary'}`}
                                     onClick={() => !task.isDone && handleTaskAction(task)}
-                                    disabled={task.isDone}
+                                    disabled={task.isDone || (task.id === 'daily-checkin' && claimedDailyTasks[task.id] === todayKey)}
                                 >
                                     {task.isDone ? 'Hoàn thành' : 'Làm ngay'}
                                 </button>

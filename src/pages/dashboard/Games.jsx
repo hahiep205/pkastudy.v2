@@ -712,7 +712,7 @@ export default function Games() {
       listen: <Listening {...studyModeProps} />,
       match: <Match {...studyModeProps} />,
       flashcard: <Flashcard {...studyModeProps} onSaveLearnedWords={studyModeProps.onSaveLearnedWords} />,
-      rain: <VocabularyRainExperience {...studyModeProps} />,
+      rain: <VocabularyRainExperience {...studyModeProps} onSessionComplete={() => trackStudySessionComplete('rain')} />,
     };
 
     return (

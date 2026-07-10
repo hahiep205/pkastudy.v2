@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import ToastNotice from '../common/ToastNotice';
 import CustomModal from '../customDocs/CustomModal';
 import { AI_API_URL, AI_MODEL } from '../../utils/aiConfig';
@@ -17,7 +17,7 @@ import {
 function prepareTextForAi(text = '') {
   return cleanText(
     String(text || '')
-      .replace(/[\u00A0]/g, ' ')
+      .replace(/\u00A0/g, ' ')
       .replace(/[•·]/g, ' ')
       .replace(/\t+/g, ' ')
   );
@@ -33,15 +33,15 @@ async function buildAiError(resp) {
   }
 
   if (resp.status === 429) {
-    return 'AI Ä‘ang báº­n hoáº·c Ä‘Ă£ cháº¡m giá»›i háº¡n táº¡m thá»i. Vui lĂ²ng thá»­ láº¡i sau Ă­t phĂºt.';
+    return 'AI đang bận hoặc đã chạm giới hạn tạm thời. Vui lòng thử lại sau ít phút.';
   }
 
   if (resp.status === 401 || resp.status === 403) {
-    return 'Cáº¥u hĂ¬nh AI hiá»‡n táº¡i khĂ´ng há»£p lá»‡ hoáº·c Ä‘Ă£ háº¿t quyá»n truy cáº­p.';
+    return 'Cấu hình AI hiện tại không hợp lệ hoặc đã hết quyền truy cập.';
   }
 
   if (resp.status >= 500) {
-    return 'MĂ¡y chá»§ AI Ä‘ang gáº·p sá»± cá»‘ táº¡m thá»i. Vui lĂ²ng thá»­ láº¡i sau.';
+    return 'Máy chủ AI đang gặp sự cố tạm thời. Vui lòng thử lại sau.';
   }
 
   return detail || `HTTP ${resp.status}`;
@@ -91,7 +91,7 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
   const handleAnalyzeText = async () => {
     const text = prepareTextForAi(rawText);
     if (!text) {
-      setErrorMsg('Vui lĂ²ng dĂ¡n Ä‘oáº¡n text trÆ°á»›c khi phĂ¢n tĂ­ch.');
+      setErrorMsg('Vui lòng dán đoạn text trước khi phân tích.');
       return;
     }
 
@@ -152,14 +152,14 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
         .slice(0, MAX_PREVIEW_WORDS);
 
       if (normalizedWords.length === 0) {
-        throw new Error('AI chÆ°a tĂ¬m Ä‘Æ°á»£c tá»« nĂ o phĂ¹ há»£p trong Ä‘oáº¡n text nĂ y.');
+        throw new Error('AI chưa tìm được từ nào phù hợp trong đoạn text này.');
       }
 
       setPreviewWords(normalizedWords);
       setSelectedIndexes(new Set(Array.from({ length: Math.min(MAX_SELECTABLE_WORDS, normalizedWords.length) }, (_, index) => index)));
       setStatus('preview');
     } catch (error) {
-      setErrorMsg(error?.message || 'KhĂ´ng thá»ƒ phĂ¢n tĂ­ch Ä‘oáº¡n text lĂºc nĂ y.');
+      setErrorMsg(error?.message || 'Không thể phân tích đoạn text lúc này.');
       setStatus('error');
     }
   };
@@ -169,7 +169,7 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
     if (nextSet.has(idx)) nextSet.delete(idx);
     else if (nextSet.size < MAX_SELECTABLE_WORDS) nextSet.add(idx);
     else {
-      setToastMessage(`Má»—i láº§n chá»‰ Ä‘Æ°á»£c chá»n tá»‘i Ä‘a ${MAX_SELECTABLE_WORDS} tá»«.`);
+      setToastMessage(`Mỗi lần chỉ được chọn tối đa ${MAX_SELECTABLE_WORDS} từ.`);
       return;
     }
     setSelectedIndexes(nextSet);
@@ -187,12 +187,12 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
   const handleAddSelected = async () => {
     const selected = Array.from(selectedIndexes).map((idx) => previewWords[idx]).filter(Boolean);
     if (selected.length === 0) {
-      setToastMessage('Vui lĂ²ng chá»n Ă­t nháº¥t 1 tá»«.');
+      setToastMessage('Vui lòng chọn ít nhất 1 từ.');
       return;
     }
 
     if (selected.length > MAX_SELECTABLE_WORDS) {
-      setToastMessage(`Má»—i láº§n chá»‰ Ä‘Æ°á»£c thĂªm tá»‘i Ä‘a ${MAX_SELECTABLE_WORDS} tá»«.`);
+      setToastMessage(`Mỗi lần chỉ được thêm tối đa ${MAX_SELECTABLE_WORDS} từ.`);
       return;
     }
 
@@ -207,7 +207,7 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
       resetState();
       onClose();
     } catch (error) {
-      setErrorMsg(error?.message || 'KhĂ´ng thá»ƒ thĂªm tá»« tá»« Ä‘oáº¡n text lĂºc nĂ y.');
+      setErrorMsg(error?.message || 'Không thể thêm từ từ đoạn text lúc này.');
       setStatus('preview');
     }
   };
@@ -217,7 +217,7 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
       isOpen={isOpen}
       onClose={handleClose}
       boxClassName="cv-text-import-modal"
-      title="ThĂªm tá»« Ä‘oáº¡n text"
+      title="Thêm từ đoạn text"
     >
       <ToastNotice message={toastMessage} onHide={() => setToastMessage('')} />
 
@@ -225,14 +225,14 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
         <>
           <div className="cv-modal-body cv-text-import-body">
             <div className="cv-text-import-copy">
-              <p>DĂ¡n má»™t Ä‘oáº¡n text báº¥t ká»³ tá»« web, máº¡ng xĂ£ há»™i hoáº·c ná»™i dung báº¡n copy á»Ÿ Ä‘Ă¢u Ä‘Ă³.</p>
-              <p>AI sáº½ lá»c tá»‘i Ä‘a {MAX_PREVIEW_WORDS} tá»« phĂ¹ há»£p, táº¡o preview vá»›i cĂ¡c cá»™t word, mean vĂ  loáº¡i tá»«. Má»—i láº§n chá»‰ Ä‘Æ°á»£c chá»n tá»‘i Ä‘a {MAX_SELECTABLE_WORDS} tá»« Ä‘á»ƒ thĂªm.</p>
+              <p>Dán một đoạn text bất kỳ từ web, mạng xã hội hoặc nội dung bạn copy ở đâu đó.</p>
+              <p>AI sẽ lọc tối đa {MAX_PREVIEW_WORDS} từ phù hợp, tạo preview với các cột word, mean và loại từ. Mỗi lần chỉ được chọn tối đa {MAX_SELECTABLE_WORDS} từ để thêm.</p>
             </div>
 
             <textarea
               className="cv-form-input cv-text-import-input"
               rows={10}
-              placeholder="DĂ¡n Ä‘oáº¡n text á»Ÿ Ä‘Ă¢y..."
+              placeholder="Dán đoạn text ở đây..."
               value={rawText}
               onChange={(event) => setRawText(event.target.value)}
             />
@@ -252,9 +252,9 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
           </div>
 
           <div className="cv-modal-footer cv-modal-footer-split">
-            <button className="btn btn-secondary" onClick={handleClose}>Há»§y</button>
+            <button className="btn btn-secondary" onClick={handleClose}>Hủy</button>
             <button className="cv-btn-ai cv-btn-ai-large" onClick={handleAnalyzeText}>
-              PhĂ¢n tĂ­ch text
+              Phân tích text
             </button>
           </div>
         </>
@@ -274,11 +274,11 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
           <div className="cv-ai-error">
             <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>?</div>
             <p>
-              Cáº§n kiá»ƒm tra láº¡i Ä‘oáº¡n text hoáº·c thá»­ Ä‘oáº¡n khĂ¡c.
+              Cần kiểm tra lại đoạn text hoặc thử đoạn khác.
               <br />
               <small style={{ color: 'var(--gray-light)' }}>{errorMsg}</small>
             </p>
-            <button className="btn btn-primary" onClick={() => setStatus('input')}>Thá»­ láº¡i</button>
+            <button className="btn btn-primary" onClick={() => setStatus('input')}>Thử lại</button>
           </div>
         </div>
       )}
@@ -288,7 +288,7 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
           <div className="cv-modal-body" style={{ padding: '10px' }}>
             <div className="cv-ai-preview-header">
               <p>
-                AI tĂ¬m Ä‘Æ°á»£c <strong>{previewWords.length} tá»«</strong> tá»« Ä‘oáº¡n text Ä‘Ă£ dĂ¡n.
+                AI tìm được <strong>{previewWords.length} từ</strong> từ đoạn text đã dán.
               </p>
               <label className="cv-ai-select-all-wrap">
                 <input
@@ -296,7 +296,7 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
                   checked={hasSelectedAllSelectable}
                   onChange={handleToggleAll}
                 />
-                <span>Chá»n táº¥t cáº£</span>
+                <span>Chọn tất cả</span>
               </label>
             </div>
 
@@ -305,7 +305,7 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
                 <span></span>
                 <span>Word</span>
                 <span>Mean</span>
-                <span>Loáº¡i tá»«</span>
+                <span>Loại từ</span>
               </div>
 
               {previewWords.map((word, index) => (
@@ -334,13 +334,13 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
           </div>
 
           <div className="cv-modal-footer">
-            <span className="cv-ai-selected-count">{selectedIndexes.size}/{MAX_SELECTABLE_WORDS} tá»« Ä‘Æ°á»£c chá»n</span>
+            <span className="cv-ai-selected-count">{selectedIndexes.size}/{MAX_SELECTABLE_WORDS} từ được chọn</span>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button className="btn btn-secondary" style={{ flex: 1, width: '100%' }} onClick={() => setStatus('input')}>
-                PhĂ¢n tĂ­ch láº¡i
+                Phân tích lại
               </button>
               <button className="btn btn-primary" style={{ flex: 1, width: '100%' }} onClick={handleAddSelected} disabled={status === 'importing'}>
-                {status === 'importing' ? 'Äang thĂªm...' : 'ThĂªm'}
+                {status === 'importing' ? 'Đang thêm...' : 'Thêm'}
               </button>
             </div>
           </div>
@@ -351,11 +351,10 @@ export default function CustomTopicTextImportModal({ isOpen, onClose, onImport, 
         <div className="cv-modal-body">
           <div className="cv-ai-loading">
             <div className="cv-ai-spinner"></div>
-            <p>AI Ä‘ang bá»• sung dá»¯ liá»‡u vĂ  thĂªm cĂ¡c tá»« Ä‘Ă£ chá»n...</p>
+            <p>AI đang bổ sung dữ liệu và thêm các từ đã chọn...</p>
           </div>
         </div>
       )}
     </CustomModal>
   );
 }
-

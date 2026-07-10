@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
@@ -34,15 +34,15 @@ async function buildAiError(resp) {
   }
 
   if (resp.status === 429) {
-    return 'AI Ä‘ang báº­n hoáº·c Ä‘Ă£ cháº¡m giá»›i háº¡n táº¡m thá»i. Vui lĂ²ng thá»­ láº¡i sau Ă­t phĂºt.';
+    return 'AI đang bận hoặc đã chạm giới hạn tạm thời. Vui lòng thử lại sau ít phút.';
   }
 
   if (resp.status === 401 || resp.status === 403) {
-    return 'Cáº¥u hĂ¬nh AI hiá»‡n táº¡i khĂ´ng há»£p lá»‡ hoáº·c Ä‘Ă£ háº¿t quyá»n truy cáº­p.';
+    return 'Cấu hình AI hiện tại không hợp lệ hoặc đã hết quyền truy cập.';
   }
 
   if (resp.status >= 500) {
-    return 'MĂ¡y chá»§ AI Ä‘ang gáº·p sá»± cá»‘ táº¡m thá»i. Vui lĂ²ng thá»­ láº¡i sau.';
+    return 'Máy chủ AI đang gặp sự cố tạm thời. Vui lòng thử lại sau.';
   }
 
   return detail || `HTTP ${resp.status}`;
@@ -77,7 +77,7 @@ async function extractTextFromDocx(file) {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const documentXmlFile = zip.file('word/document.xml');
   if (!documentXmlFile) {
-    throw new Error('File Word khĂ´ng há»£p lá»‡ hoáº·c bá»‹ lá»—i.');
+    throw new Error('File Word không hợp lệ hoặc bị lỗi.');
   }
 
   const xmlText = await documentXmlFile.async('string');
@@ -138,12 +138,12 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
     if (!file) return;
 
     if (!isAllowedFile(file)) {
-      setErrorMsg('Chá»‰ há»— trá»£ file PDF vĂ  Word (.docx).');
+      setErrorMsg('Chỉ hỗ trợ file PDF và Word (.docx).');
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      setErrorMsg('File quĂ¡ lá»›n. Vui lĂ²ng chá»n file nhá» hÆ¡n hoáº·c báº±ng 5MB.');
+      setErrorMsg('File quá lớn. Vui lòng chọn file nhỏ hơn hoặc bằng 5MB.');
       return;
     }
 
@@ -160,7 +160,7 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
 
   const analyzeSelectedFile = async () => {
     if (!selectedFile) {
-      setErrorMsg('Vui lĂ²ng chá»n file PDF/Word trÆ°á»›c khi phĂ¢n tĂ­ch.');
+      setErrorMsg('Vui lòng chọn file PDF/Word trước khi phân tích.');
       return;
     }
 
@@ -176,11 +176,11 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
       const extracted = extractedResult.text;
 
       if (!cleanText(extracted)) {
-        throw new Error('KhĂ´ng trĂ­ch xuáº¥t Ä‘Æ°á»£c text há»£p lá»‡ tá»« file nĂ y.');
+        throw new Error('Không trích xuất được text hợp lệ từ file này.');
       }
 
       if (extractedResult.truncated) {
-        setToastMessage(`File PDF có ${extractedResult.totalPages} trang. H? th?ng ch? x? l? ${MAX_PDF_PAGES} trang đ?u đ? tránh ch?m.`);
+        setToastMessage(`File PDF có ${extractedResult.totalPages} trang. Hệ thống chỉ xử lý tối đa ${MAX_PDF_PAGES} trang đầu để giữ tốc độ ổn định.`);
       }
 
       const candidates = collectVocabularyCandidatesFromText(extracted, topicLang, 260);
@@ -236,14 +236,14 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
         .slice(0, MAX_PREVIEW_WORDS);
 
       if (normalizedWords.length === 0) {
-        throw new Error('AI chÆ°a tĂ¬m Ä‘Æ°á»£c tá»« nĂ o phĂ¹ há»£p trong file nĂ y.');
+        throw new Error('AI chưa tìm được từ nào phù hợp trong file này.');
       }
 
       setPreviewWords(normalizedWords);
       setSelectedIndexes(new Set(Array.from({ length: Math.min(MAX_SELECTABLE_WORDS, normalizedWords.length) }, (_, index) => index)));
       setStatus('preview');
     } catch (error) {
-      setErrorMsg(error?.message || 'KhĂ´ng thá»ƒ phĂ¢n tĂ­ch file lĂºc nĂ y.');
+      setErrorMsg(error?.message || 'Không thể phân tích file lúc này.');
       setStatus('error');
     }
   };
@@ -253,7 +253,7 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
     if (nextSet.has(idx)) nextSet.delete(idx);
     else if (nextSet.size < MAX_SELECTABLE_WORDS) nextSet.add(idx);
     else {
-      setToastMessage(`Má»—i láº§n chá»‰ Ä‘Æ°á»£c chá»n tá»‘i Ä‘a ${MAX_SELECTABLE_WORDS} tá»«.`);
+      setToastMessage(`Mỗi lần chỉ được chọn tối đa ${MAX_SELECTABLE_WORDS} từ.`);
       return;
     }
     setSelectedIndexes(nextSet);
@@ -271,12 +271,12 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
   const handleAddSelected = async () => {
     const selected = Array.from(selectedIndexes).map((idx) => previewWords[idx]).filter(Boolean);
     if (selected.length === 0) {
-      setToastMessage('Vui lĂ²ng chá»n Ă­t nháº¥t 1 tá»«.');
+      setToastMessage('Vui lòng chọn ít nhất 1 từ.');
       return;
     }
 
     if (selected.length > MAX_SELECTABLE_WORDS) {
-      setToastMessage(`Má»—i láº§n chá»‰ Ä‘Æ°á»£c thĂªm tá»‘i Ä‘a ${MAX_SELECTABLE_WORDS} tá»«.`);
+      setToastMessage(`Mỗi lần chỉ được thêm tối đa ${MAX_SELECTABLE_WORDS} từ.`);
       return;
     }
 
@@ -291,7 +291,7 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
       resetState();
       onClose();
     } catch (error) {
-      setErrorMsg(error?.message || 'KhĂ´ng thá»ƒ thĂªm tá»« tá»« file lĂºc nĂ y.');
+      setErrorMsg(error?.message || 'Không thể thêm từ từ file lúc này.');
       setStatus('preview');
     }
   };
@@ -301,7 +301,7 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
       isOpen={isOpen}
       onClose={handleClose}
       boxClassName="cv-file-import-modal"
-      title="ThĂªm tá»« file PDF/Word"
+      title="Thêm từ file PDF/Word"
     >
       <ToastNotice message={toastMessage} onHide={() => setToastMessage('')} />
 
@@ -309,8 +309,9 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
         <>
           <div className="cv-modal-body cv-file-import-body">
             <div className="cv-file-import-copy">
-              <p>Táº£i lĂªn file PDF hoáº·c Word (.docx) dung lÆ°á»£ng tá»‘i Ä‘a 5MB.</p>
-                            <p>File l?n có th? x? l? lâu hơn. N?u là PDF, h? th?ng ch? scan t?i đa {MAX_PDF_PAGES} trang đ?u đ? gi? t?c đ? ?n đ?nh.</p>`r`n              <p>AI sáº½ trĂ­ch text quan trá»ng, lá»c tá»‘i Ä‘a {MAX_PREVIEW_WORDS} tá»« Ä‘á»ƒ preview. Má»—i láº§n chá»‰ Ä‘Æ°á»£c chá»n tá»‘i Ä‘a {MAX_SELECTABLE_WORDS} tá»« Ä‘á»ƒ thĂªm.</p>
+              <p>Tải lên file PDF hoặc Word (.docx) dung lượng tối đa 5MB.</p>
+              <p>File lớn có thể xử lý lâu hơn. Nếu là PDF, hệ thống chỉ scan tối đa {MAX_PDF_PAGES} trang đầu để giữ tốc độ ổn định.</p>
+              <p>AI sẽ trích text quan trọng, lọc tối đa {MAX_PREVIEW_WORDS} từ để preview. Mỗi lần chỉ được chọn tối đa {MAX_SELECTABLE_WORDS} từ để thêm.</p>
             </div>
 
             <input
@@ -323,19 +324,19 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
 
             <div className="cv-file-import-actions">
               <button type="button" className="cv-excel-import-choice cv-excel-import-choice-primary" onClick={handlePickFile}>
-                <span className="cv-excel-import-choice-title">Chá»n file PDF/Word</span>
-                <span className="cv-excel-import-choice-desc">Chá»n file Ä‘á»ƒ AI trĂ­ch vĂ  phĂ¢n tĂ­ch tá»« vá»±ng quan trá»ng.</span>
+                <span className="cv-excel-import-choice-title">Chọn file PDF/Word</span>
+                <span className="cv-excel-import-choice-desc">Chọn file để AI trích và phân tích từ vựng quan trọng.</span>
               </button>
 
               <button type="button" className="cv-excel-import-choice" onClick={analyzeSelectedFile} disabled={!selectedFile}>
-                <span className="cv-excel-import-choice-title">PhĂ¢n tĂ­ch file</span>
-                <span className="cv-excel-import-choice-desc">AI sáº½ táº¡o preview tá»‘i Ä‘a {MAX_PREVIEW_WORDS} tá»«.</span>
+                <span className="cv-excel-import-choice-title">Phân tích file</span>
+                <span className="cv-excel-import-choice-desc">AI sẽ tạo preview tối đa {MAX_PREVIEW_WORDS} từ.</span>
               </button>
             </div>
 
             {selectedFile ? (
               <div className="cv-file-import-selected">
-                <strong>ÄĂ£ chá»n:</strong> {selectedFile.name} <span>({Math.round(selectedFile.size / 1024)} KB)</span>
+                <strong>Đã chọn:</strong> {selectedFile.name} <span>({Math.round(selectedFile.size / 1024)} KB)</span>
               </div>
             ) : null}
 
@@ -343,9 +344,9 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
           </div>
 
           <div className="cv-modal-footer cv-modal-footer-split">
-            <button className="btn btn-secondary" onClick={handleClose}>Há»§y</button>
+            <button className="btn btn-secondary" onClick={handleClose}>Hủy</button>
             <button className="cv-btn-ai cv-btn-ai-large" onClick={analyzeSelectedFile} disabled={!selectedFile}>
-              PhĂ¢n tĂ­ch file
+              Phân tích file
             </button>
           </div>
         </>
@@ -355,7 +356,7 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
         <div className="cv-modal-body">
           <div className="cv-ai-loading">
             <div className="cv-ai-spinner"></div>
-            <p>AI Ä‘ang Ä‘á»c file vĂ  nháº­n diá»‡n tá»‘i Ä‘a {MAX_PREVIEW_WORDS} tá»«...</p>
+            <p>AI đang đọc file và nhận diện tối đa {MAX_PREVIEW_WORDS} từ...</p>
           </div>
         </div>
       )}
@@ -365,11 +366,11 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
           <div className="cv-ai-error">
             <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>?</div>
             <p>
-              Cáº§n kiá»ƒm tra láº¡i file hoáº·c thá»­ file khĂ¡c.
+              Cần kiểm tra lại file hoặc thử file khác.
               <br />
               <small style={{ color: 'var(--gray-light)' }}>{errorMsg}</small>
             </p>
-            <button className="btn btn-primary" onClick={() => setStatus('input')}>Thá»­ láº¡i</button>
+            <button className="btn btn-primary" onClick={() => setStatus('input')}>Thử lại</button>
           </div>
         </div>
       )}
@@ -379,11 +380,11 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
           <div className="cv-modal-body" style={{ padding: '10px' }}>
             <div className="cv-ai-preview-header">
               <p>
-                AI tĂ¬m Ä‘Æ°á»£c <strong>{previewWords.length} tá»«</strong> tá»« file Ä‘Ă£ táº£i lĂªn.
+                AI tìm được <strong>{previewWords.length} từ</strong> từ file đã tải lên.
               </p>
               <label className="cv-ai-select-all-wrap">
                 <input type="checkbox" checked={hasSelectedAllSelectable} onChange={handleToggleAll} />
-                <span>Chá»n táº¥t cáº£</span>
+                <span>Chọn tất cả</span>
               </label>
             </div>
 
@@ -392,7 +393,7 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
                 <span></span>
                 <span>Word</span>
                 <span>Mean</span>
-                <span>Loáº¡i tá»«</span>
+                <span>Loại từ</span>
               </div>
 
               {previewWords.map((word, index) => (
@@ -421,13 +422,13 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
           </div>
 
           <div className="cv-modal-footer">
-            <span className="cv-ai-selected-count">{selectedIndexes.size}/{MAX_SELECTABLE_WORDS} tá»« Ä‘Æ°á»£c chá»n</span>
+            <span className="cv-ai-selected-count">{selectedIndexes.size}/{MAX_SELECTABLE_WORDS} từ được chọn</span>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button className="btn btn-secondary" style={{ flex: 1, width: '100%' }} onClick={() => setStatus('input')}>
-                PhĂ¢n tĂ­ch láº¡i
+                Phân tích lại
               </button>
               <button className="btn btn-primary" style={{ flex: 1, width: '100%' }} onClick={handleAddSelected} disabled={status === 'importing'}>
-                {status === 'importing' ? 'Äang thĂªm...' : 'ThĂªm'}
+                {status === 'importing' ? 'Đang thêm...' : 'Thêm'}
               </button>
             </div>
           </div>
@@ -438,13 +439,10 @@ export default function CustomTopicFileImportModal({ isOpen, onClose, onImport, 
         <div className="cv-modal-body">
           <div className="cv-ai-loading">
             <div className="cv-ai-spinner"></div>
-            <p>AI Ä‘ang bá»• sung dá»¯ liá»‡u vĂ  thĂªm cĂ¡c tá»« Ä‘Ă£ chá»n...</p>
+            <p>AI đang bổ sung dữ liệu và thêm các từ đã chọn...</p>
           </div>
         </div>
       )}
-
     </CustomModal>
   );
 }
-
-

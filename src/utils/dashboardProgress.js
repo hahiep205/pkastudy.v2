@@ -5,7 +5,13 @@ import { getStoredUser, getUserStorageOwner } from './userStorage';
 
 const STORAGE_KEY = 'pka_dashboard_progress_v1';
 const UPDATE_EVENT = 'pka-dashboard-progress-updated';
-const VOCAB_DAILY_MODES = ['flashcard', 'quiz', 'listen', 'typing', 'match', 'flappy-bird'];
+const VOCAB_DAILY_MODES = ['flashcard', 'quiz', 'listen', 'typing', 'match', 'flappy-bird', 'rain'];
+
+function normalizeStudyModeName(modeName) {
+    if (modeName === 'listening') return 'listen';
+    if (modeName === 'rain-vocab') return 'rain';
+    return modeName;
+}
 
 const TASK_TEMPLATES = [
     {
@@ -19,7 +25,7 @@ const TASK_TEMPLATES = [
     {
         id: 'vocab-modes',
         title: 'Học từ vựng',
-        desc: 'Hoàn thành Flashcard, Quiz, Listening, Typing, Match và Flappy Bird · +24 EXP',
+        desc: 'Hoàn thành Flashcard, Quiz, Listening, Typing, Match, Flappy Bird và Mưa từ vựng · +24 EXP',
         btnText: 'Làm ngay',
         page: 'games',
         exp: 24,
@@ -80,6 +86,7 @@ function createDefaultProgress() {
         learnedWordIdsToday: [],
         learnedWordEventIdsToday: [],
         completedStudyModesToday: [],
+        dailyTaskClaimedAt: {},
         tasks: createDailyTasks(),
     };
 }
@@ -96,8 +103,13 @@ function normalizeProgress(progress) {
         learnedWordIdsToday: Array.isArray(safe.learnedWordIdsToday) ? safe.learnedWordIdsToday : [],
         learnedWordEventIdsToday: Array.isArray(safe.learnedWordEventIdsToday) ? safe.learnedWordEventIdsToday : [],
         completedStudyModesToday: Array.isArray(safe.completedStudyModesToday)
-            ? safe.completedStudyModesToday.filter((mode) => VOCAB_DAILY_MODES.includes(mode))
+            ? safe.completedStudyModesToday
+                .map(normalizeStudyModeName)
+                .filter((mode) => VOCAB_DAILY_MODES.includes(mode))
             : [],
+        dailyTaskClaimedAt: safe.dailyTaskClaimedAt && typeof safe.dailyTaskClaimedAt === 'object'
+            ? safe.dailyTaskClaimedAt
+            : {},
         tasks: Array.isArray(safe.tasks) && safe.tasks.length
             ? TASK_TEMPLATES.map((template) => {
                 const existing = safe.tasks.find((task) => task.id === template.id);
@@ -130,6 +142,7 @@ export function ensureTodayProgress(progress) {
         learnedWordIdsToday: [],
         learnedWordEventIdsToday: [],
         completedStudyModesToday: [],
+        dailyTaskClaimedAt: {},
         tasks: createDailyTasks(),
     };
 }
@@ -138,6 +151,17 @@ function applyDashboardTaskCompletion(current, taskId) {
     const today = getTodayKey();
     let expGained = 0;
     let streakGained = false;
+    const dailyTaskClaimedAt = current.dailyTaskClaimedAt && typeof current.dailyTaskClaimedAt === 'object'
+        ? current.dailyTaskClaimedAt
+        : {};
+
+    if (dailyTaskClaimedAt[taskId] === today) {
+        return {
+            nextProgress: current,
+            expGained: 0,
+            streakGained: false,
+        };
+    }
 
     const tasks = current.tasks.map((task) => {
         if (task.id !== taskId || task.isDone) return task;
@@ -170,6 +194,10 @@ function applyDashboardTaskCompletion(current, taskId) {
     return {
         nextProgress: {
             ...current,
+            dailyTaskClaimedAt: {
+                ...dailyTaskClaimedAt,
+                [taskId]: today,
+            },
             tasks,
             streak,
             lastStreakDate,
@@ -272,7 +300,9 @@ function finalizeTaskProgress(userKey, nextProgress) {
 }
 
 export function recordStudyModeCompletion(modeName) {
-    if (!VOCAB_DAILY_MODES.includes(modeName)) {
+    const normalizedMode = normalizeStudyModeName(modeName);
+
+    if (!VOCAB_DAILY_MODES.includes(normalizedMode)) {
         return {
             progress: readDashboardProgress(getCurrentDashboardUserKey()),
             expGained: 0,
@@ -283,7 +313,7 @@ export function recordStudyModeCompletion(modeName) {
     const userKey = getCurrentDashboardUserKey();
     const current = readDashboardProgress(userKey);
     const completedModes = new Set(current.completedStudyModesToday || []);
-    completedModes.add(modeName);
+    completedModes.add(normalizedMode);
 
     let nextProgress = {
         ...current,
