@@ -50,14 +50,14 @@ function dedupeWords(words = []) {
 
 function getDeviceProfile(width) {
   if (width >= 1200) {
-    return { laneCount: 6, speedMin: 88, speedMax: 136, fontScale: 1, wordWidth: 150 };
+    return { laneCount: 6, speedMin: 88, speedMax: 136, fontScale: 1, wordWidth: 150, lanePadding: 0.06, driftMax: 18, overlapFactor: 1.04 };
   }
 
   if (width >= 768) {
-    return { laneCount: 5, speedMin: 80, speedMax: 124, fontScale: 0.95, wordWidth: 140 };
+    return { laneCount: 5, speedMin: 80, speedMax: 124, fontScale: 0.95, wordWidth: 140, lanePadding: 0.08, driftMax: 16, overlapFactor: 1.02 };
   }
 
-  return { laneCount: 4, speedMin: 64, speedMax: 102, fontScale: 0.88, wordWidth: 96 };
+  return { laneCount: 5, speedMin: 68, speedMax: 110, fontScale: 0.95, wordWidth: 114, lanePadding: 0.08, driftMax: 12, overlapFactor: 0.98 };
 }
 
 function formatTime(ms) {
@@ -174,23 +174,24 @@ export default function VocabularyRainExperience({
   };
 
   const getMaxActiveDrops = () => {
-    if (viewportWidth <= 560) return 5;
+    if (viewportWidth <= 560) return 7;
     if (viewportWidth <= 768) return 6;
     return 7;
   };
 
   const getDropBounds = (wordText = '') => {
     const width = boardWidthRef.current || 960;
+    const profile = deviceProfileRef.current;
     const isMobile = viewportWidth <= 560;
     const textLength = String(wordText || '').trim().length;
     const textDrivenWidth = isMobile
-      ? 18 + (textLength * 7.8)
+      ? 20 + (textLength * 8.8)
       : 24 + (textLength * 8.6);
-    const minLayoutWidth = deviceProfileRef.current.wordWidth + (isMobile ? 26 : 34);
+    const minLayoutWidth = (profile.wordWidth || 120) + (isMobile ? 20 : 34);
     const estimatedWidth = Math.max(
       minLayoutWidth,
       textDrivenWidth,
-      Math.min(width * (isMobile ? 0.20 : 0.28), isMobile ? 180 : 240),
+      Math.min(width * (isMobile ? 0.28 : 0.28), isMobile ? 196 : 240),
     );
     const estimatedHeight = Math.max(isMobile ? 50 : 48, Math.round(estimatedWidth * (isMobile ? 0.36 : 0.3)));
     const scale = deviceProfileRef.current.fontScale || 1;
@@ -204,11 +205,15 @@ export default function VocabularyRainExperience({
     const { halfWidth, halfHeight } = bounds || getDropBounds();
     const width = boardWidthRef.current || 960;
     const height = boardHeightRef.current || 540;
-    const safeX = viewportWidth <= 560 ? 20 : viewportWidth <= 768 ? 14 : 10;
-    const safeY = viewportWidth <= 560 ? 34 : viewportWidth <= 768 ? 18 : 10;
+    const safeX = viewportWidth <= 560 ? 14 : viewportWidth <= 768 ? 12 : 10;
+    const safeY = viewportWidth <= 560 ? 26 : viewportWidth <= 768 ? 18 : 10;
+    const minX = halfWidth + safeX;
+    const maxX = width - halfWidth - safeX;
+    const minY = halfHeight + safeY;
+    const maxY = height - halfHeight - safeY;
     return {
-      x: Math.max(halfWidth + safeX, Math.min(width - halfWidth - safeX, x)),
-      y: Math.max(halfHeight + safeY, Math.min(height - halfHeight - safeY, y)),
+      x: Math.max(Math.min(minX, maxX), Math.min(Math.max(minX, maxX), x)),
+      y: Math.max(Math.min(minY, maxY), Math.min(Math.max(minY, maxY), y)),
     };
   };
 
@@ -216,7 +221,7 @@ export default function VocabularyRainExperience({
     const width = viewportWidth;
     if (width >= 1200) return SPAWN_INTERVAL_DESKTOP;
     if (width >= 768) return SPAWN_INTERVAL_TABLET;
-    return SPAWN_INTERVAL_MOBILE;
+    return 560;
   };
 
   const refillDeck = () => {
@@ -239,8 +244,10 @@ export default function VocabularyRainExperience({
     const width = boardWidthRef.current || 960;
     const laneCount = Math.max(1, profile.laneCount);
     const laneIndex = Math.floor(Math.random() * laneCount);
-    const laneCenter = ((laneIndex + 0.5) / laneCount) * width;
-    const spread = Math.max(12, Math.min(width * 0.05, viewportWidth <= 560 ? 62 : 92));
+    const lanePadding = Math.min(width * (profile.lanePadding || 0), width * (viewportWidth <= 560 ? 0.1 : 0.16));
+    const laneAreaWidth = Math.max(0, width - (lanePadding * 2));
+    const laneCenter = lanePadding + (((laneIndex + 0.5) / laneCount) * laneAreaWidth);
+    const spread = Math.max(12, Math.min(width * (viewportWidth <= 560 ? 0.1 : 0.08), viewportWidth <= 560 ? 54 : 86));
     const rawX = laneCenter + ((Math.random() - 0.5) * spread);
     const bounds = getDropBounds(word?.word);
     const rawY = typeof startY === 'number' ? startY : bounds.halfHeight + (viewportWidth <= 560 ? 16 : 10);
@@ -256,7 +263,7 @@ export default function VocabularyRainExperience({
       halfWidth: bounds.halfWidth,
       halfHeight: bounds.halfHeight,
       speed: isCorrect ? speedBase * 0.98 : speedBase,
-      drift: (Math.random() - 0.5) * (width >= 768 ? 18 : 12),
+      drift: (Math.random() - 0.5) * (profile.driftMax || (width >= 768 ? 18 : 12)),
     };
   };
 
@@ -572,8 +579,8 @@ export default function VocabularyRainExperience({
         const nextY = drop.y + (drop.speed * dt);
         const halfWidth = drop.halfWidth || getDropBounds(drop.word?.word).halfWidth;
         const halfHeight = drop.halfHeight || getDropBounds(drop.word?.word).halfHeight;
-        const safeX = viewportWidth <= 560 ? 20 : viewportWidth <= 768 ? 14 : 10;
-        const safeY = viewportWidth <= 560 ? 18 : 10;
+        const safeX = viewportWidth <= 560 ? 14 : viewportWidth <= 768 ? 12 : 10;
+        const safeY = viewportWidth <= 560 ? 16 : 10;
         const minX = halfWidth + safeX;
         const maxX = boardWidthRef.current - halfWidth - safeX;
         const minY = halfHeight + safeY;

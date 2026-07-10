@@ -1451,7 +1451,7 @@ const activeWords = !studyWordIds
             Thêm từ file PDF/Word
           </button>
           <button className="cv-btn-import-text" id="cv-import-text-btn" onClick={() => setTextImportModalOpen(true)}>
-            Thêm từ đoạn text
+            Thêm từ văn bản
           </button>
           <button className="cv-btn-ai" id="cv-ai-gen-btn" onClick={() => setAIModalOpen(true)}>
             AI tạo từ hàng loạt
@@ -1481,8 +1481,8 @@ const activeWords = !studyWordIds
                       <img className="games-vocab-card-banner" src={flappyLogo} alt={game.name} />
                       <span className="games-fun-launcher-overlay">
                         <span className="games-fun-launcher-badge">Chọn trò chơi</span>
-                        <strong>Flappy Bird</strong>
-                        <span>Mở menu để chọn Flappy Bird hoặc Mưa từ vựng</span>
+                        <strong>Games</strong>
+                        <span>Mở menu để chọn một trò để chơi</span>
                       </span>
                     </>
                   ) : (

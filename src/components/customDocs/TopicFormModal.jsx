@@ -74,6 +74,7 @@ export default function TopicFormModal({
                         <select
                             className="cv-form-input cv-form-select"
                             value={topicForm.lang || 'en'}
+                            disabled={Boolean(editingTopic)}
                             onChange={(event) => {
                                 setTopicForm({ ...topicForm, lang: event.target.value });
                                 onToastHide?.();
@@ -85,6 +86,11 @@ export default function TopicFormModal({
                                 </option>
                             ))}
                         </select>
+                        {editingTopic ? (
+                            <small style={{ display: 'block', marginTop: '6px', color: 'var(--gray-light)' }}>
+                                Khi sửa chủ đề, ngôn ngữ được giữ cố định.
+                            </small>
+                        ) : null}
                     </div>
                 </div>
                 {!editingTopic ? (

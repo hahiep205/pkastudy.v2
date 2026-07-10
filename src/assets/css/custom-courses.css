@@ -1582,6 +1582,37 @@ body.app-dark-mode .cv-custom-card-pct {
     line-height: 1.6;
 }
 
+.cv-text-import-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.cv-text-import-stats span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, .08);
+    border: 1px solid rgba(37, 99, 235, .14);
+    color: var(--blue);
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.cv-text-import-warning {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(245, 158, 11, .12);
+    border: 1px solid rgba(245, 158, 11, .24);
+    color: #9a5b00;
+    font-size: .86rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
 body.app-dark-mode .cv-excel-import-copy {
     background: rgba(20, 184, 166, .12);
     color: #e2e8f0;
@@ -1638,6 +1669,18 @@ body.app-dark-mode .cv-file-import-selected {
 body.app-dark-mode .cv-text-import-copy {
     background: rgba(245, 158, 11, .12);
     color: #e2e8f0;
+}
+
+body.app-dark-mode .cv-text-import-stats span {
+    background: rgba(59, 130, 246, .16);
+    border-color: rgba(59, 130, 246, .22);
+    color: #bfdbfe;
+}
+
+body.app-dark-mode .cv-text-import-warning {
+    background: rgba(245, 158, 11, .12);
+    border-color: rgba(245, 158, 11, .24);
+    color: #fde68a;
 }
 
 @media (max-width: 720px) {
@@ -1817,6 +1860,21 @@ body.app-dark-mode .cv-text-import-copy {
     gap: 10px;
 }
 
+.cv-ai-preview-header::after {
+    content: 'Đã chọn ' attr(data-selected) ' từ';
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(28, 176, 246, .1);
+    border: 1px solid rgba(28, 176, 246, .18);
+    color: var(--blue);
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: .01em;
+    white-space: nowrap;
+}
+
 .cv-ai-preview-header p {
     font-size: .875rem;
     color: var(--gray-text);
@@ -1988,6 +2046,10 @@ body.app-dark-mode .cv-text-import-copy {
     font-size: .82rem;
     font-weight: 700;
     color: var(--gray-light);
+    margin-right: auto;
+}
+
+.cv-ai-selected-count--footer {
     margin-right: auto;
 }
 

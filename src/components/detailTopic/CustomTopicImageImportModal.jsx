@@ -7,6 +7,8 @@ import {
   buildSmartVocabularyPrompt,
   collectVocabularyCandidatesFromText,
   getTopicLanguageMeta,
+  MAX_PREVIEW_WORDS,
+  MAX_SELECTABLE_WORDS,
   normalizePreviewItem,
   normalizeWord,
   parseJsonList,
@@ -465,7 +467,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
         throw new Error('Không đọc được text rõ ràng trong ảnh này.');
       }
 
-      const candidates = collectVocabularyCandidatesFromText(normalizedText, topicLang, 260);
+      const candidates = collectVocabularyCandidatesFromText(normalizedText, topicLang, MAX_PREVIEW_WORDS);
       const resp = await fetch(AI_API_URL, {
         method: 'POST',
         headers: {
@@ -486,11 +488,11 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
                 rawText: normalizedText,
                 candidates,
                 existingWords,
-                maxPreviewWords: 15,
+                maxPreviewWords: MAX_PREVIEW_WORDS,
               }),
             },
           ],
-          max_tokens: 2400,
+          max_tokens: 3200,
           temperature: 0.1,
           stream: false,
         }),
@@ -516,7 +518,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
           seen.add(normalized);
           return true;
         })
-        .slice(0, 15);
+        .slice(0, MAX_PREVIEW_WORDS);
 
       if (normalizedWords.length === 0) {
         throw new Error('AI chưa lọc được từ nào phù hợp từ text OCR trong ảnh này.');
@@ -533,8 +535,18 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
 
   const handleToggleCheck = (idx) => {
     const nextSet = new Set(selectedIndexes);
-    if (nextSet.has(idx)) nextSet.delete(idx);
-    else nextSet.add(idx);
+    if (nextSet.has(idx)) {
+      nextSet.delete(idx);
+      setSelectedIndexes(nextSet);
+      return;
+    }
+
+    if (nextSet.size >= MAX_SELECTABLE_WORDS) {
+      setToastMessage(`Chỉ được chọn tối đa ${MAX_SELECTABLE_WORDS} từ.`);
+      return;
+    }
+
+    nextSet.add(idx);
     setSelectedIndexes(nextSet);
   };
 
@@ -544,7 +556,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
       return;
     }
 
-    setSelectedIndexes(new Set(previewWords.map((_, index) => index)));
+    setSelectedIndexes(new Set(previewWords.slice(0, MAX_SELECTABLE_WORDS).map((_, index) => index)));
   };
 
   const handleAddSelected = async () => {
@@ -552,6 +564,11 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
 
     if (selected.length === 0) {
       setToastMessage('Vui lòng chọn ít nhất 1 từ.');
+      return;
+    }
+
+    if (selected.length > MAX_SELECTABLE_WORDS) {
+      setToastMessage(`Chỉ được chọn tối đa ${MAX_SELECTABLE_WORDS} từ.`);
       return;
     }
 
@@ -585,7 +602,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
           <div className="cv-modal-body cv-image-import-body">
             <div className="cv-image-import-copy">
               <p>Tải lên một ảnh có chứa từ tiếng Anh.</p>
-              <p>Hệ thống sẽ resize, tăng tương phản và scan OCR trước, rồi AI chỉ lọc tối đa 15 từ để tạo preview với các cột word, mean và loại từ.</p>
+              <p>Hệ thống sẽ resize, tăng tương phản và scan OCR trước, rồi AI chỉ lọc tối đa {MAX_PREVIEW_WORDS} từ để tạo preview với các cột word, mean và loại từ. Bạn có thể chọn tối đa {MAX_SELECTABLE_WORDS} từ để thêm vào topic.</p>
             </div>
 
             <input
@@ -612,7 +629,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
               >
                 <span className="cv-excel-import-choice-title">Phân tích ảnh</span>
                 <span className="cv-excel-import-choice-desc">
-                  Resize + contrast + OCR trước, rồi AI lọc tối đa 15 từ.
+                  Resize + contrast + OCR trước, rồi AI lọc tối đa {MAX_PREVIEW_WORDS} từ.
                 </span>
               </button>
             </div>
@@ -645,7 +662,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
         <div className="cv-modal-body">
           <div className="cv-ai-loading">
             <div className="cv-ai-spinner"></div>
-            <p>Hệ thống đang tiền xử lý ảnh, scan OCR rồi lọc tối đa 15 từ...</p>
+            <p>Hệ thống đang tiền xử lý ảnh, scan OCR rồi lọc tối đa {MAX_PREVIEW_WORDS} từ...</p>
           </div>
         </div>
       )}
@@ -667,14 +684,14 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
       {status === 'preview' && (
         <>
           <div className="cv-modal-body" style={{ padding: '10px' }}>
-            <div className="cv-ai-preview-header">
+            <div className="cv-ai-preview-header" data-selected={`${selectedIndexes.size}/${MAX_SELECTABLE_WORDS}`}>
               <p>
                 OCR + AI tìm được <strong>{previewWords.length} từ</strong> từ ảnh đã tải lên.
               </p>
               <label className="cv-ai-select-all-wrap">
                 <input
                   type="checkbox"
-                  checked={selectedIndexes.size === previewWords.length}
+                  checked={previewWords.length > 0 && selectedIndexes.size === Math.min(previewWords.length, MAX_SELECTABLE_WORDS)}
                   onChange={handleToggleAll}
                 />
                 <span>Chọn tất cả</span>
@@ -697,6 +714,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
                         type="checkbox"
                         className="cv-ai-chk"
                         checked={selectedIndexes.has(index)}
+                        disabled={!selectedIndexes.has(index) && selectedIndexes.size >= MAX_SELECTABLE_WORDS}
                         onChange={() => handleToggleCheck(index)}
                       />
                       <span className="cv-ai-chk-box"></span>
@@ -715,7 +733,7 @@ export default function CustomTopicImageImportModal({ isOpen, onClose, onImport,
           </div>
 
           <div className="cv-modal-footer">
-            <span className="cv-ai-selected-count">{selectedIndexes.size} từ được chọn</span>
+            <span className="cv-ai-selected-count">{selectedIndexes.size}/{MAX_SELECTABLE_WORDS} từ được chọn</span>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button className="btn btn-secondary" style={{ flex: 1, width: '100%' }} onClick={() => setStatus('input')}>
                 Phân tích lại

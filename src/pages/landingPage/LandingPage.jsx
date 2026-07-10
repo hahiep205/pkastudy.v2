@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './LandingPage.css';
 
 import { useLandingReveal, useCounterAnimation } from './hooks';
 import { FEATURES, SVGS, COURSE_CARDS } from '../../data/landingData';
 import CourseCard from './CourseCard';
 import axiosClient from '../../utils/axiosClient';
+import { useAuth } from '../../contexts/useAuth';
 
 export default function LandingPage() {
     useLandingReveal();
     useCounterAnimation();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
 
     const [courses, setCourses] = useState([]);
     const [tests, setTests] = useState([]);
@@ -51,6 +54,23 @@ export default function LandingPage() {
         })
     ), [catalogSummary]);
 
+    const isAuthenticated = Boolean(user?.token);
+    const heroPrimaryLabel = isAuthenticated ? 'Vào dashboard' : 'Bắt đầu ngay';
+    const heroSecondaryLabel = isAuthenticated ? 'Đăng xuất' : 'Đã có tài khoản';
+
+    const handleHeroPrimary = () => {
+        navigate('/dashboard');
+    };
+
+    const handleHeroSecondary = async () => {
+        if (isAuthenticated) {
+            await logout();
+            navigate('/');
+        } else {
+            navigate('/login');
+        }
+    };
+
     return (
         <>
             <header className="hero" id="hero-section">
@@ -61,12 +81,12 @@ export default function LandingPage() {
                         Học từ vựng TOEIC theo chủ đề, kết hợp luyện tập kỹ năng và làm đề để duy trì nhịp học ổn định mỗi ngày.
                     </p>
                     <div className="hero-buttons">
-                        <Link to="/dashboard">
-                            <button className="btn btn-primary hero-btn" id="btn-get-started">Bắt đầu ngay</button>
-                        </Link>
-                        <Link to="/login">
-                            <button className="btn btn-secondary hero-btn">Đã có tài khoản</button>
-                        </Link>
+                        <button type="button" className="btn btn-primary hero-btn" id="btn-get-started" onClick={handleHeroPrimary}>
+                            {heroPrimaryLabel}
+                        </button>
+                        <button type="button" className="btn btn-secondary hero-btn" onClick={handleHeroSecondary}>
+                            {heroSecondaryLabel}
+                        </button>
                     </div>
                 </div>
             </header>
