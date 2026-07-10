@@ -513,11 +513,35 @@ function parseGeneratedWords(rawText, requestedCount, existingWords = []) {
         throw new Error('AI trả về dữ liệu nhưng không có từ vựng hợp lệ để sử dụng');
     }
 
-    if (normalized.length < requestedCount) {
-        throw new Error('AI trả về quá ít mục hợp lệ. Hay thử tạo lại để lấy bộ từ chất lượng hơn');
+    return normalized;
+}
+
+async function fetchGeneratedWords({ prompt, uniqueSystemPrompt, count, langLabel, currentLang, existingWords }) {
+    const resp = await fetch(AI_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: AI_MODEL,
+            messages: [
+                { role: 'system', content: currentLang.systemPrompt },
+                { role: 'system', content: uniqueSystemPrompt },
+                { role: 'user', content: prompt }
+            ],
+            max_tokens: 5200,
+            temperature: 0.25,
+            stream: false
+        })
+    });
+
+    if (!resp.ok) {
+        throw new Error(await buildAiError(resp));
     }
 
-    return normalized;
+    const data = await resp.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    return parseGeneratedWords(text, count, existingWords);
 }
 
 async function buildAiError(resp) {
@@ -574,40 +598,57 @@ export default function AIGenModal({ isOpen, onClose, onSave, topicLang, existin
         setStatus('loading');
 
         try {
+            const promptCount = Math.max(count + Math.ceil(count / 2), count + 2);
             const prompt = buildUserPrompt({
-                count,
+                count: promptCount,
                 label: langLabel,
                 langName: currentLang.promptName || currentLang.label,
                 theme: theme.trim(),
                 existingWords
             });
             const uniqueSystemPrompt = buildUniqueSystemPrompt(existingWords);
-
-            const resp = await fetch(AI_API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: AI_MODEL,
-                    messages: [
-                        { role: 'system', content: currentLang.systemPrompt },
-                        { role: 'system', content: uniqueSystemPrompt },
-                        { role: 'user', content: prompt }
-                    ],
-                    max_tokens: 3200,
-                    temperature: 0.2,
-                    stream: false
-                })
+            let words = await fetchGeneratedWords({
+                prompt,
+                uniqueSystemPrompt,
+                count,
+                langLabel,
+                currentLang,
+                existingWords,
             });
 
-            if (!resp.ok) {
-                throw new Error(await buildAiError(resp));
-            }
+            if (words.length < count) {
+                const missingCount = count - words.length;
+                const mergedExisting = [
+                    ...existingWords,
+                    ...words.map((item) => ({ word: item.word }))
+                ];
+                const refillPrompt = buildUserPrompt({
+                    count: Math.max(missingCount + 2, missingCount * 2),
+                    label: langLabel,
+                    langName: currentLang.promptName || currentLang.label,
+                    theme: theme.trim(),
+                    existingWords: mergedExisting
+                });
+                const refillUniqueSystemPrompt = buildUniqueSystemPrompt(mergedExisting);
+                const refillWords = await fetchGeneratedWords({
+                    prompt: refillPrompt,
+                    uniqueSystemPrompt: refillUniqueSystemPrompt,
+                    count: missingCount,
+                    langLabel,
+                    currentLang,
+                    existingWords: mergedExisting,
+                });
 
-            const data = await resp.json();
-            const text = data.choices?.[0]?.message?.content || '';
-            const words = parseGeneratedWords(text, count, existingWords);
+                words = [...words];
+                const seenWordKeys = new Set(words.map((item) => normalizeWordKey(item.word)));
+                refillWords.forEach((item) => {
+                    const key = normalizeWordKey(item.word);
+                    if (key && !seenWordKeys.has(key) && words.length < count) {
+                        seenWordKeys.add(key);
+                        words.push(item);
+                    }
+                });
+            }
 
             setPreviewWords(words);
             setSelectedIndexes(new Set(words.map((_, index) => index)));
