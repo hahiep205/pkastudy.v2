@@ -27,7 +27,17 @@ export function isAuthenticatedUser(user) {
 
 export function getUserStorageOwner(user = getStoredUser()) {
     if (!isAuthenticatedUser(user)) return GUEST_OWNER_KEY;
-    return `user:${String(user.id)}`;
+    const stableId = user?.profileId || user?.authUserId || user?.id;
+    if (stableId) {
+        return `user:${String(stableId)}`;
+    }
+
+    const fallbackName = user?.email || user?.name;
+    if (fallbackName) {
+        return `user:${String(fallbackName)}`;
+    }
+
+    return GUEST_OWNER_KEY;
 }
 
 export function getUserScopedStorageKey(baseKey, user = getStoredUser()) {

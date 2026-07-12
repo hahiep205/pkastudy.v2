@@ -60,6 +60,38 @@ function mapServerDueItem(item) {
   };
 }
 
+function mapLocalDueItem(item) {
+  return {
+    wordId: item.wordId,
+    flashcardId: item.flashcardId ?? null,
+    word: item.word,
+    mean: item.mean,
+    transcription: item.transcription,
+    example: item.example,
+    example_vi: item.example_vi,
+    wordtype: item.wordtype,
+    interval: Number(item.interval ?? 0),
+    ef: Number(item.ef ?? 2.5),
+    repetition: Number(item.repetition ?? 0),
+    nextReview: item.nextReview || null,
+  };
+}
+
+function mergeReviewItems(primaryItems = [], secondaryItems = []) {
+  const merged = [];
+  const seen = new Set();
+
+  [...primaryItems, ...secondaryItems].forEach((item) => {
+    if (!item) return;
+    const key = String(item.wordId ?? item.flashcardId ?? '');
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+
+  return merged;
+}
+
 function ReviewHero({ dueCount, totalCount, totalCountLabel }) {
   return (
     <section className="review-hero review-hero-collapsed">
@@ -526,10 +558,18 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
           fetchDueReviews(),
           fetchReviewQueue(),
         ]);
-        if (dueItemsFromServer.length > 0 || queueItemsFromServer.length > 0) {
+        const serverDueItems = dueItemsFromServer.map(mapServerDueItem);
+        const serverQueueItems = queueItemsFromServer.map(mapServerDueItem);
+        const localDueItems = getLocalDueItems().map(mapLocalDueItem);
+        const localQueueItems = getLocalFullQueue().map(mapLocalDueItem);
+
+        const mergedDueItems = mergeReviewItems(serverDueItems, localDueItems);
+        const mergedQueueItems = mergeReviewItems(serverQueueItems, localQueueItems);
+
+        if (mergedDueItems.length > 0 || mergedQueueItems.length > 0) {
           setSrsSource('server');
-          setDueItems(dueItemsFromServer.map(mapServerDueItem));
-          setFullQueue(queueItemsFromServer.map(mapServerDueItem));
+          setDueItems(mergedDueItems);
+          setFullQueue(mergedQueueItems);
           setStatus('ready');
           return;
         }
@@ -538,11 +578,9 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
       }
     }
 
-    const localDueItems = getLocalDueItems();
-    const localFullQueue = getLocalFullQueue();
     setSrsSource('local');
-    setDueItems(localDueItems);
-    setFullQueue(localFullQueue);
+    setDueItems(getLocalDueItems().map(mapLocalDueItem));
+    setFullQueue(getLocalFullQueue().map(mapLocalDueItem));
     setStatus('ready');
   }, [useServerSrs]);
 
@@ -556,18 +594,8 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
   };
 
   const handleReviewedItem = useCallback(async () => {
-    if (srsSource === 'server') {
-      try {
-        const refreshedQueue = await fetchReviewQueue();
-        setFullQueue(refreshedQueue.map(mapServerDueItem));
-      } catch (error) {
-        console.error('Failed to refresh server SRS queue.', error);
-      }
-      return;
-    }
-
-    setFullQueue(getLocalFullQueue());
-  }, [srsSource]);
+    await loadData();
+  }, [loadData]);
 
   if (variant === 'preview') {
     return (
@@ -603,27 +631,6 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
         <button type="button" className="btn btn-secondary review-screen-close" onClick={onClose}>
           Đóng
         </button>
-      </section>
-
-      <section className="review-sm2-info">
-        <div className="review-sm2-card">
-          <h3>Cách tính nhịp ôn</h3>
-          <div className="review-sm2-steps">
-            {[
-              { step: 'Lần 1', interval: '1 ngày', icon: '1️⃣' },
-              { step: 'Lần 2', interval: '6 ngày', icon: '2️⃣' },
-              { step: 'Từ lần 3 trở đi', interval: 'Nhân theo EF', icon: '📘' },
-            ].map((item) => (
-              <div key={item.step} className="review-sm2-step">
-                <span>{item.icon}</span>
-                <div>
-                  <strong>{item.step}</strong>
-                  <p>{item.interval}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
 
       {status === 'loading' ? (

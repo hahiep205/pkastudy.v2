@@ -84,6 +84,21 @@ function mapDueItemToWord(item) {
   };
 }
 
+function mergeDueWords(primaryWords = [], secondaryWords = []) {
+  const merged = [];
+  const seen = new Set();
+
+  [...primaryWords, ...secondaryWords].forEach((word) => {
+    if (!word) return;
+    const key = String(word.id ?? word.wordId ?? word.flashcardId ?? '');
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    merged.push(word);
+  });
+
+  return merged;
+}
+
 async function enqueueWordsForImmediateSrs(words, useServerSrs, topicId, courseId) {
   const serverFlashcardIds = [];
 
@@ -439,8 +454,20 @@ export default function Games() {
       if (useServerSrs) {
         try {
           const items = await fetchDueReviews();
+          const serverDueWords = items.map(mapDueItemToWord);
+          const localDueWords = getLocalDueItems().map((item) => ({
+            id: item.wordId,
+            wordId: item.wordId,
+            flashcardId: item.flashcardId ?? null,
+            word: item.word,
+            mean: item.mean,
+            transcription: item.transcription,
+            example: item.example,
+            example_vi: item.example_vi,
+            wordtype: item.wordtype,
+          }));
           if (!cancelled && items.length > 0) {
-            setDueReviewWords(items.map(mapDueItemToWord));
+            setDueReviewWords(mergeDueWords(serverDueWords, localDueWords));
             return;
           }
         } catch (error) {
@@ -453,6 +480,7 @@ export default function Games() {
           getLocalDueItems().map((item) => ({
             id: item.wordId,
             wordId: item.wordId,
+            flashcardId: item.flashcardId ?? null,
             word: item.word,
             mean: item.mean,
             transcription: item.transcription,
