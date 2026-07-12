@@ -325,7 +325,7 @@ export default function Overview() {
                         </div>
                         <h1 className="welcome-title">Tiếp tục hành trình học từ vựng</h1>
                         <p className="welcome-sub">
-                            Bạn đã thuộc <strong id="dash-total-remembered">{stats.words}</strong> từ vựng trên tổng
+                            Bạn đã học <strong id="dash-total-remembered">{stats.words}</strong> từ vựng trên tổng
                             <strong id="dash-total-words"> {grandTotal}</strong> từ. Duy trì nhịp độ ổn định để kho từ
                             vựng tăng đều mỗi ngày.
                         </p>

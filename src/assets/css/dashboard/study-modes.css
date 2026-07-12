@@ -2706,19 +2706,34 @@ body.app-dark-mode .flashcard-completion-content p {
     display: flex;
     justify-content: space-between;
     gap: 16px;
+    align-items: center;
 }
 
 .flashcard-completion-stat-row+.flashcard-completion-stat-row {
     margin-top: 4px;
 }
 
-.flashcard-completion-stat-row span,
 .flashcard-completion-stat-row strong {
     color: #0f172a;
 }
 
+.flashcard-completion-stat-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: #0f172a;
+    font-weight: 500;
+}
+
 .flashcard-completion-stat-icon {
-    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    line-height: 0;
 }
 
 .flashcard-completion-stat-icon.is-correct {
@@ -2727,6 +2742,10 @@ body.app-dark-mode .flashcard-completion-content p {
 
 .flashcard-completion-stat-icon.is-wrong {
     color: #ef4444;
+}
+
+.flashcard-completion-stat-icon svg {
+    display: block;
 }
 
 body.app-dark-mode .flashcard-progress {
@@ -2751,8 +2770,11 @@ body.app-dark-mode .flashcard-completion-stats-title {
     color: #94a3b8;
 }
 
-body.app-dark-mode .flashcard-completion-stat-row span,
 body.app-dark-mode .flashcard-completion-stat-row strong {
+    color: #e2e8f0;
+}
+
+body.app-dark-mode .flashcard-completion-stat-label {
     color: #e2e8f0;
 }
 

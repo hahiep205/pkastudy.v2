@@ -435,3 +435,44 @@ body.app-dark-mode .float-input {
         width: calc(100vw - 88px);
     }
 }
+
+/* Match the shared input styling used on /logined */
+.float-chat-footer .float-input {
+    width: 100%;
+    height: 48px;
+    min-height: 48px;
+    max-height: 120px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--gray-text);
+    font-family: var(--font-stack);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    outline: none;
+    resize: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.float-chat-footer .float-input::placeholder {
+    color: var(--nav-text);
+    font-weight: 500;
+}
+
+.float-chat-footer .float-input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(28, 176, 246, 0.12);
+}
+
+body.app-dark-mode .float-chat-footer .float-input {
+    background: #202b3f;
+    color: #e2e8f0;
+    border-color: rgba(148, 163, 184, .18);
+}
+
+body.app-dark-mode .float-chat-footer .float-input::placeholder {
+    color: #94a3b8;
+}

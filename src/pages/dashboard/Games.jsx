@@ -17,7 +17,7 @@ import { getGuestReadyCourseTopics } from '../../data/guestToeicCourses';
 import axiosClient from '../../utils/axiosClient';
 import { getDashboardUserKey, recordStudyModeCompletion } from '../../utils/dashboardProgress';
 import { recordGamePlay } from '../../utils/userStats';
-import { addToSrs, enqueueToSrsNow, getDueItems as getLocalDueItems, reviewItem as reviewLocalItem } from '../../utils/srsStorage';
+import { enqueueToSrsNow, getDueItems as getLocalDueItems, reviewItem as reviewLocalItem } from '../../utils/srsStorage';
 import {
   enqueueImmediateReviews,
   fetchDueReviews,
@@ -605,32 +605,33 @@ export default function Games() {
       onSaveLearnedWords: async (correctWordIds, wrongWordIds = []) => {
         const correctSet = new Set(correctWordIds);
         const wrongSet = new Set(wrongWordIds);
-        const serverBatch = [];
+        const immediateServerFlashcardIds = [];
 
         activeWords.forEach((word) => {
           if (hasServerFlashcardId(word)) {
             if (correctSet.has(word.id)) {
-              serverBatch.push({ flashcard_id: word.flashcardId, quality: mapReviewRatingToQualityScore('good') });
+              immediateServerFlashcardIds.push(word.flashcardId);
             } else if (wrongSet.has(word.id)) {
-              serverBatch.push({ flashcard_id: word.flashcardId, quality: mapReviewRatingToQualityScore('forgot') });
+              // Leave wrong cards to the normal study flows; completion should only
+              // enqueue the words the learner actually remembered.
             }
             return;
           }
 
           if (correctSet.has(word.id)) {
-            if (!selectedTopic.isSrs) addToSrs(word, selectedTopic.id, 'game');
+            if (!selectedTopic.isSrs) enqueueToSrsNow(word, selectedTopic.id, 'game');
             reviewLocalItem(word.id, 'good');
           } else if (wrongSet.has(word.id)) {
-            if (!selectedTopic.isSrs) addToSrs(word, selectedTopic.id, 'game');
+            if (!selectedTopic.isSrs) enqueueToSrsNow(word, selectedTopic.id, 'game');
             reviewLocalItem(word.id, 'forgot');
           }
         });
 
-        if (serverBatch.length > 0) {
+        if (immediateServerFlashcardIds.length > 0) {
           try {
-            await submitSrsReviewBatch(serverBatch);
+            await enqueueImmediateReviews(immediateServerFlashcardIds);
           } catch (error) {
-            console.error('Failed to submit game review batch.', error);
+            console.error('Failed to enqueue immediate game flashcard reviews.', error);
           }
         }
 

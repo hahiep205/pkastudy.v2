@@ -741,8 +741,13 @@ const activeWords = !studyWordIds
   const handleSaveWord = async (wordData) => {
     const normalizedWordData = { ...wordData, language: topicLang };
     if (isCustom) {
-      if (editingWord) updateWordInTopic(topicId, editingWord.id, normalizedWordData);
-      else addWordToTopic(topicId, normalizedWordData);
+      const result = editingWord
+        ? await updateWordInTopic(topicId, editingWord.id, normalizedWordData)
+        : await addWordToTopic(topicId, normalizedWordData);
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
       return;
     }
 
@@ -1216,7 +1221,7 @@ const activeWords = !studyWordIds
   const handleSaveFlashcard = async (selectedWordIds) => {
     const prevSet = new Set(activeWords.filter((word) => remembered[getWordKey(word)]).map((word) => getWordKey(word)));
     const newSet = new Set(selectedWordIds);
-    const serverBatch = [];
+    const immediateServerFlashcardIds = [];
 
     activeWords.forEach((word) => {
       const key = getWordKey(word);
@@ -1225,19 +1230,22 @@ const activeWords = !studyWordIds
 
       if (useServerSrs && hasServerFlashcardId(word)) {
         if (isNowRemembered && !wasRemembered) {
-          serverBatch.push({ flashcard_id: word.flashcardId, quality: mapReviewRatingToQualityScore('good') });
+          immediateServerFlashcardIds.push(word.flashcardId);
         }
         if (!isNowRemembered && wasRemembered) {
-          serverBatch.push({ flashcard_id: word.flashcardId, quality: mapReviewRatingToQualityScore('forgot') });
+          // If the learner flips a card back to "not remembered", leave the
+          // server queue untouched here; the word will be handled by other study flows.
         }
         return;
       }
 
-      if (isNowRemembered && !wasRemembered) addToSrs(word, topicId, courseId);
+      if (isNowRemembered && !wasRemembered) enqueueToSrsNow(word, topicId, courseId);
       if (!isNowRemembered && wasRemembered) removeFromSrs(key);
     });
 
-    await syncServerReviews(serverBatch);
+    if (immediateServerFlashcardIds.length > 0) {
+      await enqueueImmediateReviews(immediateServerFlashcardIds);
+    }
     saveRememberedWords(selectedWordIds);
     recordFlashcardSessionProgress();
   };

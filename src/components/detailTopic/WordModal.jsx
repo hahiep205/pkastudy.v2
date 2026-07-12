@@ -73,11 +73,11 @@ export default function WordModal({ isOpen, onClose, onSave, existingWord }) {
                 <div className="cv-form-row">
                     <div className="cv-form-group">
                         <label className="cv-form-label">
-                            Nghĩa tiếng Việt
+                            Nghĩa tiếng Việt <span style={{ color: 'var(--red)' }}>*</span>
                         </label>
                         <input
                             className="cv-form-input"
-                            placeholder="có thể để trống nếu chưa biết nghĩa"
+                            placeholder="Điền bất kỳ nếu không biết nghĩa"
                             value={meaning}
                             onChange={(event) => {
                                 setMeaning(event.target.value);

@@ -19,12 +19,12 @@ marked.setOptions({
 });
 
 
-const SYSTEM_PROMPT = `Bạn là trợ lý AI gia sư của PKA Study — nền tảng học ngoại ngữ thông minh dành cho sinh viên và người học.
+const SYSTEM_PROMPT = `Xin chào bạn! Mình là trợ lý AI của pkastudy — người bạn đồng hành giúp bạn học tiếng Anh hiệu quả và thú vị hơn.
 
 Bạn thân thiện, dễ hiểu, giải thích rõ ràng, và luôn khuyến khích người học tiến bộ.
 
 Nhiệm vụ của bạn là:
-- Giải nghĩa từ vựng, ngữ pháp (Anh / Hàn / Việt)
+- Giải nghĩa từ vựng, ngữ pháp tiếng Anh
 - Hỗ trợ luyện hội thoại, phát âm, viết câu
 - Sửa lỗi và giải thích chi tiết, dễ hiểu
 - Đưa ví dụ thực tế, dễ áp dụng
@@ -43,7 +43,7 @@ export default function FloatChat() {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([{
         sender: 'bot',
-        text: 'Xin chào! Mình là trợ lý AI của PKA Study. Mình có thể giúp gì cho bạn hôm nay?'
+        text: 'Xin chào bạn! Mình là trợ lý AI của pkastudy. Mình có thể giúp gì cho bạn hôm nay?'
     }]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
