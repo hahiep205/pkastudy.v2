@@ -105,6 +105,7 @@ async function enqueueWordsForImmediateSrs(words, useServerSrs, topicId, courseI
   words.forEach((word) => {
     if (useServerSrs && hasServerFlashcardId(word)) {
       serverFlashcardIds.push(word.flashcardId);
+      enqueueToSrsNow({ ...word, id: word.flashcardId, wordId: word.flashcardId }, topicId, courseId);
       return;
     }
 
@@ -611,6 +612,7 @@ export default function Games() {
           if (hasServerFlashcardId(word)) {
             if (correctSet.has(word.id)) {
               immediateServerFlashcardIds.push(word.flashcardId);
+              enqueueToSrsNow({ ...word, id: word.flashcardId, wordId: word.flashcardId }, selectedTopic.id, 'game');
             } else if (wrongSet.has(word.id)) {
               // Leave wrong cards to the normal study flows; completion should only
               // enqueue the words the learner actually remembered.

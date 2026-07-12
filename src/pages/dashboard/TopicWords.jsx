@@ -1231,10 +1231,10 @@ const activeWords = !studyWordIds
       if (useServerSrs && hasServerFlashcardId(word)) {
         if (isNowRemembered && !wasRemembered) {
           immediateServerFlashcardIds.push(word.flashcardId);
+          enqueueToSrsNow({ ...word, id: word.flashcardId, wordId: word.flashcardId }, topicId, courseId);
         }
         if (!isNowRemembered && wasRemembered) {
-          // If the learner flips a card back to "not remembered", leave the
-          // server queue untouched here; the word will be handled by other study flows.
+          removeFromSrs(word.flashcardId ?? key);
         }
         return;
       }

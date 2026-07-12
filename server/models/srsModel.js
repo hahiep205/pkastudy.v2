@@ -1,5 +1,11 @@
 const { ensureSupabaseEnabled, unwrapList, resolveProfileId } = require('../lib/supabaseData');
 
+function getVietnamDateStamp(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+  }).format(date);
+}
+
 async function getReviewsSupabase(userId, onlyDue) {
   const admin = ensureSupabaseEnabled();
   const profileId = await resolveProfileId(userId);
@@ -11,7 +17,7 @@ async function getReviewsSupabase(userId, onlyDue) {
     .order('id', { ascending: true });
 
   if (onlyDue) {
-    query = query.lte('next_review_date', new Date().toISOString().slice(0, 10));
+    query = query.lte('next_review_date', getVietnamDateStamp());
   }
 
   const reviews = unwrapList(await query);
