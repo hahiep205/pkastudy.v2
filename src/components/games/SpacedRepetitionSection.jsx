@@ -215,6 +215,7 @@ function ReviewSession({ dueItems, onFinish, onReviewed, useServerSrs }) {
 
   const item = dueItems[index];
   const correctCount = results.filter((entry) => entry.quality === 'good' || entry.quality === 'easy').length;
+  const reviewFlashcardId = Number(item?.flashcardId ?? item?.flashcard_id ?? item?.wordId ?? item?.id);
 
   const handleRate = useCallback(async (quality) => {
     if (ratedQuality || isSubmitting) return;
@@ -227,8 +228,12 @@ function ReviewSession({ dueItems, onFinish, onReviewed, useServerSrs }) {
       let updatedQueueItem = null;
 
       if (useServerSrs) {
+        if (!Number.isInteger(reviewFlashcardId) || reviewFlashcardId <= 0) {
+          throw new Error('Missing server flashcard id');
+        }
+
         const updated = await submitSrsReviewBatch([
-          { flashcard_id: item.flashcardId, quality: mapReviewRatingToQualityScore(quality) },
+          { flashcard_id: reviewFlashcardId, quality: mapReviewRatingToQualityScore(quality) },
         ]);
         const scheduledItem = updated[0];
         label = scheduledItem ? formatIntervalLabel(scheduledItem.interval) : getServerNextIntervalLabel(item, quality);
@@ -275,7 +280,7 @@ function ReviewSession({ dueItems, onFinish, onReviewed, useServerSrs }) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [dueItems.length, index, isSubmitting, item, onFinish, onReviewed, ratedQuality, results, useServerSrs]);
+  }, [dueItems.length, index, isSubmitting, item, onFinish, onReviewed, ratedQuality, reviewFlashcardId, results, useServerSrs]);
 
   useEffect(() => () => {
     if (advanceTimeoutRef.current) {
@@ -558,18 +563,13 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
           fetchDueReviews(),
           fetchReviewQueue(),
         ]);
-        const serverDueItems = dueItemsFromServer.map(mapServerDueItem);
-        const serverQueueItems = queueItemsFromServer.map(mapServerDueItem);
-        const localDueItems = getLocalDueItems().map(mapLocalDueItem);
-        const localQueueItems = getLocalFullQueue().map(mapLocalDueItem);
+        const serverDueItems = dueItemsFromServer.map(mapServerDueItem).filter((item) => item.flashcardId);
+        const serverQueueItems = queueItemsFromServer.map(mapServerDueItem).filter((item) => item.flashcardId);
 
-        const mergedDueItems = mergeReviewItems(serverDueItems, localDueItems);
-        const mergedQueueItems = mergeReviewItems(serverQueueItems, localQueueItems);
-
-        if (mergedDueItems.length > 0 || mergedQueueItems.length > 0) {
+        if (serverDueItems.length > 0 || serverQueueItems.length > 0) {
           setSrsSource('server');
-          setDueItems(mergedDueItems);
-          setFullQueue(mergedQueueItems);
+          setDueItems(serverDueItems);
+          setFullQueue(serverQueueItems);
           setStatus('ready');
           return;
         }
