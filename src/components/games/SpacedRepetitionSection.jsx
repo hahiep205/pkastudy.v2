@@ -503,6 +503,7 @@ function UpcomingSection({ queue, dueItems }) {
 
 export default function SpacedRepetitionSection({ variant = 'preview', onOpen, onClose, onGoHome }) {
   const useServerSrs = hasServerSrsAccess();
+  const [srsSource, setSrsSource] = useState(useServerSrs ? 'server' : 'local');
   const [dueItems, setDueItems] = useState([]);
   const [fullQueue, setFullQueue] = useState([]);
   const [status, setStatus] = useState('loading');
@@ -510,11 +511,11 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
   const [results, setResults] = useState(null);
 
   const totalCount = useMemo(() => (
-    useServerSrs ? dueItems.length : getLocalTotalSrsCount()
-  ), [dueItems.length, useServerSrs, sessionKey]);
+    srsSource === 'server' ? dueItems.length : getLocalTotalSrsCount()
+  ), [dueItems.length, srsSource, sessionKey]);
   const totalCountLabel = useMemo(() => (
-    useServerSrs ? 'Thẻ trong phiên này' : 'Tổng số thẻ'
-  ), [useServerSrs]);
+    srsSource === 'server' ? 'Thẻ trong phiên này' : 'Tổng số thẻ'
+  ), [srsSource]);
 
   const loadData = useCallback(async () => {
     setStatus('loading');
@@ -525,17 +526,23 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
           fetchDueReviews(),
           fetchReviewQueue(),
         ]);
-        setDueItems(dueItemsFromServer.map(mapServerDueItem));
-        setFullQueue(queueItemsFromServer.map(mapServerDueItem));
-        setStatus('ready');
-        return;
+        if (dueItemsFromServer.length > 0 || queueItemsFromServer.length > 0) {
+          setSrsSource('server');
+          setDueItems(dueItemsFromServer.map(mapServerDueItem));
+          setFullQueue(queueItemsFromServer.map(mapServerDueItem));
+          setStatus('ready');
+          return;
+        }
       } catch (error) {
         console.error('Failed to load server SRS queue.', error);
       }
     }
 
-    setDueItems(getLocalDueItems());
-    setFullQueue(getLocalFullQueue());
+    const localDueItems = getLocalDueItems();
+    const localFullQueue = getLocalFullQueue();
+    setSrsSource('local');
+    setDueItems(localDueItems);
+    setFullQueue(localFullQueue);
     setStatus('ready');
   }, [useServerSrs]);
 
@@ -549,7 +556,7 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
   };
 
   const handleReviewedItem = useCallback(async () => {
-    if (useServerSrs) {
+    if (srsSource === 'server') {
       try {
         const refreshedQueue = await fetchReviewQueue();
         setFullQueue(refreshedQueue.map(mapServerDueItem));
@@ -560,7 +567,7 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
     }
 
     setFullQueue(getLocalFullQueue());
-  }, [useServerSrs]);
+  }, [srsSource]);
 
   if (variant === 'preview') {
     return (
@@ -637,7 +644,7 @@ export default function SpacedRepetitionSection({ variant = 'preview', onOpen, o
           dueItems={dueItems}
           onFinish={setResults}
           onReviewed={handleReviewedItem}
-          useServerSrs={useServerSrs}
+          useServerSrs={srsSource === 'server'}
         />
       ) : (
         <EmptyState useServerSrs={useServerSrs} />

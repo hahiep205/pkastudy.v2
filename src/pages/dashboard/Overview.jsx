@@ -14,7 +14,7 @@ import {
     syncDashboardProgressWithServer,
 } from '../../utils/dashboardProgress';
 import { buildActivityChartData } from '../../utils/userStats';
-import { getLevelInfo, getXpData, syncXpWithServer } from '../../utils/xpSystem';
+import { XP_EVENT, getLevelInfo, getXpData, syncXpWithServer } from '../../utils/xpSystem';
 import { getDueCount, checkSrsDecayWarning } from '../../utils/srsStorage';
 import { isAuthenticatedUser } from '../../utils/userStorage';
 
@@ -29,6 +29,7 @@ export default function Overview() {
     const [allCourses, setAllCourses] = useState([]);
     const [stats, setStats] = useState({ streak: 0, words: 0, xp: 0 });
     const [chartPeriod, setChartPeriod] = useState('week');
+    const [xpTotal, setXpTotal] = useState(() => getXpData().totalXp);
 
     useEffect(() => {
         axiosClient.get('/courses')
@@ -45,7 +46,7 @@ export default function Overview() {
 
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
     const [dashboardProgress, setDashboardProgress] = useState(() => readDashboardProgress(userKey));
-    const levelInfo = getLevelInfo(getXpData().totalXp);
+    const levelInfo = getLevelInfo(xpTotal);
     const srsCount = getDueCount();
     const decayCount = checkSrsDecayWarning();
 
@@ -55,6 +56,19 @@ export default function Overview() {
             syncXpWithServer();
         }
     }, [isGuestUser, userKey, user]);
+
+    useEffect(() => {
+        const syncXpTotal = () => setXpTotal(getXpData().totalXp);
+
+        syncXpTotal();
+        window.addEventListener(XP_EVENT, syncXpTotal);
+        window.addEventListener('storage', syncXpTotal);
+
+        return () => {
+            window.removeEventListener(XP_EVENT, syncXpTotal);
+            window.removeEventListener('storage', syncXpTotal);
+        };
+    }, [userKey]);
 
     useEffect(() => {
         setDashboardProgress(readDashboardProgress(userKey));
@@ -130,7 +144,7 @@ export default function Overview() {
             ? dashboardProgress.learnedWordEventIdsToday.length
             : (Array.isArray(dashboardProgress.learnedWordIdsToday) ? dashboardProgress.learnedWordIdsToday.length : 0),
         rememberedTotal: grandDone,
-        totalXp: dashboardProgress.totalXp,
+        totalXp: xpTotal,
         streak: dashboardProgress.streak,
         tasksCompleted: completedTasks,
         taskTarget: tasksView.length,
@@ -139,18 +153,18 @@ export default function Overview() {
         dashboardProgress.dailyXp,
         dashboardProgress.learnedWordEventIdsToday,
         dashboardProgress.learnedWordIdsToday,
-        dashboardProgress.totalXp,
         dashboardProgress.streak,
         grandDone,
         completedTasks,
         tasksView.length,
+        xpTotal,
     ]);
 
     const targetStats = useMemo(() => ({
         streak: dashboardProgress.streak,
         words: grandDone,
-        xp: dashboardProgress.totalXp,
-    }), [dashboardProgress.streak, dashboardProgress.totalXp, grandDone]);
+        xp: xpTotal,
+    }), [dashboardProgress.streak, grandDone, xpTotal]);
 
     const activeChartData = useMemo(
         () => buildActivityChartData(userKey, chartPeriod, currentChartSnapshot),
@@ -389,11 +403,11 @@ export default function Overview() {
                     <div className="card-header">
                         <div>
                             <div className="card-eyebrow">Hoạt động</div>
-                            <h2 className="card-title-text">{chartPeriod === 'week' ? 'Tuần này' : 'Tháng này'}</h2>
+                            <h2 className="card-title-text">{chartPeriod === 'week' ? 'Tuần này' : '4 tuần gần nhất'}</h2>
                         </div>
                         <div className="chart-tabs">
                             <button className={`chart-tab ${chartPeriod === 'week' ? 'active' : ''}`} onClick={() => setChartPeriod('week')}>Tuần</button>
-                            <button className={`chart-tab ${chartPeriod === 'month' ? 'active' : ''}`} onClick={() => setChartPeriod('month')}>Tháng</button>
+                            <button className={`chart-tab ${chartPeriod === 'month' ? 'active' : ''}`} onClick={() => setChartPeriod('month')}>4 tuần</button>
                         </div>
                     </div>
 

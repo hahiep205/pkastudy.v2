@@ -76,16 +76,6 @@ export default function Navbar() {
 
             <div className="nav-mobile-controls">
                 <button
-                    type="button"
-                    className={`theme-switch-btn theme-switch-btn-mobile${isDarkMode ? ' is-dark' : ''}`}
-                    onClick={toggleTheme}
-                    aria-label={isDarkMode ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
-                    title={isDarkMode ? 'Chế độ sáng' : 'Chế độ tối'}
-                >
-                    <span className="theme-switch-icon" aria-hidden="true">{isDarkMode ? '☀' : '☾'}</span>
-                </button>
-
-                <button
                     className={`mobile-menu-toggle ${isMobileMenuOpen ? 'active' : ''}`}
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                     aria-label="Menu"

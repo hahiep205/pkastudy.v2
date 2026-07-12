@@ -8,7 +8,7 @@ import {
     readDashboardProgress,
     subscribeDashboardProgress,
 } from '../../utils/dashboardProgress';
-import { getXpData, getLevelInfo } from '../../utils/xpSystem';
+import { XP_EVENT, getXpData, getLevelInfo } from '../../utils/xpSystem';
 import { isAuthenticatedUser } from '../../utils/userStorage';
 
 export default function Topbar({ onMenuClick }) {
@@ -52,9 +52,11 @@ export default function Topbar({ onMenuClick }) {
         }
 
         const refresh = () => setLevelInfo(getLevelInfo(getXpData().totalXp));
+        window.addEventListener(XP_EVENT, refresh);
         window.addEventListener('storage', refresh);
         const id = setInterval(refresh, 3000);
         return () => {
+            window.removeEventListener(XP_EVENT, refresh);
             window.removeEventListener('storage', refresh);
             clearInterval(id);
         };

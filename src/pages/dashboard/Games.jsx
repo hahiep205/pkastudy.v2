@@ -439,10 +439,10 @@ export default function Games() {
       if (useServerSrs) {
         try {
           const items = await fetchDueReviews();
-          if (!cancelled) {
+          if (!cancelled && items.length > 0) {
             setDueReviewWords(items.map(mapDueItemToWord));
+            return;
           }
-          return;
         } catch (error) {
           console.error('Failed to load due reviews from server.', error);
         }

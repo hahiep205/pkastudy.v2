@@ -1,5 +1,5 @@
 import { recordUserStatsSnapshot } from './userStats';
-import { xpStreakDaily } from './xpSystem';
+import { addXp, getXpData } from './xpSystem';
 import axiosClient from './axiosClient';
 import { getStoredUser, getUserStorageOwner } from './userStorage';
 
@@ -147,10 +147,12 @@ export function ensureTodayProgress(progress) {
     };
 }
 
-function applyDashboardTaskCompletion(current, taskId) {
+function applyDashboardTaskCompletion(current, taskId, options = {}) {
+    const awardXp = options.awardXp !== false;
     const today = getTodayKey();
     let expGained = 0;
     let streakGained = false;
+    let completedTaskTitle = '';
     const dailyTaskClaimedAt = current.dailyTaskClaimedAt && typeof current.dailyTaskClaimedAt === 'object'
         ? current.dailyTaskClaimedAt
         : {};
@@ -166,6 +168,7 @@ function applyDashboardTaskCompletion(current, taskId) {
     const tasks = current.tasks.map((task) => {
         if (task.id !== taskId || task.isDone) return task;
         expGained = task.exp;
+        completedTaskTitle = task.title || taskId;
         return {
             ...task,
             isDone: true,
@@ -181,6 +184,10 @@ function applyDashboardTaskCompletion(current, taskId) {
         };
     }
 
+    if (awardXp) {
+        addXp(expGained, `Dashboard task: ${completedTaskTitle}`);
+    }
+
     let streak = current.streak;
     let lastStreakDate = current.lastStreakDate;
 
@@ -188,7 +195,6 @@ function applyDashboardTaskCompletion(current, taskId) {
         streak += 1;
         lastStreakDate = today;
         streakGained = true;
-        xpStreakDaily();
     }
 
     return {
@@ -212,6 +218,10 @@ function applyDashboardTaskCompletion(current, taskId) {
 export function readDashboardProgress(userKey = 'guest') {
     const map = getStorageMap();
     const progress = ensureTodayProgress(map[userKey] || createDefaultProgress());
+    const currentXp = getXpData().totalXp;
+    if (Number.isFinite(currentXp) && currentXp > progress.totalXp) {
+        progress.totalXp = currentXp;
+    }
 
     map[userKey] = progress;
     saveStorageMap(map);
@@ -229,9 +239,10 @@ export async function syncDashboardProgressWithServer(userKey = 'guest') {
         const serverData = res;
         const map = getStorageMap();
         const progress = ensureTodayProgress(map[userKey] || createDefaultProgress());
+        const currentXp = getXpData().totalXp;
 
         let updated = false;
-        if (serverData.current_xp > progress.totalXp) {
+        if (serverData.current_xp > Math.max(progress.totalXp, currentXp)) {
             progress.totalXp = serverData.current_xp;
             updated = true;
         }
@@ -399,7 +410,7 @@ export function recordToeicFullTestProgress(totalScore) {
         };
     }
 
-    const completed = applyDashboardTaskCompletion(current, 'toeic-fulltest');
+    const completed = applyDashboardTaskCompletion(current, 'toeic-fulltest', { awardXp: false });
     return {
         ...finalizeTaskProgress(userKey, completed.nextProgress),
         expGained: completed.expGained,

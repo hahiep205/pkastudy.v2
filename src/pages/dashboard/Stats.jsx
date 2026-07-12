@@ -7,7 +7,7 @@ import {
     readDashboardProgress,
     syncDashboardProgressWithServer,
 } from '../../utils/dashboardProgress';
-import { syncXpWithServer } from '../../utils/xpSystem';
+import { XP_EVENT, getXpData, syncXpWithServer } from '../../utils/xpSystem';
 import axiosClient from '../../utils/axiosClient';
 import { isAuthenticatedUser } from '../../utils/userStorage';
 
@@ -18,6 +18,7 @@ export default function Stats() {
     const { customCourses } = useCustomCourses();
     const [leaderboard, setLeaderboard] = useState([]);
     const [courses, setCourses] = useState([]);
+    const [xpTotal, setXpTotal] = useState(() => getXpData().totalXp);
 
     const userKey = useMemo(() => getDashboardUserKey(user), [user]);
     const dashboardProgress = useMemo(() => readDashboardProgress(userKey), [userKey]);
@@ -49,6 +50,19 @@ export default function Stats() {
                 setCourses([]);
             });
     }, [isGuestUser, userKey]);
+
+    useEffect(() => {
+        const syncXpTotal = () => setXpTotal(getXpData().totalXp);
+
+        syncXpTotal();
+        window.addEventListener(XP_EVENT, syncXpTotal);
+        window.addEventListener('storage', syncXpTotal);
+
+        return () => {
+            window.removeEventListener(XP_EVENT, syncXpTotal);
+            window.removeEventListener('storage', syncXpTotal);
+        };
+    }, [userKey]);
 
     const customTotal = useMemo(
         () => customCourses.reduce((sum, topic) => sum + topic.words.length, 0),
@@ -87,7 +101,7 @@ export default function Stats() {
         },
         {
             label: 'Tổng EXP',
-            value: isGuestUser ? 'Null' : dashboardProgress.totalXp.toLocaleString('vi-VN'),
+            value: isGuestUser ? 'Null' : xpTotal.toLocaleString('vi-VN'),
             icon: '⚡',
             tone: 'blue',
         },

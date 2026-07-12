@@ -123,6 +123,9 @@ export function recordUserStatsSnapshot(userKey = 'guest', progress, options = {
     const rememberedTotal = Number.isFinite(options.rememberedTotal)
         ? options.rememberedTotal
         : getRememberedCount();
+    const currentXpTotal = Number.isFinite(getXpStorage()?.totalXp)
+        ? getXpStorage().totalXp
+        : (Number.isFinite(progress.totalXp) ? progress.totalXp : 0);
     const tasksCompleted = Array.isArray(progress.tasks) ? progress.tasks.filter((task) => task.isDone).length : 0;
     const taskTarget = Array.isArray(progress.tasks) ? progress.tasks.length : 0;
 
@@ -134,7 +137,7 @@ export function recordUserStatsSnapshot(userKey = 'guest', progress, options = {
             ? progress.learnedWordEventIdsToday.length
             : (Array.isArray(progress.learnedWordIdsToday) ? progress.learnedWordIdsToday.length : existingDay.learnedWords),
         rememberedTotal,
-        totalXp: Number.isFinite(progress.totalXp) ? progress.totalXp : existingDay.totalXp,
+        totalXp: currentXpTotal,
         streak: Number.isFinite(progress.streak) ? progress.streak : existingDay.streak,
         gamesPlayed: Number.isFinite(existingDay.gamesPlayed) ? existingDay.gamesPlayed : 0,
         tasksCompleted,

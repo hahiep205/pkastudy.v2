@@ -2,6 +2,7 @@ import axiosClient from './axiosClient';
 import { getStoredUser, getUserScopedJson, setUserScopedJson } from './userStorage';
 
 const XP_STORAGE_KEY = 'pka_xp_system_v1';
+export const XP_EVENT = 'pka-xp-updated';
 
 export const XP_REWARDS = {
   FLASHCARD_VIEW: 5,
@@ -34,6 +35,11 @@ function getStorage() {
 
 function saveStorage(data) {
   setUserScopedJson(XP_STORAGE_KEY, data);
+}
+
+function emitXpUpdate(detail = {}) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(XP_EVENT, { detail }));
 }
 
 function getDefault() {
@@ -118,6 +124,11 @@ export function addXp(amount, reason = '') {
   }
 
   saveStorage(data);
+  emitXpUpdate({
+    totalXp: data.totalXp,
+    xpGained: amount,
+    reason,
+  });
 
   return {
     totalXp: data.totalXp,
@@ -140,6 +151,7 @@ export async function syncXpWithServer() {
     if (serverData.current_xp > localData.totalXp) {
       localData.totalXp = serverData.current_xp;
       saveStorage(localData);
+      emitXpUpdate({ totalXp: localData.totalXp, source: 'sync' });
     }
   } catch (error) {
     console.error('Failed to sync progress:', error);
