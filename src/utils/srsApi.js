@@ -16,9 +16,16 @@ function getStoredUser() {
   }
 }
 
-export function getAuthToken() {
+function getStoredToken() {
+  const directToken = localStorage.getItem('token');
+  if (directToken) return directToken;
+
   const user = getStoredUser();
-  return user?.token || null;
+  return user?.token || user?.stsTokenManager?.accessToken || null;
+}
+
+export function getAuthToken() {
+  return getStoredToken();
 }
 
 export function hasServerSrsAccess() {
@@ -45,11 +52,40 @@ async function parseJsonResponse(response, fallbackMessage) {
   return payload;
 }
 
+function normalizePositiveInteger(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeFlashcardIds(flashcardIds) {
+  return [...new Set((flashcardIds || []).map(normalizePositiveInteger).filter(Boolean))];
+}
+
+function normalizeReviewItems(reviewItems) {
+  return (reviewItems || [])
+    .map((item) => {
+      if (!item) return null;
+
+      const flashcardId = normalizePositiveInteger(item.flashcard_id ?? item.flashcardId ?? item.id);
+      const quality = Number(item.quality);
+
+      if (!flashcardId || !Number.isInteger(quality) || quality < 0 || quality > 5) {
+        return null;
+      }
+
+      return {
+        flashcard_id: flashcardId,
+        quality,
+      };
+    })
+    .filter(Boolean);
+}
+
 export async function fetchDueReviews() {
   const response = await fetch(buildApiUrl('api/srs/due'), {
     headers: buildAuthHeaders(),
   });
-  const payload = await parseJsonResponse(response, 'Không thể tải danh sách ôn tập.');
+  const payload = await parseJsonResponse(response, 'Khong the tai danh sach on tap.');
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
@@ -57,27 +93,37 @@ export async function fetchReviewQueue() {
   const response = await fetch(buildApiUrl('api/srs/queue'), {
     headers: buildAuthHeaders(),
   });
-  const payload = await parseJsonResponse(response, 'KhĂ´ng thá»ƒ táº£i hĂ ng Ä‘á»£i Ă´n táº­p.');
+  const payload = await parseJsonResponse(response, 'Khong the tai hang doi on tap.');
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
 export async function enqueueImmediateReviews(flashcardIds) {
+  const normalizedFlashcardIds = normalizeFlashcardIds(flashcardIds);
+  if (normalizedFlashcardIds.length === 0) {
+    return [];
+  }
+
   const response = await fetch(buildApiUrl('api/srs/enqueue'), {
     method: 'POST',
     headers: buildAuthHeaders(),
-    body: JSON.stringify({ flashcard_ids: flashcardIds }),
+    body: JSON.stringify({ flashcard_ids: normalizedFlashcardIds }),
   });
   const payload = await parseJsonResponse(response, 'Khong the dua tu vao hang doi SRS.');
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
 export async function submitSrsReviewBatch(reviewItems) {
+  const normalizedReviewItems = normalizeReviewItems(reviewItems);
+  if (normalizedReviewItems.length === 0) {
+    throw new Error('Invalid review payload');
+  }
+
   const response = await fetch(buildApiUrl('api/srs/review'), {
     method: 'POST',
     headers: buildAuthHeaders(),
-    body: JSON.stringify(reviewItems),
+    body: JSON.stringify(normalizedReviewItems),
   });
-  const payload = await parseJsonResponse(response, 'Không thể lưu kết quả ôn tập.');
+  const payload = await parseJsonResponse(response, 'Khong the luu ket qua on tap.');
   return Array.isArray(payload.data) ? payload.data : [];
 }
 
@@ -90,5 +136,5 @@ export function mapReviewRatingToQualityScore(rating) {
 }
 
 export function hasServerFlashcardId(word) {
-  return Number.isInteger(word?.flashcardId) && word.flashcardId > 0;
+  return normalizePositiveInteger(word?.flashcardId) !== null;
 }
